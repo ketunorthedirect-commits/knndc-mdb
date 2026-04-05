@@ -96,13 +96,13 @@ function addMember(data) {
   
   const lastRow = sheet.getLastRow();
   
-  // Append the member row (matching Excel columns: First Name, Surname, Party ID, Voter ID, Phone)
   sheet.appendRow([
     data.firstName   || '',
     data.lastName    || '',
     data.partyId     || '',
     data.voterId     || '',
     data.phone       || '',
+    data.ward        || '',   // NEW: Ward Name
     data.station     || '',
     data.stationCode || '',
     data.branch      || '',
@@ -178,36 +178,40 @@ function logAuditEntry(data) {
   return { success: true };
 }
 
-// ─── Setup Sheet Headers ─────────────────────────────────────
+// ─── Setup Sheet Headers (matches Excel export template) ─────
 function setupSheet(sheet) {
-  // Row 1: Title
-  sheet.getRange('A1').setValue('MEMBERSHIP DATABASE');
-  sheet.getRange('A1').setFontWeight('bold').setFontSize(14);
-  sheet.getRange('E1').setValue('Constituency: Ketu North');
+  // Row 1: Title — matches "MEMBERSHIP DATABASE" in template
+  sheet.getRange('A1:E1').merge();
+  sheet.getRange('A1').setValue('MEMBERSHIP DATABASE')
+    .setFontWeight('bold').setFontSize(14)
+    .setHorizontalAlignment('center');
   
-  // Row 2: Polling Station info
+  // Row 2: Polling Station / Constituency line (matches template row 2)
   sheet.getRange('A2').setValue('Polling Station / Branch Name:');
+  sheet.getRange('E2').setValue('Constituency: Ketu North');
   
-  // Row 3: Empty
+  // Row 3: Empty (matches template)
   
-  // Row 4: Column headers (matching Excel format)
-  const headers = [
-    'First Name','Surname','Party ID Number','Voter ID Number','Telephone Number',
-    'Polling Station','Station Code','Branch Name','Branch Code','Other Names',
-    'Officer ID','Officer Name','Date/Time Added','Record ID'
-  ];
-  sheet.getRange(4, 1, 1, headers.length).setValues([headers]);
-  sheet.getRange(4, 1, 1, headers.length).setFontWeight('bold').setBackground('#1a6b3a').setFontColor('white');
+  // Row 4: Column headers — EXACTLY matching template columns (A-E) + extra tracking cols
+  const coreHeaders = ['First Name', 'Surname', 'Party ID Number', 'Voter ID Number', 'Telephone Number'];
+  const extraHeaders = ['Ward Name', 'Polling Station', 'Station Code', 'Branch Name', 'Branch Code', 'Other Names', 'Officer ID', 'Officer Name', 'Date/Time Added', 'Record ID'];
+  const allHeaders = [...coreHeaders, ...extraHeaders];
   
-  // Freeze header rows
+  sheet.getRange(4, 1, 1, allHeaders.length).setValues([allHeaders]);
+  sheet.getRange(4, 1, 1, allHeaders.length)
+    .setFontWeight('bold')
+    .setBackground('#1a6b3a')
+    .setFontColor('white');
+  
+  // Highlight core 5 columns differently (matching template)
+  sheet.getRange(4, 1, 1, 5).setBackground('#134d2a');
+  
   sheet.setFrozenRows(4);
   
   // Column widths
-  sheet.setColumnWidth(1, 130); // First Name
-  sheet.setColumnWidth(2, 130); // Surname
-  sheet.setColumnWidth(3, 150); // Party ID
-  sheet.setColumnWidth(4, 150); // Voter ID
-  sheet.setColumnWidth(5, 140); // Phone
+  [130,130,150,150,140,120,140,100,130,110,130,100,150,180,160].forEach((w,i) => {
+    sheet.setColumnWidth(i+1, w);
+  });
 }
 
 // ─── Stats ───────────────────────────────────────────────────

@@ -6,6 +6,8 @@
   <title>Ketu North NDC Members Database</title>
   <link rel="stylesheet" href="css/styles.css">
   <link rel="icon" type="image/png" href="assets/ndc-logo.png">
+  <!-- SheetJS for Excel export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -23,16 +25,38 @@
       <div class="login-subtitle">KNNDCmdb · Constituency Members Portal</div>
     </div>
 
+    <!-- Lockout warning -->
+    <div id="lockout-banner" style="display:none;background:var(--ndc-red-pale);border:1px solid var(--ndc-red);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;text-align:center">
+      <div style="font-weight:700;color:var(--ndc-red-dk);font-size:14px">🔒 Account Temporarily Locked</div>
+      <div style="font-size:13px;color:var(--ndc-red-dk);margin-top:4px">Too many failed attempts. Try again in <strong id="lockout-timer">2:00</strong></div>
+    </div>
+
+    <!-- Attempt warning -->
+    <div id="attempt-warning" style="display:none;background:#fef3c7;border:1px solid #d97706;border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:13px;color:#92400e">
+      ⚠️ Incorrect credentials. <strong id="attempts-left"></strong> attempt(s) remaining before lockout.
+    </div>
+
     <div class="form-group" style="margin-bottom:14px">
       <label for="login-username">Username <span class="required">*</span></label>
       <input type="text" id="login-username" placeholder="Enter your username" autocomplete="username">
     </div>
-    <div class="form-group" style="margin-bottom:20px">
+    <div class="form-group" style="margin-bottom:8px">
       <label for="login-password">Password <span class="required">*</span></label>
-      <input type="password" id="login-password" placeholder="Enter your password" autocomplete="current-password"
-        onkeydown="if(event.key==='Enter') doLogin()">
+      <div style="position:relative">
+        <input type="password" id="login-password" placeholder="Enter your password" autocomplete="current-password"
+          onkeydown="if(event.key==='Enter') doLogin()" style="padding-right:46px">
+        <button type="button" id="show-pwd-btn" onclick="togglePassword()"
+          style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:18px;color:var(--gray-400);padding:0;line-height:1"
+          title="Show/hide password">👁️</button>
+      </div>
     </div>
-    <button class="btn btn-primary btn-lg" style="width:100%" onclick="doLogin()">
+    <div style="margin-bottom:20px;text-align:right">
+      <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--gray-500);cursor:pointer;text-transform:none;letter-spacing:0;font-weight:400">
+        <input type="checkbox" id="show-pwd-check" onchange="togglePassword()" style="width:auto;accent-color:var(--ndc-green)">
+        Show password
+      </label>
+    </div>
+    <button class="btn btn-primary btn-lg" id="login-btn" style="width:100%" onclick="doLogin()">
       🔐 Sign In
     </button>
 
@@ -158,28 +182,39 @@
 
           <!-- Auto-filled Section -->
           <div style="background:var(--ndc-green-pale);border:1px solid var(--ndc-green-lt);border-radius:var(--radius);padding:16px 20px;margin-bottom:24px">
-            <div style="font-size:12px;font-weight:600;color:var(--ndc-green-dk);margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px">
-              🔒 Auto-Configured Fields (set in Settings)
+            <div style="font-size:12px;font-weight:600;color:var(--ndc-green-dk);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">
+              🔍 Station Lookup — Search by Branch Code
             </div>
+            <div style="font-size:12px;color:var(--gray-500);margin-bottom:14px">
+              Type a Branch Code, Station Name or Ward below. The other fields will fill automatically.
+            </div>
+
+            <!-- Branch Code (search trigger) -->
+            <div class="form-group" style="margin-bottom:14px">
+              <label>Branch Code <span class="required">*</span> <span style="font-size:11px;font-weight:400;color:var(--ndc-green-dk);text-transform:none;letter-spacing:0">— start typing to search</span></label>
+              <div class="search-dropdown-wrap">
+                <input type="text" id="f-branch-code" placeholder="e.g. BR-001 or Aflao…" autocomplete="off">
+                <div id="branch-code-dropdown" class="search-dropdown"></div>
+              </div>
+            </div>
+
+            <!-- Auto-filled grid -->
             <div class="form-grid">
               <div class="form-group">
-                <label>Polling Station Name</label>
-                <input type="text" id="f-station-name" readonly class="auto-filled" placeholder="Configured in Settings">
+                <label>Ward Name</label>
+                <input type="text" id="f-ward-name" readonly class="auto-filled" placeholder="Auto-filled from selection">
               </div>
               <div class="form-group">
-                <label>Polling Station Code</label>
-                <input type="text" id="f-station-code" readonly class="auto-filled" placeholder="Auto-filled">
+                <label>Polling Station Name</label>
+                <input type="text" id="f-station-name" readonly class="auto-filled" placeholder="Auto-filled from selection">
               </div>
               <div class="form-group">
                 <label>Branch Name</label>
-                <div class="search-dropdown-wrap">
-                  <input type="text" id="f-branch-name" readonly class="auto-filled" placeholder="Configured in Settings">
-                  <div id="branch-dropdown" class="search-dropdown"></div>
-                </div>
+                <input type="text" id="f-branch-name" readonly class="auto-filled" placeholder="Auto-filled from selection">
               </div>
               <div class="form-group">
-                <label>Branch Code</label>
-                <input type="text" id="f-branch-code" readonly class="auto-filled" placeholder="Auto-filled">
+                <label>Polling Station Code</label>
+                <input type="text" id="f-station-code" readonly class="auto-filled" placeholder="Auto-filled from selection">
               </div>
             </div>
           </div>
@@ -516,24 +551,28 @@
 
           <!-- Polling Stations -->
           <div id="stab-stations" class="settings-tab" style="display:none">
-            <div class="card" style="margin-bottom:16px">
+              <div class="card" style="margin-bottom:16px">
               <div class="card-header"><div class="card-icon">➕</div><h3>Add Polling Station / Branch</h3></div>
               <div class="card-body">
                 <div class="form-grid">
                   <div class="form-group">
-                    <label>Station Name <span class="required">*</span></label>
-                    <input type="text" id="st-name" placeholder="e.g. Aflao Polling Station">
+                    <label>Ward Name <span class="required">*</span></label>
+                    <input type="text" id="st-ward" placeholder="e.g. Aflao Ward">
                   </div>
                   <div class="form-group">
-                    <label>Station Code <span class="required">*</span></label>
-                    <input type="text" id="st-code" placeholder="e.g. PS-001">
+                    <label>Station Name <span class="required">*</span></label>
+                    <input type="text" id="st-name" placeholder="e.g. Aflao A Polling Station">
                   </div>
                   <div class="form-group">
                     <label>Branch Name <span class="required">*</span></label>
                     <input type="text" id="st-branch" placeholder="e.g. Aflao Branch">
                   </div>
                   <div class="form-group">
-                    <label>Branch Code</label>
+                    <label>Station Code <span class="required">*</span></label>
+                    <input type="text" id="st-code" placeholder="e.g. PS-001">
+                  </div>
+                  <div class="form-group">
+                    <label>Branch Code <span class="required">*</span></label>
                     <input type="text" id="st-bcode" placeholder="e.g. BR-001">
                   </div>
                 </div>
@@ -714,14 +753,78 @@
 <script src="js/pages.js"></script>
 <script>
 
+// ── PASSWORD TOGGLE ──
+function togglePassword() {
+  const pwdInput = document.getElementById('login-password');
+  const check    = document.getElementById('show-pwd-check');
+  const isShown  = pwdInput.type === 'text';
+  pwdInput.type  = isShown ? 'password' : 'text';
+  if (check) check.checked = !isShown;
+}
+
+// ── LOCKOUT COUNTDOWN ──
+let _lockTimer = null;
+function startLockoutCountdown(seconds) {
+  const banner   = document.getElementById('lockout-banner');
+  const timerEl  = document.getElementById('lockout-timer');
+  const loginBtn = document.getElementById('login-btn');
+  const attemptW = document.getElementById('attempt-warning');
+  if (banner)   banner.style.display = 'block';
+  if (attemptW) attemptW.style.display = 'none';
+  if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = '🔒 Locked'; }
+
+  let remaining = seconds;
+  if (_lockTimer) clearInterval(_lockTimer);
+  _lockTimer = setInterval(() => {
+    remaining--;
+    const m = Math.floor(remaining / 60);
+    const s = remaining % 60;
+    if (timerEl) timerEl.textContent = `${m}:${String(s).padStart(2,'0')}`;
+    if (remaining <= 0) {
+      clearInterval(_lockTimer);
+      if (banner)   banner.style.display = 'none';
+      if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = '🔐 Sign In'; }
+    }
+  }, 1000);
+}
+
 // ── LOGIN HANDLER ──
 function doLogin() {
   const u = document.getElementById('login-username').value.trim();
   const p = document.getElementById('login-password').value;
-  if (!u||!p) { Toast.show('Error','Please enter username and password.','error'); return; }
-  if (App.login(u,p)) { App.showApp(); }
-  else Toast.show('Login Failed','Invalid username or password.','error');
+  if (!u || !p) { Toast.show('Error','Please enter username and password.','error'); return; }
+
+  const result = App.login(u, p);
+
+  if (result.success) {
+    document.getElementById('attempt-warning').style.display = 'none';
+    document.getElementById('lockout-banner').style.display  = 'none';
+    if (_lockTimer) clearInterval(_lockTimer);
+    App.showApp();
+
+  } else if (result.locked) {
+    startLockoutCountdown(result.seconds);
+    Toast.show('Account Locked', `Too many failed attempts. Wait ${Math.ceil(result.seconds/60)} minute(s).`, 'error', 6000);
+
+  } else if (result.failed) {
+    const w = document.getElementById('attempt-warning');
+    const al = document.getElementById('attempts-left');
+    if (w)  w.style.display = 'block';
+    if (al) al.textContent  = result.attemptsLeft;
+    Toast.show('Login Failed', `Invalid credentials. ${result.attemptsLeft} attempt(s) left.`, 'error');
+    document.getElementById('login-password').value = '';
+    document.getElementById('login-password').focus();
+  }
 }
+
+// Check if already locked on page load
+(function checkInitialLock() {
+  const lockData = JSON.parse(localStorage.getItem('knndc_lockout') || 'null');
+  if (lockData) {
+    const remaining = Math.ceil((lockData.until - Date.now()) / 1000);
+    if (remaining > 0) startLockoutCountdown(remaining);
+  }
+})();
 
 // ── SETTINGS TABS ──
 function setTab(el, tabId) {
