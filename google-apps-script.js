@@ -44,7 +44,7 @@ const LIGHT_GRN  = '#e8f5ec';
 // ════════════════════════════════════════════════════════════
 function setupSpreadsheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.setSpreadsheetName('KNNDCmdb – Ketu North NDC Members Database');
+  ss.rename('KNNDCmdb – Ketu North NDC Members Database'); // FIX 1: was ss.setSpreadsheetName()
 
   _setupMembersSheet(ss);
   _setupPollingStationsSheet(ss);
@@ -52,11 +52,11 @@ function setupSpreadsheet() {
   _setupAuditSheet(ss);
   _setupSummarySheet(ss);
 
-  // Reorder tabs
+  // Reorder tabs — FIX 3: split chained call into two statements
   const order = [SHEETS.MEMBERS, SHEETS.POLLING_STATIONS, SHEETS.USERS, SHEETS.AUDIT, SHEETS.SUMMARY];
   order.forEach((name, i) => {
     const s = ss.getSheetByName(name);
-    if (s) ss.setActiveSheet(s).moveActiveSheet(i + 1);
+    if (s) { ss.setActiveSheet(s); ss.moveActiveSheet(i + 1); }
   });
 
   Logger.log('✅ Setup complete! All tabs created successfully.');
@@ -92,9 +92,8 @@ function _setupMembersSheet(ss) {
   sheet.getRange(4, 1, 1, 5).setBackground(NDC_GREEN2); // darker for core cols
 
   sheet.setFrozenRows(4);
-  sheet.setFrozenColumns(2);
+  // FIX 2: Removed setFrozenColumns(2) — conflicts with merged cell A1:E1
 
-  // Alternating row colours (starting row 5 — formula driven via conditional format)
   // Column widths
   const widths = [130,130,160,160,150,120,150,100,140,110,130,100,160,180,160];
   widths.forEach((w,i) => sheet.setColumnWidth(i+1, w));
