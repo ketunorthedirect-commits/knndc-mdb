@@ -35,19 +35,20 @@ const DEFAULT_USERS = [
 ];
 
 const DEMO_POLLING_STATIONS = [
-  { code:'PS-001', name:'Aflao Polling Station',    branch:'Aflao Branch',   branchCode:'BR-001' },
-  { code:'PS-002', name:'Denu Polling Station',     branch:'Denu Branch',    branchCode:'BR-002' },
-  { code:'PS-003', name:'Agbozume Polling Station', branch:'Agbozume Branch',branchCode:'BR-003' },
-  { code:'PS-004', name:'Klikor Polling Station',   branch:'Klikor Branch',  branchCode:'BR-004' },
-  { code:'PS-005', name:'Adafienu Polling Station', branch:'Adafienu Branch',branchCode:'BR-005' },
+  { ward:'Aflao Ward',    code:'PS-001', name:'Aflao A Polling Station',    branch:'Aflao Branch',    branchCode:'BR-001' },
+  { ward:'Aflao Ward',    code:'PS-002', name:'Aflao B Polling Station',    branch:'Aflao Branch',    branchCode:'BR-001' },
+  { ward:'Denu Ward',     code:'PS-003', name:'Denu Polling Station',       branch:'Denu Branch',     branchCode:'BR-002' },
+  { ward:'Agbozume Ward', code:'PS-004', name:'Agbozume Polling Station',   branch:'Agbozume Branch', branchCode:'BR-003' },
+  { ward:'Klikor Ward',   code:'PS-005', name:'Klikor Polling Station',     branch:'Klikor Branch',   branchCode:'BR-004' },
+  { ward:'Adafienu Ward', code:'PS-006', name:'Adafienu Polling Station',   branch:'Adafienu Branch', branchCode:'BR-005' },
 ];
 
 const DEMO_MEMBERS = [
-  { id:'m001', firstName:'Kofi',    lastName:'Mensah',   otherNames:'Agyei',  partyId:'NDC-2024-001', voterId:'GH-V-001', phone:'0244001122', station:'Aflao Polling Station', stationCode:'PS-001', branch:'Aflao Branch', branchCode:'BR-001', officer:'officer1', timestamp:'2024-01-15 09:30:00' },
-  { id:'m002', firstName:'Abena',   lastName:'Korkor',   otherNames:'',       partyId:'NDC-2024-002', voterId:'GH-V-002', phone:'0244002233', station:'Aflao Polling Station', stationCode:'PS-001', branch:'Aflao Branch', branchCode:'BR-001', officer:'officer1', timestamp:'2024-01-15 10:15:00' },
-  { id:'m003', firstName:'Yaw',     lastName:'Tetteh',   otherNames:'Kwame',  partyId:'NDC-2024-003', voterId:'GH-V-003', phone:'0554003344', station:'Denu Polling Station',  stationCode:'PS-002', branch:'Denu Branch',  branchCode:'BR-002', officer:'officer2', timestamp:'2024-01-16 08:45:00' },
-  { id:'m004', firstName:'Akosua',  lastName:'Kporku',   otherNames:'',       partyId:'NDC-2024-004', voterId:'GH-V-004', phone:'0244004455', station:'Aflao Polling Station', stationCode:'PS-001', branch:'Aflao Branch', branchCode:'BR-001', officer:'officer1', timestamp:'2024-01-16 11:20:00' },
-  { id:'m005', firstName:'Efo',     lastName:'Dordor',   otherNames:'Selorm', partyId:'NDC-2024-005', voterId:'GH-V-005', phone:'0504005566', station:'Agbozume Polling Station',stationCode:'PS-003',branch:'Agbozume Branch',branchCode:'BR-003', officer:'officer1', timestamp:'2024-01-17 09:00:00' },
+  { id:'m001', firstName:'Kofi',    lastName:'Mensah',   otherNames:'Agyei',  partyId:'NDC-2024-001', voterId:'GH-V-001', phone:'0244001122', ward:'Aflao Ward',    station:'Aflao A Polling Station', stationCode:'PS-001', branch:'Aflao Branch', branchCode:'BR-001', officer:'officer1', timestamp:'2024-01-15 09:30:00' },
+  { id:'m002', firstName:'Abena',   lastName:'Korkor',   otherNames:'',       partyId:'NDC-2024-002', voterId:'GH-V-002', phone:'0244002233', ward:'Aflao Ward',    station:'Aflao A Polling Station', stationCode:'PS-001', branch:'Aflao Branch', branchCode:'BR-001', officer:'officer1', timestamp:'2024-01-15 10:15:00' },
+  { id:'m003', firstName:'Yaw',     lastName:'Tetteh',   otherNames:'Kwame',  partyId:'NDC-2024-003', voterId:'GH-V-003', phone:'0554003344', ward:'Denu Ward',     station:'Denu Polling Station',    stationCode:'PS-003', branch:'Denu Branch',  branchCode:'BR-002', officer:'officer2', timestamp:'2024-01-16 08:45:00' },
+  { id:'m004', firstName:'Akosua',  lastName:'Kporku',   otherNames:'',       partyId:'NDC-2024-004', voterId:'GH-V-004', phone:'0244004455', ward:'Aflao Ward',    station:'Aflao B Polling Station', stationCode:'PS-002', branch:'Aflao Branch', branchCode:'BR-001', officer:'officer1', timestamp:'2024-01-16 11:20:00' },
+  { id:'m005', firstName:'Efo',     lastName:'Dordor',   otherNames:'Selorm', partyId:'NDC-2024-005', voterId:'GH-V-005', phone:'0504005566', ward:'Agbozume Ward', station:'Agbozume Polling Station', stationCode:'PS-004',branch:'Agbozume Branch',branchCode:'BR-003', officer:'officer1', timestamp:'2024-01-17 09:00:00' },
 ];
 
 // ─── APP STATE ────────────────────────────────────────────────
@@ -132,13 +133,48 @@ const App = {
     this.showLogin();
   },
 
+  // ─── LOGIN WITH LOCKOUT ────────────────────────────────────
   login(username, password) {
+    const LOCK_KEY    = 'knndc_lockout';
+    const ATTEMPT_KEY = 'knndc_attempts';
+    const MAX_ATTEMPTS = 5;
+    const LOCK_MS      = 2 * 60 * 1000; // 2 minutes
+
+    // Check lockout
+    const lockData = JSON.parse(localStorage.getItem(LOCK_KEY) || 'null');
+    if (lockData) {
+      const remaining = lockData.until - Date.now();
+      if (remaining > 0) {
+        const secs = Math.ceil(remaining / 1000);
+        return { locked: true, seconds: secs };
+      } else {
+        localStorage.removeItem(LOCK_KEY);
+        localStorage.removeItem(ATTEMPT_KEY);
+      }
+    }
+
     const user = this.users.find(u => u.username === username && u.password === password && u.active);
-    if (!user) return false;
+
+    if (!user) {
+      // Track failed attempts
+      const attempts = (parseInt(localStorage.getItem(ATTEMPT_KEY) || '0')) + 1;
+      localStorage.setItem(ATTEMPT_KEY, attempts);
+      if (attempts >= MAX_ATTEMPTS) {
+        localStorage.setItem(LOCK_KEY, JSON.stringify({ until: Date.now() + LOCK_MS }));
+        localStorage.removeItem(ATTEMPT_KEY);
+        this.logAudit('LOCKOUT', `Account locked after ${MAX_ATTEMPTS} failed attempts for username: ${username}`, 'system');
+        return { locked: true, seconds: LOCK_MS / 1000 };
+      }
+      return { failed: true, attemptsLeft: MAX_ATTEMPTS - attempts };
+    }
+
+    // Success — clear attempts
+    localStorage.removeItem(ATTEMPT_KEY);
+    localStorage.removeItem(LOCK_KEY);
     this.currentUser = user;
     sessionStorage.setItem(LS.SESSION, JSON.stringify(user));
-    this.logAudit('LOGIN', `User logged in`, user.username);
-    return true;
+    this.logAudit('LOGIN', `User logged in successfully`, user.username);
+    return { success: true };
   },
 
   logout() {
