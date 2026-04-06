@@ -1,60 +1,59 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v1.2
+   KNNDCmdb – Core Application Logic  v1.3
    ============================================================ */
-
 'use strict';
 
-// ─── CONFIG ──────────────────────────────────────────────────
 const CONFIG = {
   SHEET_ID:      '',
   API_KEY:       '',
   SCRIPT_URL:    '',
   APP_NAME:      'Ketu North NDC Members Database',
-  APP_SHORT:     'KNNDCmdb',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '1.2.0',
-  INACTIVITY_MS: 10 * 60 * 1000,   // 10 minutes
+  VERSION:       '1.3.0',
+  INACTIVITY_MS: 10 * 60 * 1000,
+  DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default
 };
 
-// ─── LOCAL STORAGE KEYS ──────────────────────────────────────
 const LS = {
-  SESSION:   'knndc_session',
-  SETTINGS:  'knndc_settings',
-  OFFLINE_Q: 'knndc_offline_queue',
-  MEMBERS:   'knndc_members',        // persistent across all roles
-  USERS:     'knndc_users',
-  AUDIT:     'knndc_audit',
-  LOCKOUT:   'knndc_lockout',
-  ATTEMPTS:  'knndc_attempts',
+  SESSION:        'knndc_session',
+  SETTINGS:       'knndc_settings',
+  OFFLINE_Q:      'knndc_offline_queue',
+  MEMBERS:        'knndc_members',
+  USERS:          'knndc_users',
+  AUDIT:          'knndc_audit',
+  LOCKOUT:        'knndc_lockout',
+  ATTEMPTS:       'knndc_attempts',
+  DEMO_CLEARED:   'knndc_demo_cleared',  // flag: admin has cleared demo
 };
 
-// ─── DEMO DATA ───────────────────────────────────────────────
-const DEFAULT_USERS = [
-  { id:'u001', username:'admin',    password:'Admin@2026',  name:'System Administrator',   role:'admin',   ward:'', station:'', branch:'', assignedStations:[], active:true },
-  { id:'u002', username:'exec',     password:'Exec@2026',   name:'Constituency Executive',  role:'exec',    ward:'', station:'', branch:'', assignedStations:[], active:true },
-  { id:'u003', username:'ward1',    password:'Ward@2026',   name:'Ward Coordinator (Aflao)',role:'ward',    ward:'Aflao Ward',   station:'PS-001', branch:'Aflao Branch', assignedStations:['PS-001','PS-002'], active:true },
-  { id:'u004', username:'officer1', password:'Off1@2026',   name:'Data Entry Officer 1',    role:'officer', ward:'Aflao Ward',   station:'PS-001', branch:'Aflao Branch', assignedStations:['PS-001'], active:true },
-  { id:'u005', username:'officer2', password:'Off2@2026',   name:'Data Entry Officer 2',    role:'officer', ward:'Denu Ward',    station:'PS-003', branch:'Denu Branch',  assignedStations:['PS-003'], active:true },
+// ─── SYSTEM USERS (non-deletable admin + demo accounts) ──────
+const SYSTEM_USERS = [
+  { id:'u001', username:'admin',    password:CONFIG.DEFAULT_PASSWORD, name:'System Administrator',    role:'admin',   ward:'', station:'', branch:'', assignedStations:[], active:true, mustChangePassword:false, isSystem:true },
+  { id:'u002', username:'exec',     password:CONFIG.DEFAULT_PASSWORD, name:'Constituency Executive',  role:'exec',    ward:'', station:'', branch:'', assignedStations:[], active:true, mustChangePassword:true,  isSystem:true },
+  { id:'u003', username:'ward1',    password:CONFIG.DEFAULT_PASSWORD, name:'Ward Coordinator (Aflao)',role:'ward',    ward:'Aflao Ward', station:'PS-001', branch:'Aflao Branch', assignedStations:['PS-001','PS-002'], active:true, mustChangePassword:true, isSystem:false },
+  { id:'u004', username:'officer1', password:CONFIG.DEFAULT_PASSWORD, name:'Data Entry Officer 1',    role:'officer', ward:'Aflao Ward', station:'PS-001', branch:'Aflao Branch', assignedStations:['PS-001'], active:true, mustChangePassword:true, isSystem:false },
+  { id:'u005', username:'officer2', password:CONFIG.DEFAULT_PASSWORD, name:'Data Entry Officer 2',    role:'officer', ward:'Denu Ward',  station:'PS-003', branch:'Denu Branch',  assignedStations:['PS-003'], active:true, mustChangePassword:true, isSystem:false },
 ];
 
 const DEMO_POLLING_STATIONS = [
-  { ward:'Aflao Ward',    code:'PS-001', name:'Aflao A Polling Station',   branch:'Aflao Branch',    branchCode:'BR-001' },
-  { ward:'Aflao Ward',    code:'PS-002', name:'Aflao B Polling Station',   branch:'Aflao Branch',    branchCode:'BR-001' },
-  { ward:'Denu Ward',     code:'PS-003', name:'Denu Polling Station',      branch:'Denu Branch',     branchCode:'BR-002' },
-  { ward:'Agbozume Ward', code:'PS-004', name:'Agbozume Polling Station',  branch:'Agbozume Branch', branchCode:'BR-003' },
-  { ward:'Klikor Ward',   code:'PS-005', name:'Klikor Polling Station',    branch:'Klikor Branch',   branchCode:'BR-004' },
-  { ward:'Adafienu Ward', code:'PS-006', name:'Adafienu Polling Station',  branch:'Adafienu Branch', branchCode:'BR-005' },
+  { zone:'Zone A', ward:'Aflao Ward',    code:'PS-001', name:'Aflao A Polling Station',   branch:'Aflao Branch',    branchCode:'BR-001' },
+  { zone:'Zone A', ward:'Aflao Ward',    code:'PS-002', name:'Aflao B Polling Station',   branch:'Aflao Branch',    branchCode:'BR-001' },
+  { zone:'Zone B', ward:'Denu Ward',     code:'PS-003', name:'Denu Polling Station',      branch:'Denu Branch',     branchCode:'BR-002' },
+  { zone:'Zone B', ward:'Agbozume Ward', code:'PS-004', name:'Agbozume Polling Station',  branch:'Agbozume Branch', branchCode:'BR-003' },
+  { zone:'Zone C', ward:'Klikor Ward',   code:'PS-005', name:'Klikor Polling Station',    branch:'Klikor Branch',   branchCode:'BR-004' },
+  { zone:'Zone C', ward:'Adafienu Ward', code:'PS-006', name:'Adafienu Polling Station',  branch:'Adafienu Branch', branchCode:'BR-005' },
 ];
 
-const SEED_MEMBERS = [
-  { id:'m001', firstName:'Kofi',   lastName:'Mensah',  otherNames:'Agyei',  partyId:'NDC-2024-001', voterId:'GH-V-001', phone:'0244001122', ward:'Aflao Ward',    station:'Aflao A Polling Station',  stationCode:'PS-001', branch:'Aflao Branch',    branchCode:'BR-001', officer:'officer1', officerName:'Data Entry Officer 1', timestamp:'15/01/2024, 09:30:00' },
-  { id:'m002', firstName:'Abena',  lastName:'Korkor',  otherNames:'',       partyId:'NDC-2024-002', voterId:'GH-V-002', phone:'0244002233', ward:'Aflao Ward',    station:'Aflao A Polling Station',  stationCode:'PS-001', branch:'Aflao Branch',    branchCode:'BR-001', officer:'officer1', officerName:'Data Entry Officer 1', timestamp:'15/01/2024, 10:15:00' },
-  { id:'m003', firstName:'Yaw',    lastName:'Tetteh',  otherNames:'Kwame',  partyId:'NDC-2024-003', voterId:'GH-V-003', phone:'0554003344', ward:'Denu Ward',     station:'Denu Polling Station',     stationCode:'PS-003', branch:'Denu Branch',     branchCode:'BR-002', officer:'officer2', officerName:'Data Entry Officer 2', timestamp:'16/01/2024, 08:45:00' },
-  { id:'m004', firstName:'Akosua', lastName:'Kporku',  otherNames:'',       partyId:'NDC-2024-004', voterId:'GH-V-004', phone:'0244004455', ward:'Aflao Ward',    station:'Aflao B Polling Station',  stationCode:'PS-002', branch:'Aflao Branch',    branchCode:'BR-001', officer:'officer1', officerName:'Data Entry Officer 1', timestamp:'16/01/2024, 11:20:00' },
-  { id:'m005', firstName:'Efo',    lastName:'Dordor',  otherNames:'Selorm', partyId:'NDC-2024-005', voterId:'GH-V-005', phone:'0504005566', ward:'Agbozume Ward', station:'Agbozume Polling Station', stationCode:'PS-004', branch:'Agbozume Branch', branchCode:'BR-003', officer:'officer1', officerName:'Data Entry Officer 1', timestamp:'17/01/2024, 09:00:00' },
+// Demo members — only present before admin clears demo data
+const DEMO_MEMBERS = [
+  { id:'m001', firstName:'Kofi',   lastName:'Mensah',  otherNames:'Agyei',  gender:'Male',   zone:'Zone A', partyId:'NDC-2024-001', voterId:'GH-V-001', phone:'0244001122', ward:'Aflao Ward',    station:'Aflao A Polling Station',  stationCode:'PS-001', branch:'Aflao Branch',    branchCode:'BR-001', officer:'officer1', officerName:'Data Entry Officer 1', timestamp:'15/01/2024, 09:30:00', _demo:true },
+  { id:'m002', firstName:'Abena',  lastName:'Korkor',  otherNames:'',       gender:'Female', zone:'Zone A', partyId:'NDC-2024-002', voterId:'GH-V-002', phone:'0244002233', ward:'Aflao Ward',    station:'Aflao A Polling Station',  stationCode:'PS-001', branch:'Aflao Branch',    branchCode:'BR-001', officer:'officer1', officerName:'Data Entry Officer 1', timestamp:'15/01/2024, 10:15:00', _demo:true },
+  { id:'m003', firstName:'Yaw',    lastName:'Tetteh',  otherNames:'Kwame',  gender:'Male',   zone:'Zone B', partyId:'NDC-2024-003', voterId:'GH-V-003', phone:'0554003344', ward:'Denu Ward',     station:'Denu Polling Station',     stationCode:'PS-003', branch:'Denu Branch',     branchCode:'BR-002', officer:'officer2', officerName:'Data Entry Officer 2', timestamp:'16/01/2024, 08:45:00', _demo:true },
+  { id:'m004', firstName:'Akosua', lastName:'Kporku',  otherNames:'',       gender:'Female', zone:'Zone A', partyId:'NDC-2024-004', voterId:'GH-V-004', phone:'0244004455', ward:'Aflao Ward',    station:'Aflao B Polling Station',  stationCode:'PS-002', branch:'Aflao Branch',    branchCode:'BR-001', officer:'officer1', officerName:'Data Entry Officer 1', timestamp:'16/01/2024, 11:20:00', _demo:true },
+  { id:'m005', firstName:'Efo',    lastName:'Dordor',  otherNames:'Selorm', gender:'Male',   zone:'Zone B', partyId:'NDC-2024-005', voterId:'GH-V-005', phone:'0504005566', ward:'Agbozume Ward', station:'Agbozume Polling Station', stationCode:'PS-004', branch:'Agbozume Branch', branchCode:'BR-003', officer:'officer1', officerName:'Data Entry Officer 1', timestamp:'17/01/2024, 09:00:00', _demo:true },
 ];
 
-// ─── APP STATE ────────────────────────────────────────────────
+// ─── APP ─────────────────────────────────────────────────────
 const App = {
   currentUser:      null,
   currentPage:      'login',
@@ -66,6 +65,7 @@ const App = {
   offlineQueue:     [],
   isOnline:         navigator.onLine,
   _inactivityTimer: null,
+  _syncInterval:    null,
 
   init() {
     this.loadSettings();
@@ -75,7 +75,7 @@ const App = {
     this.checkSession();
   },
 
-  // ── SETTINGS ──
+  // ── SETTINGS ──────────────────────────────────────────────
   loadSettings() {
     const saved = JSON.parse(localStorage.getItem(LS.SETTINGS) || '{}');
     this.settings = {
@@ -90,17 +90,24 @@ const App = {
   },
   saveSettings() { localStorage.setItem(LS.SETTINGS, JSON.stringify(this.settings)); },
 
-  // ── DATA LOADING — persistent across logins ──
+  // ── DATA LOADING ──────────────────────────────────────────
   loadData() {
-    // Users
     const su = localStorage.getItem(LS.USERS);
-    this.users = su ? JSON.parse(su) : DEFAULT_USERS;
+    this.users = su ? JSON.parse(su) : JSON.parse(JSON.stringify(SYSTEM_USERS));
     if (!su) this.saveUsers();
 
-    // Members — ALWAYS from localStorage; never overwrite if data exists
     const sm = localStorage.getItem(LS.MEMBERS);
-    this.members = sm ? JSON.parse(sm) : SEED_MEMBERS;
-    if (!sm) this.saveMembers();
+    const demoCleared = localStorage.getItem(LS.DEMO_CLEARED);
+    if (sm) {
+      this.members = JSON.parse(sm);
+    } else if (!demoCleared) {
+      // First ever load — seed demo data
+      this.members = JSON.parse(JSON.stringify(DEMO_MEMBERS));
+      this.saveMembers();
+    } else {
+      this.members = [];
+      this.saveMembers();
+    }
 
     this.auditLog     = JSON.parse(localStorage.getItem(LS.AUDIT)    || '[]');
     this.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q)|| '[]');
@@ -117,20 +124,19 @@ const App = {
     document.title = n;
   },
 
-  // ── NETWORK ──
+  // ── NETWORK ───────────────────────────────────────────────
   setupNetworkListeners() {
     window.addEventListener('online',  () => { this.isOnline = true;  this.updateOnlineStatus(); this.flushOfflineQueue(); });
     window.addEventListener('offline', () => { this.isOnline = false; this.updateOnlineStatus(); });
     this.updateOnlineStatus();
   },
   updateOnlineStatus() {
-    const banner = document.getElementById('offline-banner');
-    const dot    = document.getElementById('conn-dot');
-    if (banner) banner.classList.toggle('show', !this.isOnline);
-    if (dot)    dot.className = this.isOnline ? 'online-dot' : 'offline-dot';
+    document.getElementById('offline-banner')?.classList.toggle('show', !this.isOnline);
+    const dot = document.getElementById('conn-dot');
+    if (dot) dot.className = this.isOnline ? 'online-dot' : 'offline-dot';
   },
 
-  // ── SESSION ──
+  // ── SESSION / INACTIVITY ──────────────────────────────────
   checkSession() {
     const s = sessionStorage.getItem(LS.SESSION);
     if (s) {
@@ -139,68 +145,106 @@ const App = {
     this.showLogin();
   },
 
-  // ── INACTIVITY TIMER ──
   resetInactivityTimer() {
     if (this._inactivityTimer) clearTimeout(this._inactivityTimer);
     this._inactivityTimer = setTimeout(() => {
       if (!this.currentUser) return;
-      this.logAudit('AUTO_LOGOUT', 'Session expired — 10 minutes inactivity', this.currentUser.username);
-      Toast.show('Session Expired', 'Logged out after 10 minutes of inactivity.', 'warning', 5000);
+      this.logAudit('AUTO_LOGOUT','Session expired — 10 min inactivity', this.currentUser.username);
+      Toast.show('Session Expired','Logged out after 10 minutes of inactivity.','warning', 5000);
       setTimeout(() => this.logout(), 1800);
     }, CONFIG.INACTIVITY_MS);
   },
-
   setupInactivityTracking() {
-    ['mousemove','keydown','mousedown','touchstart','scroll','click'].forEach(evt =>
-      document.addEventListener(evt, () => this.resetInactivityTimer(), { passive: true })
+    ['mousemove','keydown','mousedown','touchstart','scroll','click'].forEach(e =>
+      document.addEventListener(e, () => this.resetInactivityTimer(), { passive:true })
     );
     this.resetInactivityTimer();
   },
-
   stopInactivityTracking() {
     if (this._inactivityTimer) clearTimeout(this._inactivityTimer);
     this._inactivityTimer = null;
   },
 
-  // ── AUTH ──
+  // ── AUTH ──────────────────────────────────────────────────
   login(username, password) {
     const MAX = 5, LOCK_MS = 2 * 60 * 1000;
-
     const lockData = JSON.parse(localStorage.getItem(LS.LOCKOUT) || 'null');
     if (lockData) {
       const rem = lockData.until - Date.now();
-      if (rem > 0) return { locked: true, seconds: Math.ceil(rem / 1000) };
+      if (rem > 0) return { locked:true, seconds:Math.ceil(rem/1000) };
       localStorage.removeItem(LS.LOCKOUT);
       localStorage.removeItem(LS.ATTEMPTS);
     }
 
-    // Re-load users from storage in case admin changed passwords
-    this.users = JSON.parse(localStorage.getItem(LS.USERS) || 'null') || DEFAULT_USERS;
+    this.users = JSON.parse(localStorage.getItem(LS.USERS) || 'null') || JSON.parse(JSON.stringify(SYSTEM_USERS));
     const user = this.users.find(u => u.username === username && u.password === password && u.active);
 
     if (!user) {
-      const n = (parseInt(localStorage.getItem(LS.ATTEMPTS) || '0')) + 1;
+      const n = (parseInt(localStorage.getItem(LS.ATTEMPTS)||'0')) + 1;
       localStorage.setItem(LS.ATTEMPTS, n);
       if (n >= MAX) {
         localStorage.setItem(LS.LOCKOUT, JSON.stringify({ until: Date.now() + LOCK_MS }));
         localStorage.removeItem(LS.ATTEMPTS);
-        this.logAudit('LOCKOUT', `Locked after ${MAX} failed attempts — username: ${username}`, 'system');
-        return { locked: true, seconds: LOCK_MS / 1000 };
+        this.logAudit('LOCKOUT', `Locked after ${MAX} failed attempts for: ${username}`, 'system');
+        return { locked:true, seconds: LOCK_MS/1000 };
       }
-      return { failed: true, attemptsLeft: MAX - n };
+      return { failed:true, attemptsLeft: MAX - n };
     }
 
     localStorage.removeItem(LS.ATTEMPTS);
     localStorage.removeItem(LS.LOCKOUT);
     this.currentUser = user;
     sessionStorage.setItem(LS.SESSION, JSON.stringify(user));
-    this.logAudit('LOGIN', `Logged in successfully`, user.username);
-    return { success: true };
+    this.logAudit('LOGIN','Logged in successfully', user.username);
+
+    // Force password change on first login
+    if (user.mustChangePassword) return { success:true, mustChangePassword:true };
+    return { success:true };
+  },
+
+  // ── DEMO DATA CLEAR (admin trigger) ───────────────────────
+  clearDemoData() {
+    this.members = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]').filter(m => !m._demo);
+    this.saveMembers();
+    localStorage.setItem(LS.DEMO_CLEARED, '1');
+    this.logAudit('CLEAR_DEMO','Administrator cleared all demo data', this.currentUser?.username || 'admin');
+    Toast.show('Demo Data Cleared','All sample data has been removed. Only real records remain.','success', 5000);
+  },
+
+  // ── PASSWORD MANAGEMENT ───────────────────────────────────
+  changePassword(userId, newPassword) {
+    this.users = JSON.parse(localStorage.getItem(LS.USERS) || 'null') || [];
+    const u = this.users.find(x => x.id === userId);
+    if (!u) return false;
+    const old = u.password;
+    u.password = newPassword;
+    u.mustChangePassword = false;
+    // Update session too
+    if (this.currentUser?.id === userId) {
+      this.currentUser = { ...this.currentUser, password:newPassword, mustChangePassword:false };
+      sessionStorage.setItem(LS.SESSION, JSON.stringify(this.currentUser));
+    }
+    this.saveUsers();
+    this.logAudit('PASSWORD_CHANGE', `Password changed for user: ${u.username}`, u.username);
+    return true;
+  },
+
+  resetPasswordToDefault(userId) {
+    this.users = JSON.parse(localStorage.getItem(LS.USERS) || 'null') || [];
+    const u = this.users.find(x => x.id === userId);
+    if (!u) return false;
+    u.password = CONFIG.DEFAULT_PASSWORD;
+    u.mustChangePassword = true;
+    this.saveUsers();
+    this.logAudit('PASSWORD_RESET', `Password reset to default for: ${u.username}`, this.currentUser.username);
+    Toast.show('Password Reset', `${u.name}'s password reset to default. They must change it on next login.`, 'success');
+    return true;
   },
 
   logout() {
-    this.logAudit('LOGOUT', 'User logged out', this.currentUser?.username);
+    this.logAudit('LOGOUT','User logged out', this.currentUser?.username);
     this.stopInactivityTracking();
+    if (this._syncInterval) { clearInterval(this._syncInterval); this._syncInterval = null; }
     this.currentUser = null;
     sessionStorage.removeItem(LS.SESSION);
     this.showLogin();
@@ -213,26 +257,135 @@ const App = {
   },
 
   showApp() {
+    // Check if admin needs to see demo-clear prompt
+    const demoCleared = localStorage.getItem(LS.DEMO_CLEARED);
+    if (this.currentUser?.role === 'admin' && !demoCleared) {
+      const hasDemo = (JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]')).some(m => m._demo);
+      if (hasDemo) {
+        // Show demo clear prompt AFTER app renders
+        setTimeout(() => Modal.open('modal-demo-clear'), 600);
+      }
+    }
+
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app-shell').style.display    = 'flex';
     document.getElementById('app-shell').style.flexDirection = 'column';
     this.renderNav();
     this.renderUserHeader();
     this.setupInactivityTracking();
+
+    // Periodic sync from Sheets every 2 minutes if connected
+    this._startSyncTimer();
     this.navigate('dashboard');
   },
 
-  // ── ROLE ACCESS ──
+  _startSyncTimer() {
+    if (this._syncInterval) clearInterval(this._syncInterval);
+    if (this.settings.scriptUrl) {
+      this._syncInterval = setInterval(() => this.fetchFromSheets(), 2 * 60 * 1000);
+      // Also fetch immediately on login
+      this.fetchFromSheets();
+    }
+  },
+
+  // ── FETCH FROM GOOGLE SHEETS (bidirectional sync) ─────────
+  async fetchFromSheets() {
+    if (!this.isOnline || !this.settings.scriptUrl) return;
+    try {
+      const url = this.settings.scriptUrl + '?action=getMembers&t=' + Date.now();
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!data?.members?.length) return;
+
+      // Merge sheet records with local records — sheet is source of truth
+      const local = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+      const localIds = new Set(local.map(m => m.id || m['Record ID']));
+      const demoCleared = localStorage.getItem(LS.DEMO_CLEARED);
+
+      let merged = [...local.filter(m => !m._demo || !demoCleared)];
+      let added = 0;
+
+      data.members.forEach(sheetRow => {
+        // Normalise sheet columns to app field names
+        const norm = this._normaliseSheetRow(sheetRow);
+        if (!norm.id) return;
+        if (!localIds.has(norm.id)) {
+          merged.unshift(norm);
+          added++;
+        } else {
+          // Update existing from sheet (sheet wins)
+          const idx = merged.findIndex(m => m.id === norm.id);
+          if (idx >= 0) merged[idx] = { ...merged[idx], ...norm };
+        }
+      });
+
+      if (added > 0) {
+        merged.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+        this.members = merged;
+        this.saveMembers();
+        Toast.show('Synced from Sheets', `${added} new record(s) pulled from Google Sheets.`, 'info', 3000);
+        // Refresh current page
+        if (['dashboard','records','my-records','reports','analytics'].includes(this.currentPage)) {
+          PageRenderers[this.currentPage]?.();
+        }
+      }
+
+      // Also fetch polling stations from sheet
+      const stationsRes = await fetch(this.settings.scriptUrl + '?action=getStations&t=' + Date.now());
+      const stationsData = await stationsRes.json();
+      if (stationsData?.stations?.length) {
+        const merged = [...this.pollingStations];
+        stationsData.stations.forEach(s => {
+          if (!merged.find(ps => ps.code === s.code)) merged.push(s);
+        });
+        this.pollingStations = merged;
+        this.settings.pollingStations = merged;
+        this.saveSettings();
+      }
+    } catch(e) {
+      // Silent fail — offline will handle it
+    }
+  },
+
+  _normaliseSheetRow(row) {
+    // Handle both named-column objects from Apps Script and raw arrays
+    const g = (keys) => {
+      for (const k of keys) {
+        const val = row[k];
+        if (val !== undefined && val !== null && val !== '') return String(val).trim();
+      }
+      return '';
+    };
+    return {
+      id:          g(['Record ID','id','ID']),
+      firstName:   g(['First Name','firstName']),
+      lastName:    g(['Surname','lastName','Last Name']),
+      otherNames:  g(['Other Names','otherNames']),
+      gender:      g(['Gender','gender']),
+      zone:        g(['Zone','zone']),
+      partyId:     g(['Party ID Number','partyId']),
+      voterId:     g(['Voter ID Number','voterId']),
+      phone:       g(['Telephone Number','phone']),
+      ward:        g(['Ward Name','ward']),
+      station:     g(['Polling Station','station']),
+      stationCode: g(['Station Code','stationCode']),
+      branch:      g(['Branch Name','branch']),
+      branchCode:  g(['Branch Code','branchCode']),
+      officer:     g(['Officer ID','officer']),
+      officerName: g(['Officer Name','officerName']),
+      timestamp:   g(['Date/Time Added','timestamp']),
+      _fromSheet:  true,
+    };
+  },
+
+  // ── ROLE ACCESS ───────────────────────────────────────────
   ROLE_PAGES: {
     officer: ['dashboard','entry','my-records'],
     ward:    ['dashboard','records','reports'],
     exec:    ['dashboard','records','reports','analytics'],
     admin:   ['dashboard','entry','records','reports','analytics','audit','users','settings'],
   },
-
-  canAccess(page) {
-    return (this.ROLE_PAGES[this.currentUser?.role] || []).includes(page);
-  },
+  canAccess(page) { return (this.ROLE_PAGES[this.currentUser?.role]||[]).includes(page); },
 
   navigate(page) {
     if (!this.canAccess(page)) { Toast.show('Access Denied','You do not have permission.','error'); return; }
@@ -248,15 +401,15 @@ const App = {
     const nav = document.getElementById('main-nav');
     if (!nav || !this.currentUser) return;
     const pages = [
-      { id:'dashboard', icon:'📊', label:'Dashboard' },
-      { id:'entry',     icon:'✍️',  label:'Data Entry' },
-      { id:'my-records',icon:'📋', label:'My Records' },
+      { id:'dashboard', icon:'📊', label:'Dashboard'  },
+      { id:'entry',     icon:'✍️',  label:'Data Entry'  },
+      { id:'my-records',icon:'📋', label:'My Records'  },
       { id:'records',   icon:'🗃️',  label:'All Records' },
-      { id:'reports',   icon:'📈', label:'Reports' },
-      { id:'analytics', icon:'🔬', label:'Analytics' },
-      { id:'audit',     icon:'🛡️',  label:'Audit Log' },
-      { id:'users',     icon:'👥', label:'User Mgmt' },
-      { id:'settings',  icon:'⚙️',  label:'Settings' },
+      { id:'reports',   icon:'📈', label:'Reports'     },
+      { id:'analytics', icon:'🔬', label:'Analytics'   },
+      { id:'audit',     icon:'🛡️',  label:'Audit Log'   },
+      { id:'users',     icon:'👥', label:'User Mgmt'   },
+      { id:'settings',  icon:'⚙️',  label:'Settings'    },
     ];
     nav.innerHTML = pages.filter(p => this.canAccess(p.id)).map(p =>
       `<a class="nav-link" data-page="${p.id}" onclick="App.navigate('${p.id}')">
@@ -268,132 +421,118 @@ const App = {
   renderUserHeader() {
     const u = this.currentUser;
     if (!u) return;
-    const initials  = u.name.split(' ').map(n => n[0]).slice(0, 2).join('');
-    const roleLabel = { officer:'Data Entry Officer', ward:'Ward Coordinator', exec:'Constituency Executive', admin:'System Administrator' }[u.role] || u.role;
+    const initials = u.name.split(' ').map(n=>n[0]).slice(0,2).join('');
+    const rl = {officer:'Data Entry Officer',ward:'Ward Coordinator',exec:'Constituency Executive',admin:'System Administrator'}[u.role]||u.role;
     document.getElementById('user-avatar').textContent   = initials;
     document.getElementById('user-name-hdr').textContent = u.name;
-    document.getElementById('user-role-hdr').textContent = roleLabel;
+    document.getElementById('user-role-hdr').textContent = rl;
   },
 
-  // ── MEMBER CRUD ──
+  // ── MEMBER CRUD ───────────────────────────────────────────
   addMember(data) {
-    const member = {
-      id: 'm' + Date.now(),
-      ...data,
-      officer:     this.currentUser.username,
-      officerName: this.currentUser.name,
-      timestamp:   new Date().toLocaleString('en-GH'),
-    };
-    // Always re-read from storage first to avoid overwriting concurrent records
-    this.members = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+    const member = { id:'m'+Date.now(), ...data, officer:this.currentUser.username, officerName:this.currentUser.name, timestamp:new Date().toLocaleString('en-GH') };
+    this.members = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
     this.members.unshift(member);
     this.saveMembers();
-    this.logAudit('ADD_MEMBER', `Added: ${data.firstName} ${data.lastName} (${data.partyId}) — ${data.station}`, this.currentUser.username);
-    if (this.isOnline && this.settings.scriptUrl) {
-      this.syncToSheets(member);
-    } else {
-      this.offlineQueue.push({ type:'add', data: member });
-      this.saveOfflineQ();
-      if (!this.isOnline) Toast.show('Saved Offline','Will sync when connection is restored.','warning');
-    }
+    this.logAudit('ADD_MEMBER',`Added: ${data.firstName} ${data.lastName} (${data.partyId}) — ${data.station}`, this.currentUser.username);
+    if (this.isOnline && this.settings.scriptUrl) this.syncToSheets(member);
+    else { this.offlineQueue.push({type:'add',data:member}); this.saveOfflineQ(); if(!this.isOnline) Toast.show('Saved Offline','Will sync when online.','warning'); }
     return member;
   },
 
   updateMember(id, updates, reason) {
-    this.members = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
-    const idx = this.members.findIndex(m => m.id === id);
-    if (idx < 0) return;
-    const before = { ...this.members[idx] };
-    this.members[idx] = { ...this.members[idx], ...updates, lastModified: new Date().toLocaleString('en-GH'), modifiedBy: this.currentUser.username };
+    this.members = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
+    const idx = this.members.findIndex(m=>m.id===id);
+    if (idx<0) return;
+    const before = {...this.members[idx]};
+    this.members[idx] = {...this.members[idx],...updates, lastModified:new Date().toLocaleString('en-GH'), modifiedBy:this.currentUser.username};
     this.saveMembers();
-    this.logAudit('EDIT_MEMBER', `Edited: ${before.firstName} ${before.lastName}. Reason: ${reason}`, this.currentUser.username, { before, after: this.members[idx], reason });
+    this.logAudit('EDIT_MEMBER',`Edited: ${before.firstName} ${before.lastName}. Reason: ${reason}`, this.currentUser.username, {before, after:this.members[idx], reason});
   },
 
   deleteMember(id, reason) {
-    this.members = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
-    const m = this.members.find(m => m.id === id);
-    this.members = this.members.filter(m => m.id !== id);
+    this.members = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
+    const m = this.members.find(m=>m.id===id);
+    this.members = this.members.filter(m=>m.id!==id);
     this.saveMembers();
-    this.logAudit('DELETE_MEMBER', `Deleted: ${m?.firstName} ${m?.lastName} (${m?.partyId}). Reason: ${reason}`, this.currentUser.username);
+    this.logAudit('DELETE_MEMBER',`Deleted: ${m?.firstName} ${m?.lastName} (${m?.partyId}). Reason: ${reason}`, this.currentUser.username);
   },
 
-  // ── DATA VISIBILITY — always fresh from storage ──
   getMembersForUser() {
-    const all = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+    const all = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
     this.members = all;
     const u = this.currentUser;
     if (!u) return [];
-    if (u.role === 'admin' || u.role === 'exec') return all;
-    const codes = (u.assignedStations || []).length ? u.assignedStations : (u.station ? [u.station] : []);
-    if (u.role === 'ward')    return all.filter(m => codes.includes(m.stationCode) || m.ward === u.ward || m.branch === u.branch);
-    if (u.role === 'officer') return all.filter(m => m.officer === u.username || codes.includes(m.stationCode));
+    if (u.role==='admin'||u.role==='exec') return all;
+    const codes = (u.assignedStations||[]).length ? u.assignedStations : (u.station?[u.station]:[]);
+    if (u.role==='ward')    return all.filter(m=>codes.includes(m.stationCode)||m.ward===u.ward||m.branch===u.branch);
+    if (u.role==='officer') return all.filter(m=>m.officer===u.username||codes.includes(m.stationCode));
     return [];
   },
 
-  // ── AUDIT ──
-  logAudit(action, details, user, extra = {}) {
-    const entry = { id:'a'+Date.now(), action, details, user: user || 'system', timestamp: new Date().toLocaleString('en-GH'), ...extra };
-    this.auditLog = JSON.parse(localStorage.getItem(LS.AUDIT) || '[]');
+  logAudit(action, details, user, extra={}) {
+    const entry = {id:'a'+Date.now(),action,details,user:user||'system',timestamp:new Date().toLocaleString('en-GH'),...extra};
+    this.auditLog = JSON.parse(localStorage.getItem(LS.AUDIT)||'[]');
     this.auditLog.unshift(entry);
-    if (this.auditLog.length > 10000) this.auditLog = this.auditLog.slice(0, 10000);
+    if (this.auditLog.length>10000) this.auditLog=this.auditLog.slice(0,10000);
     this.saveAudit();
   },
 
-  // ── STATS ──
   getStats() {
     const all   = this.getMembersForUser();
     const today = new Date().toLocaleDateString('en-GH');
-    const byStation = {};
-    all.forEach(m => { byStation[m.station] = (byStation[m.station] || 0) + 1; });
-    const byDay = {};
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(); d.setDate(d.getDate() - i);
-      const key = d.toLocaleDateString('en-GH');
-      byDay[key] = all.filter(m => m.timestamp?.includes(key)).length;
+    const byStation={}, byDay={}, byGender={Male:0,Female:0,Other:0}, byZone={};
+    all.forEach(m => {
+      byStation[m.station] = (byStation[m.station]||0)+1;
+      const g = m.gender==='Male'?'Male':m.gender==='Female'?'Female':'Other';
+      byGender[g]++;
+      if (m.zone) byZone[m.zone] = (byZone[m.zone]||0)+1;
+    });
+    for (let i=6;i>=0;i--) {
+      const d=new Date(); d.setDate(d.getDate()-i);
+      const key=d.toLocaleDateString('en-GH');
+      byDay[key]=all.filter(m=>m.timestamp?.includes(key)).length;
     }
-    return { total: all.length, today: all.filter(m => m.timestamp?.includes(today)).length, byStation, byDay, stations: Object.keys(byStation).length };
+    return { total:all.length, today:all.filter(m=>m.timestamp?.includes(today)).length, byStation, byDay, stations:Object.keys(byStation).length, byGender, byZone };
   },
 
-  // ── SYNC ──
   async syncToSheets(data) {
     if (!this.settings.scriptUrl) return;
-    try { await fetch(this.settings.scriptUrl, { method:'POST', body: JSON.stringify(data) }); }
-    catch(e) { this.offlineQueue.push({ type:'add', data }); this.saveOfflineQ(); }
+    try { await fetch(this.settings.scriptUrl,{method:'POST',body:JSON.stringify(data)}); }
+    catch(e) { this.offlineQueue.push({type:'add',data}); this.saveOfflineQ(); }
   },
 
   async flushOfflineQueue() {
-    if (!this.offlineQueue.length || !this.settings.scriptUrl) return;
-    Toast.show('Syncing', `Uploading ${this.offlineQueue.length} record(s)…`, 'info');
-    const failed = [];
+    if (!this.offlineQueue.length||!this.settings.scriptUrl) return;
+    Toast.show('Syncing',`Uploading ${this.offlineQueue.length} record(s)…`,'info');
+    const failed=[];
     for (const item of this.offlineQueue) {
       try { await this.syncToSheets(item.data); } catch(e) { failed.push(item); }
     }
-    this.offlineQueue = failed;
-    this.saveOfflineQ();
+    this.offlineQueue=failed; this.saveOfflineQ();
     if (!failed.length) Toast.show('Sync Complete','All records uploaded.','success');
   },
 };
 
 // ─── TOAST ───────────────────────────────────────────────────
 const Toast = {
-  show(title, msg = '', type = 'success', duration = 4000) {
+  show(title, msg='', type='success', duration=4000) {
     const c = document.getElementById('toast-container');
     if (!c) return;
-    const icons = { success:'✅', error:'❌', warning:'⚠️', info:'ℹ️' };
-    const t = document.createElement('div');
-    t.className = `toast ${type}`;
-    t.innerHTML = `<span class="toast-icon">${icons[type]||'✅'}</span>
+    const icons={success:'✅',error:'❌',warning:'⚠️',info:'ℹ️'};
+    const t=document.createElement('div');
+    t.className=`toast ${type}`;
+    t.innerHTML=`<span class="toast-icon">${icons[type]||'✅'}</span>
       <div class="toast-content"><div class="toast-title">${title}</div>${msg?`<div class="toast-msg">${msg}</div>`:''}</div>
       <button class="toast-close" onclick="this.parentElement.remove()">✕</button>`;
     c.appendChild(t);
-    setTimeout(() => { t.classList.add('hiding'); setTimeout(() => t.remove(), 300); }, duration);
+    setTimeout(()=>{t.classList.add('hiding');setTimeout(()=>t.remove(),300);},duration);
   }
 };
 
-// ─── MODAL ───────────────────────────────────────────────────
 const Modal = {
   open(id)   { document.getElementById(id)?.classList.add('open'); },
   close(id)  { document.getElementById(id)?.classList.remove('open'); },
-  closeAll() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open')); },
+  closeAll() { document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open')); },
 };
-document.addEventListener('click', e => { if (e.target.classList.contains('modal-overlay')) Modal.closeAll(); });
+document.addEventListener('click',e=>{ if(e.target.classList.contains('modal-overlay')) Modal.closeAll(); });
