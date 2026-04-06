@@ -46,14 +46,21 @@ const LIGHT_GRN  = '#e8f5ec';
 // ════════════════════════════════════════════════════════════
 function setupSpreadsheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.setSpreadsheetName('KNNDCmdb – Ketu North NDC Members Database');
+  ss.rename('KNNDCmdb – Ketu North NDC Members Database');
   _setupMembersSheet(ss);
   _setupPollingStationsSheet(ss);
   _setupUsersSheet(ss);
   _setupAuditSheet(ss);
   _setupSummarySheet(ss);
+  // Reorder tabs: activate each sheet then call moveActiveSheet on the spreadsheet
   const order = [SHEETS.MEMBERS, SHEETS.POLLING_STATIONS, SHEETS.USERS, SHEETS.AUDIT, SHEETS.SUMMARY];
-  order.forEach((name,i)=>{ const s=ss.getSheetByName(name); if(s) ss.setActiveSheet(s).moveActiveSheet(i+1); });
+  order.forEach((name, i) => {
+    const s = ss.getSheetByName(name);
+    if (s) {
+      ss.setActiveSheet(s);
+      ss.moveActiveSheet(i + 1);
+    }
+  });
   Logger.log('✅ Setup complete!');
   SpreadsheetApp.getUi().alert('✅ KNNDCmdb v1.3 Setup Complete!\n\nTabs created:\n• Members Database (with Zone & Gender columns)\n• Polling Stations (with Zone column)\n• Users\n• Audit Log\n• Summary\n\nNext: Deploy as Web App.');
 }
@@ -141,10 +148,15 @@ function _setupMembersSheet(ss) {
   if (!sheet) sheet = ss.insertSheet(SHEETS.MEMBERS);
   sheet.clear();
 
-  // Row 1: Title (matches Excel template format)
-  sheet.getRange('A1:E1').merge().setValue('MEMBERSHIP DATABASE')
+  // Row 1: Title — merge only columns A:A (no merge conflict with freeze)
+  sheet.getRange('A1').setValue('MEMBERSHIP DATABASE')
     .setFontFamily('Arial').setFontSize(16).setFontWeight('bold')
-    .setHorizontalAlignment('center').setBackground(NDC_GREEN2).setFontColor(WHITE);
+    .setHorizontalAlignment('left').setBackground(NDC_GREEN2).setFontColor(WHITE);
+  sheet.getRange('B1').setValue('').setBackground(NDC_GREEN2);
+  sheet.getRange('C1').setValue('').setBackground(NDC_GREEN2);
+  sheet.getRange('D1').setValue('').setBackground(NDC_GREEN2);
+  sheet.getRange('E1').setValue('').setBackground(NDC_GREEN2);
+
   sheet.getRange('A2').setValue('Polling Station / Branch Name:').setFontWeight('bold');
   sheet.getRange('E2').setValue('Constituency: Ketu North').setHorizontalAlignment('right');
 
@@ -157,10 +169,10 @@ function _setupMembersSheet(ss) {
   hdrRange.setValues([allHdrs]).setFontWeight('bold').setFontColor(WHITE).setBackground(NDC_GREEN);
   sheet.getRange(4, 1, 1, 5).setBackground(NDC_GREEN2); // darker for core 5 cols
 
+  // Freeze rows only — no column freeze (avoids merge conflict)
   sheet.setFrozenRows(4);
-  sheet.setFrozenColumns(2);
 
-  const widths = [130,130,160,160,150,100,110, 120,150,100,140,110,130,100,160,180,160];
+  const widths = [130,130,160,160,150,100,110,120,150,100,140,110,130,100,160,180,160];
   widths.forEach((w,i) => sheet.setColumnWidth(i+1, w));
   sheet.setTabColor(NDC_GREEN);
 }
