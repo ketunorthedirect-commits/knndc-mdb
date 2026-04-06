@@ -103,8 +103,8 @@
         <div class="stat-card amber"><div class="stat-icon">📶</div><div class="stat-label">Offline Queue</div><div class="stat-value" id="dash-offline">0</div></div>
       </div>
 
-      <!-- Gender summary row -->
-      <div class="two-col" style="margin-bottom:20px">
+      <!-- Gender + Zone summary row -->
+      <div class="three-col" style="margin-bottom:20px">
         <div class="card">
           <div class="card-header"><div class="card-icon">📊</div><h3>Entries — Last 7 Days</h3></div>
           <div class="card-body"><canvas id="dash-chart" style="width:100%"></canvas></div>
@@ -112,25 +112,28 @@
         <div class="card">
           <div class="card-header"><div class="card-icon red">⚧</div><h3>Gender Distribution</h3></div>
           <div class="card-body">
-            <div style="display:flex;gap:20px;align-items:center">
-              <canvas id="dash-gender-chart" style="width:160px;flex-shrink:0"></canvas>
+            <div style="display:flex;gap:16px;align-items:center">
+              <canvas id="dash-gender-chart" style="width:130px;flex-shrink:0"></canvas>
               <div style="flex:1">
-                <div style="margin-bottom:14px">
-                  <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:var(--ndc-green-dk);margin-bottom:4px">
-                    <span>🟢 Male</span><span id="dash-male">0</span>
-                  </div>
+                <div style="margin-bottom:12px">
+                  <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--ndc-green-dk);margin-bottom:4px"><span>♂ Male</span><span id="dash-male">0</span></div>
                   <div class="progress-bar"><div class="progress-fill" id="dash-male-bar" style="width:0%"></div></div>
                   <div style="font-size:11px;color:var(--gray-400);margin-top:2px" id="dash-male-pct">0%</div>
                 </div>
                 <div>
-                  <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:var(--ndc-red-dk);margin-bottom:4px">
-                    <span>🔴 Female</span><span id="dash-female">0</span>
-                  </div>
+                  <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--ndc-red-dk);margin-bottom:4px"><span>♀ Female</span><span id="dash-female">0</span></div>
                   <div class="progress-bar"><div class="progress-fill red" id="dash-female-bar" style="width:0%"></div></div>
                   <div style="font-size:11px;color:var(--gray-400);margin-top:2px" id="dash-female-pct">0%</div>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-icon" style="background:var(--ndc-green-lt)">🗺️</div><h3>Zone Distribution</h3></div>
+          <div class="card-body">
+            <canvas id="dash-zone-chart" style="width:100%;margin-bottom:8px"></canvas>
+            <div id="dash-zone-list"></div>
           </div>
         </div>
       </div>
@@ -139,7 +142,7 @@
         <div class="card-header"><div class="card-icon red">🕓</div><h3>Recent Entries</h3></div>
         <div class="table-wrap" style="border:none">
           <table>
-            <thead><tr><th>Name</th><th>Gender</th><th>Party ID</th><th>Station</th><th>Officer</th><th>Time</th></tr></thead>
+            <thead><tr><th>Name</th><th>Gender</th><th>Zone</th><th>Party ID</th><th>Station</th><th>Officer</th><th>Time</th></tr></thead>
             <tbody id="dash-recent-tbody"></tbody>
           </table>
         </div>
@@ -232,6 +235,7 @@
           <span class="search-ico">🔍</span>
           <input type="text" placeholder="Search name, ID, phone, station, zone…" oninput="PageRenderers._allState={...PageRenderers._allState,q:this.value,page:1};PageRenderers._renderAllRecords()">
         </div>
+        <select id="filter-zone"    onchange="PageRenderers._allState={...PageRenderers._allState,zone:this.value,page:1};PageRenderers._renderAllRecords()" style="width:auto"><option value="">All Zones</option></select>
         <select id="filter-ward"    onchange="PageRenderers._allState={...PageRenderers._allState,ward:this.value,page:1};PageRenderers._renderAllRecords()" style="width:auto"><option value="">All Wards</option></select>
         <select id="filter-station" onchange="PageRenderers._allState={...PageRenderers._allState,station:this.value,page:1};PageRenderers._renderAllRecords()" style="width:auto"><option value="">All Stations</option></select>
         <select id="filter-branch"  onchange="PageRenderers._allState={...PageRenderers._allState,branch:this.value,page:1};PageRenderers._renderAllRecords()" style="width:auto"><option value="">All Branches</option></select>
@@ -262,6 +266,7 @@
 
       <!-- Filters -->
       <div class="search-bar" style="margin-bottom:16px">
+        <select id="rep-filter-zone"    onchange="PageRenderers._repState={...PageRenderers._repState,zone:this.value};PageRenderers._renderReports()" style="width:auto"><option value="">All Zones</option></select>
         <select id="rep-filter-ward"    onchange="PageRenderers._repState={...PageRenderers._repState,ward:this.value};PageRenderers._renderReports()" style="width:auto"><option value="">All Wards</option></select>
         <select id="rep-filter-station" onchange="PageRenderers._repState={...PageRenderers._repState,station:this.value};PageRenderers._renderReports()" style="width:auto"><option value="">All Stations</option></select>
         <select id="rep-filter-branch"  onchange="PageRenderers._repState={...PageRenderers._repState,branch:this.value};PageRenderers._renderReports()" style="width:auto"><option value="">All Branches</option></select>
@@ -323,6 +328,7 @@
       <div class="section-header"><div class="section-title">Analytics Dashboard</div></div>
       <!-- Filters -->
       <div class="search-bar" style="margin-bottom:16px">
+        <select id="ana-filter-zone"    onchange="PageRenderers._anaState={...PageRenderers._anaState,zone:this.value};PageRenderers._renderAnalytics()" style="width:auto"><option value="">All Zones</option></select>
         <select id="ana-filter-ward"    onchange="PageRenderers._anaState={...PageRenderers._anaState,ward:this.value};PageRenderers._renderAnalytics()" style="width:auto"><option value="">All Wards</option></select>
         <select id="ana-filter-station" onchange="PageRenderers._anaState={...PageRenderers._anaState,station:this.value};PageRenderers._renderAnalytics()" style="width:auto"><option value="">All Stations</option></select>
         <select id="ana-filter-branch"  onchange="PageRenderers._anaState={...PageRenderers._anaState,branch:this.value};PageRenderers._renderAnalytics()" style="width:auto"><option value="">All Branches</option></select>
@@ -335,6 +341,7 @@
         <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">Total</div><div class="stat-value" id="ana-total">0</div></div>
         <div class="stat-card red"><div class="stat-icon">📅</div><div class="stat-label">Today</div><div class="stat-value" id="ana-today">0</div></div>
         <div class="stat-card blue"><div class="stat-icon">🏢</div><div class="stat-label">Stations</div><div class="stat-value" id="ana-stations">0</div></div>
+        <div class="stat-card" style="--before-color:var(--ndc-green-lt)"><div class="stat-icon">🗺️</div><div class="stat-label">Active Zones</div><div class="stat-value" id="ana-zones">0</div></div>
         <div class="stat-card purple"><div class="stat-icon">📈</div><div class="stat-label">Day-over-Day</div><div class="stat-value" id="ana-growth">—</div></div>
       </div>
 
@@ -362,9 +369,16 @@
         </div>
       </div>
 
-      <div class="two-col" style="margin-bottom:20px">
+      <div class="three-col" style="margin-bottom:20px">
         <div class="card"><div class="card-header"><div class="card-icon">📊</div><h3>7-Day Trend</h3></div><div class="card-body"><canvas id="ana-chart" style="width:100%"></canvas></div></div>
         <div class="card"><div class="card-header"><div class="card-icon red">⚧</div><h3>Gender Split</h3></div><div class="card-body"><canvas id="ana-gender-chart" style="width:100%"></canvas></div></div>
+        <div class="card">
+          <div class="card-header"><div class="card-icon" style="background:var(--ndc-green-lt)">🗺️</div><h3>Zone Distribution</h3></div>
+          <div class="card-body">
+            <canvas id="ana-zone-chart" style="width:100%;margin-bottom:10px"></canvas>
+            <div id="ana-zone-list"></div>
+          </div>
+        </div>
       </div>
 
       <div class="card">
