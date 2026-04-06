@@ -6,7 +6,7 @@
 const PageRenderers = {
 
   // ══════════════════════════════════════════════════════════
-  // DASHBOARD — with gender distribution
+  // DASHBOARD — with gender + zone distribution
   // ══════════════════════════════════════════════════════════
   dashboard() {
     const s = App.getStats();
@@ -20,7 +20,7 @@ const PageRenderers = {
     document.getElementById('dash-offline').textContent  = App.offlineQueue.length;
 
     // Gender stats
-    const male = s.byGender?.Male||0, female = s.byGender?.Female||0, other = s.byGender?.Other||0;
+    const male = s.byGender?.Male||0, female = s.byGender?.Female||0;
     document.getElementById('dash-male').textContent   = male;
     document.getElementById('dash-female').textContent = female;
     const mPct = s.total ? Math.round(male/s.total*100) : 0;
@@ -32,20 +32,84 @@ const PageRenderers = {
     document.getElementById('dash-male-pct').textContent   = mPct + '%';
     document.getElementById('dash-female-pct').textContent = fPct + '%';
 
+    // Zone stats
+    this._renderZoneList('dash-zone-list', s.byZone, s.total);
+
     const recent = App.getMembersForUser().slice(0,8);
     const tbody  = document.getElementById('dash-recent-tbody');
     if (tbody) tbody.innerHTML = recent.length
       ? recent.map(m=>`<tr>
           <td><strong>${m.lastName||''},</strong> ${m.firstName||''} ${m.otherNames||''}</td>
           <td>${m.gender||'—'}</td>
+          <td>${m.zone||'—'}</td>
           <td>${m.partyId||'—'}</td>
           <td>${m.station||'—'}</td>
           <td><span class="badge badge-blue">${m.officer||'—'}</span></td>
           <td>${m.timestamp||'—'}</td>
         </tr>`).join('')
-      : `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No records yet</div></div></td></tr>`;
+      : `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No records yet</div></div></td></tr>`;
 
-    setTimeout(()=>{ this._drawBarChart('dash-chart',s.byDay); this._drawGenderDonut('dash-gender-chart',s.byGender); },100);
+    setTimeout(()=>{
+      this._drawBarChart('dash-chart', s.byDay);
+      this._drawGenderDonut('dash-gender-chart', s.byGender);
+      this._drawZoneBar('dash-zone-chart', s.byZone, s.total);
+    }, 100);
+  },
+
+  // Render zone breakdown list (progress bars)
+  _renderZoneList(containerId, byZone, total) {
+    const c = document.getElementById(containerId); if (!c) return;
+    const zones = Object.entries(byZone||{}).sort((a,b)=>b[1]-a[1]);
+    const colors = ['#1a6b3a','#2563eb','#d97706','#7c3aed','#c8102e','#10b981','#f59e0b'];
+    if (!zones.length) { c.innerHTML='<div style="color:var(--gray-400);font-size:13px;text-align:center;padding:12px">No zone data</div>'; return; }
+    c.innerHTML = zones.map(([zone,count],i)=>{
+      const pct = total ? Math.round(count/total*100) : 0;
+      return `<div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+          <span style="font-size:12px;font-weight:600;color:var(--gray-700)">${zone}</span>
+          <span style="font-size:12px;color:var(--gray-500)">${count} &nbsp;<span style="color:var(--gray-400)">(${pct}%)</span></span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${colors[i%colors.length]}"></div></div>
+      </div>`;
+    }).join('');
+  },
+
+  // Draw horizontal zone bar chart on canvas
+  _drawZoneBar(canvasId, byZone, total) {
+    const canvas = document.getElementById(canvasId); if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const entries = Object.entries(byZone||{}).sort((a,b)=>b[1]-a[1]);
+    if (!entries.length) return;
+    const colors = ['#1a6b3a','#2563eb','#d97706','#7c3aed','#c8102e','#10b981','#f59e0b'];
+    const W = canvas.width = canvas.offsetWidth || 300;
+    const rowH = 28, pad = 8, labelW = 80;
+    const H = canvas.height = entries.length * rowH + pad * 2;
+    ctx.clearRect(0,0,W,H);
+    const maxVal = Math.max(...entries.map(e=>e[1]), 1);
+    const barAreaW = W - labelW - 60;
+
+    entries.forEach(([zone,count],i) => {
+      const y = pad + i * rowH;
+      const bw = Math.max((count/maxVal)*barAreaW, 2);
+      const pct = total ? Math.round(count/total*100) : 0;
+
+      // Label
+      ctx.fillStyle = '#4b5563'; ctx.font = '11px Inter'; ctx.textAlign = 'right';
+      const label = zone.length > 10 ? zone.substring(0,10)+'…' : zone;
+      ctx.fillText(label, labelW - 6, y + rowH/2 + 4);
+
+      // Bar
+      const g = ctx.createLinearGradient(labelW, 0, labelW + bw, 0);
+      g.addColorStop(0, colors[i%colors.length]);
+      g.addColorStop(1, colors[i%colors.length] + '99');
+      ctx.fillStyle = g;
+      if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(labelW, y+4, bw, rowH-10, 3); ctx.fill(); }
+      else { ctx.fillRect(labelW, y+4, bw, rowH-10); }
+
+      // Value label
+      ctx.fillStyle = '#1f2937'; ctx.font = 'bold 11px Inter'; ctx.textAlign = 'left';
+      ctx.fillText(`${count} (${pct}%)`, labelW + bw + 6, y + rowH/2 + 4);
+    });
   },
 
   _drawBarChart(canvasId, byDay) {
@@ -226,25 +290,18 @@ const PageRenderers = {
   // ALL RECORDS — with ward/station/branch/gender filters
   // ══════════════════════════════════════════════════════════
   records() {
-    PageRenderers._allState = PageRenderers._allState || { q:'', page:1, ward:'', station:'', branch:'', gender:'' };
+    PageRenderers._allState = PageRenderers._allState || { q:'', page:1, zone:'', ward:'', station:'', branch:'', gender:'' };
     this._populateRecordFilters();
     this._renderAllRecords();
   },
 
   _populateRecordFilters() {
     const all = App.getMembersForUser();
-    const wards    = [...new Set(all.map(m=>m.ward).filter(Boolean))].sort();
-    const stations = [...new Set(all.map(m=>m.station).filter(Boolean))].sort();
-    const branches = [...new Set(all.map(m=>m.branch).filter(Boolean))].sort();
-
-    const populate=(id,vals,label)=>{
-      const el=document.getElementById(id); if(!el) return;
-      const cur=el.value;
-      el.innerHTML=`<option value="">All ${label}</option>`+vals.map(v=>`<option value="${v}"${v===cur?' selected':''}>${v}</option>`).join('');
-    };
-    populate('filter-ward',    wards,    'Wards');
-    populate('filter-station', stations, 'Stations');
-    populate('filter-branch',  branches, 'Branches');
+    const pop=(id,vals,lbl)=>{ const el=document.getElementById(id);if(!el)return;const cur=el.value;el.innerHTML=`<option value="">All ${lbl}</option>`+vals.map(v=>`<option value="${v}"${v===cur?' selected':''}>${v}</option>`).join(''); };
+    pop('filter-zone',    [...new Set(all.map(m=>m.zone).filter(Boolean))].sort(),    'Zones');
+    pop('filter-ward',    [...new Set(all.map(m=>m.ward).filter(Boolean))].sort(),    'Wards');
+    pop('filter-station', [...new Set(all.map(m=>m.station).filter(Boolean))].sort(), 'Stations');
+    pop('filter-branch',  [...new Set(all.map(m=>m.branch).filter(Boolean))].sort(),  'Branches');
   },
 
   _renderAllRecords() {
@@ -252,6 +309,7 @@ const PageRenderers = {
     let members = App.getMembersForUser();
 
     if (st.q)       { const q=st.q.toLowerCase(); members=members.filter(m=>m.firstName?.toLowerCase().includes(q)||m.lastName?.toLowerCase().includes(q)||m.partyId?.toLowerCase().includes(q)||m.voterId?.toLowerCase().includes(q)||m.phone?.includes(q)||m.station?.toLowerCase().includes(q)||m.ward?.toLowerCase().includes(q)||m.zone?.toLowerCase().includes(q)); }
+    if (st.zone)    members=members.filter(m=>m.zone===st.zone);
     if (st.ward)    members=members.filter(m=>m.ward===st.ward);
     if (st.station) members=members.filter(m=>m.station===st.station);
     if (st.branch)  members=members.filter(m=>m.branch===st.branch);
@@ -344,7 +402,7 @@ const PageRenderers = {
   // REPORTS — with filters
   // ══════════════════════════════════════════════════════════
   reports() {
-    PageRenderers._repState = PageRenderers._repState || { ward:'', station:'', branch:'', gender:'' };
+    PageRenderers._repState = PageRenderers._repState || { zone:'', ward:'', station:'', branch:'', gender:'' };
     this._populateReportFilters();
     this._renderReports();
   },
@@ -352,14 +410,16 @@ const PageRenderers = {
   _populateReportFilters() {
     const all=App.getMembersForUser();
     const pop=(id,vals,lbl)=>{ const el=document.getElementById(id);if(!el)return;const cur=el.value;el.innerHTML=`<option value="">All ${lbl}</option>`+vals.map(v=>`<option value="${v}"${v===cur?' selected':''}>${v}</option>`).join(''); };
-    pop('rep-filter-ward',   [...new Set(all.map(m=>m.ward).filter(Boolean))].sort(),'Wards');
-    pop('rep-filter-station',[...new Set(all.map(m=>m.station).filter(Boolean))].sort(),'Stations');
-    pop('rep-filter-branch', [...new Set(all.map(m=>m.branch).filter(Boolean))].sort(),'Branches');
+    pop('rep-filter-zone',   [...new Set(all.map(m=>m.zone).filter(Boolean))].sort(),    'Zones');
+    pop('rep-filter-ward',   [...new Set(all.map(m=>m.ward).filter(Boolean))].sort(),    'Wards');
+    pop('rep-filter-station',[...new Set(all.map(m=>m.station).filter(Boolean))].sort(), 'Stations');
+    pop('rep-filter-branch', [...new Set(all.map(m=>m.branch).filter(Boolean))].sort(),  'Branches');
   },
 
   _renderReports() {
     const st=PageRenderers._repState;
     let members=App.getMembersForUser();
+    if(st.zone)    members=members.filter(m=>m.zone===st.zone);
     if(st.ward)    members=members.filter(m=>m.ward===st.ward);
     if(st.station) members=members.filter(m=>m.station===st.station);
     if(st.branch)  members=members.filter(m=>m.branch===st.branch);
@@ -447,7 +507,7 @@ const PageRenderers = {
   // ANALYTICS — with gender distribution and filters
   // ══════════════════════════════════════════════════════════
   analytics() {
-    PageRenderers._anaState = PageRenderers._anaState || { ward:'', station:'', branch:'', gender:'' };
+    PageRenderers._anaState = PageRenderers._anaState || { zone:'', ward:'', station:'', branch:'', gender:'' };
     this._populateAnaFilters();
     this._renderAnalytics();
   },
@@ -455,14 +515,16 @@ const PageRenderers = {
   _populateAnaFilters() {
     const all=App.getMembersForUser();
     const pop=(id,vals,lbl)=>{ const el=document.getElementById(id);if(!el)return;const cur=el.value;el.innerHTML=`<option value="">All ${lbl}</option>`+vals.map(v=>`<option value="${v}"${v===cur?' selected':''}>${v}</option>`).join(''); };
-    pop('ana-filter-ward',   [...new Set(all.map(m=>m.ward).filter(Boolean))].sort(),'Wards');
-    pop('ana-filter-station',[...new Set(all.map(m=>m.station).filter(Boolean))].sort(),'Stations');
-    pop('ana-filter-branch', [...new Set(all.map(m=>m.branch).filter(Boolean))].sort(),'Branches');
+    pop('ana-filter-zone',   [...new Set(all.map(m=>m.zone).filter(Boolean))].sort(),    'Zones');
+    pop('ana-filter-ward',   [...new Set(all.map(m=>m.ward).filter(Boolean))].sort(),    'Wards');
+    pop('ana-filter-station',[...new Set(all.map(m=>m.station).filter(Boolean))].sort(), 'Stations');
+    pop('ana-filter-branch', [...new Set(all.map(m=>m.branch).filter(Boolean))].sort(),  'Branches');
   },
 
   _renderAnalytics() {
     const st=PageRenderers._anaState;
     let members=App.getMembersForUser();
+    if(st.zone)    members=members.filter(m=>m.zone===st.zone);
     if(st.ward)    members=members.filter(m=>m.ward===st.ward);
     if(st.station) members=members.filter(m=>m.station===st.station);
     if(st.branch)  members=members.filter(m=>m.branch===st.branch);
@@ -472,8 +534,11 @@ const PageRenderers = {
     const female=members.filter(m=>m.gender==='Female').length;
     const today=new Date().toLocaleDateString('en-GH');
     const todayCount=members.filter(m=>m.timestamp?.includes(today)).length;
-    const byStation={};
-    members.forEach(m=>{byStation[m.station]=(byStation[m.station]||0)+1;});
+    const byStation={}, byZone={};
+    members.forEach(m=>{
+      byStation[m.station]=(byStation[m.station]||0)+1;
+      if(m.zone) byZone[m.zone]=(byZone[m.zone]||0)+1;
+    });
 
     document.getElementById('ana-total').textContent    = members.length.toLocaleString();
     document.getElementById('ana-today').textContent    = todayCount;
@@ -482,6 +547,11 @@ const PageRenderers = {
     document.getElementById('ana-female').textContent   = female;
     document.getElementById('ana-male-pct').textContent = members.length?Math.round(male/members.length*100)+'%':'0%';
     document.getElementById('ana-female-pct').textContent=members.length?Math.round(female/members.length*100)+'%':'0%';
+
+    // Zone count stat
+    const zoneCount = Object.keys(byZone).length;
+    const anaZones = document.getElementById('ana-zones');
+    if (anaZones) anaZones.textContent = zoneCount;
 
     const yest=new Date();yest.setDate(yest.getDate()-1);
     const yKey=yest.toLocaleDateString('en-GH');
@@ -492,9 +562,13 @@ const PageRenderers = {
     const byDay={};
     for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const k=d.toLocaleDateString('en-GH');byDay[k]=members.filter(m=>m.timestamp?.includes(k)).length;}
 
+    // Render zone list
+    this._renderZoneList('ana-zone-list', byZone, members.length);
+
     setTimeout(()=>{
       this._drawBarChart('ana-chart',byDay);
       this._drawGenderDonut('ana-gender-chart',{Male:male,Female:female});
+      this._drawZoneBar('ana-zone-chart', byZone, members.length);
       this._drawPieChart(byStation,members.length);
     },100);
 
