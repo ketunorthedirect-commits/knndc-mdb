@@ -6,17 +6,15 @@
   <title>Ketu North NDC Members Database</title>
   <link rel="stylesheet" href="css/styles.css">
   <link rel="icon" type="image/png" href="assets/ndc-logo.png">
-  <!-- SheetJS for Excel export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
-<!-- ════════════ OFFLINE BANNER ════════════ -->
-<div id="offline-banner">
-  ⚡ You are offline — new records will be queued and synced when connection is restored.
-</div>
+<div id="offline-banner">⚡ You are offline — records are queued and will sync automatically.</div>
 
-<!-- ════════════ LOGIN SCREEN ════════════ -->
+<!-- ═══════════════════════════════════════════
+     LOGIN SCREEN
+════════════════════════════════════════════ -->
 <div id="login-screen" class="login-page">
   <div class="login-card">
     <div class="login-logo-wrap">
@@ -25,15 +23,12 @@
       <div class="login-subtitle">KNNDCmdb · Constituency Members Portal</div>
     </div>
 
-    <!-- Lockout warning -->
     <div id="lockout-banner" style="display:none;background:var(--ndc-red-pale);border:1px solid var(--ndc-red);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;text-align:center">
-      <div style="font-weight:700;color:var(--ndc-red-dk);font-size:14px">🔒 Account Temporarily Locked</div>
-      <div style="font-size:13px;color:var(--ndc-red-dk);margin-top:4px">Too many failed attempts. Try again in <strong id="lockout-timer">2:00</strong></div>
+      <div style="font-weight:700;color:var(--ndc-red-dk)">🔒 Account Temporarily Locked</div>
+      <div style="font-size:13px;color:var(--ndc-red-dk);margin-top:4px">Try again in <strong id="lockout-timer">2:00</strong></div>
     </div>
-
-    <!-- Attempt warning -->
     <div id="attempt-warning" style="display:none;background:#fef3c7;border:1px solid #d97706;border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:13px;color:#92400e">
-      ⚠️ Incorrect credentials. <strong id="attempts-left"></strong> attempt(s) remaining before lockout.
+      ⚠️ Incorrect credentials. <strong id="attempts-left"></strong> attempt(s) remaining.
     </div>
 
     <div class="form-group" style="margin-bottom:14px">
@@ -43,36 +38,28 @@
     <div class="form-group" style="margin-bottom:8px">
       <label for="login-password">Password <span class="required">*</span></label>
       <div style="position:relative">
-        <input type="password" id="login-password" placeholder="Enter your password" autocomplete="current-password"
-          onkeydown="if(event.key==='Enter') doLogin()" style="padding-right:46px">
-        <button type="button" id="show-pwd-btn" onclick="togglePassword()"
-          style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:18px;color:var(--gray-400);padding:0;line-height:1"
-          title="Show/hide password">👁️</button>
+        <input type="password" id="login-password" placeholder="Enter your password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()" style="padding-right:46px">
+        <button type="button" onclick="togglePassword()" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:18px;color:var(--gray-400)">👁️</button>
       </div>
     </div>
     <div style="margin-bottom:20px;text-align:right">
       <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--gray-500);cursor:pointer;text-transform:none;letter-spacing:0;font-weight:400">
-        <input type="checkbox" id="show-pwd-check" onchange="togglePassword()" style="width:auto;accent-color:var(--ndc-green)">
-        Show password
+        <input type="checkbox" id="show-pwd-check" onchange="togglePassword()" style="width:auto;accent-color:var(--ndc-green)"> Show password
       </label>
     </div>
-    <button class="btn btn-primary btn-lg" id="login-btn" style="width:100%" onclick="doLogin()">
-      🔐 Sign In
-    </button>
-
+    <button class="btn btn-primary btn-lg" id="login-btn" style="width:100%" onclick="doLogin()">🔐 Sign In</button>
     <div style="margin-top:16px;text-align:center">
-      <small style="color:var(--gray-400)">Demo: admin / admin123 &nbsp;|&nbsp; officer1 / off123</small>
+      <small style="color:var(--gray-400)">Default password: <code>Ketu@2026</code></small>
     </div>
   </div>
-  <div style="color:rgba(255,255,255,.6);font-size:12px;text-align:center">
-    Powered by the Elections and IT Directorate, 2026
-  </div>
+  <div style="color:rgba(255,255,255,.6);font-size:12px">Powered by the Elections and IT Directorate, 2026</div>
 </div>
 
-<!-- ════════════ APP SHELL ════════════ -->
+<!-- ═══════════════════════════════════════════
+     APP SHELL
+════════════════════════════════════════════ -->
 <div id="app-shell" style="display:none;flex-direction:column;min-height:100vh">
 
-  <!-- HEADER -->
   <header class="site-header">
     <div class="header-inner">
       <img src="assets/ndc-logo.png" alt="NDC" class="header-logo">
@@ -81,238 +68,181 @@
         <span class="app-name">KNNDCmdb · Members Registration Portal</span>
       </div>
       <div class="header-actions">
-        <span id="conn-dot" class="online-dot" title="Connection status"></span>
-        <div class="header-user" onclick="App.logout()" title="Click to logout">
+        <button class="btn-icon" title="Sync from Google Sheets" onclick="App.fetchFromSheets().then(()=>Toast.show('Synced','Data refreshed from Google Sheets.','success'))">🔄</button>
+        <span id="conn-dot" class="online-dot"></span>
+        <div class="header-user" onclick="App.logout()" title="Logout">
           <div class="user-avatar" id="user-avatar">--</div>
           <div class="user-info">
             <div class="user-name" id="user-name-hdr">—</div>
             <div class="user-role" id="user-role-hdr">—</div>
           </div>
         </div>
-        <button class="btn-icon" title="Logout" onclick="App.logout()">🚪</button>
+        <button class="btn-icon" onclick="App.logout()" title="Logout">🚪</button>
       </div>
     </div>
   </header>
 
-  <!-- NAV -->
-  <nav class="site-nav">
-    <div class="nav-inner" id="main-nav"></div>
-  </nav>
+  <nav class="site-nav"><div class="nav-inner" id="main-nav"></div></nav>
 
-  <!-- MAIN -->
   <main class="main-wrapper">
 
-    <!-- ── DASHBOARD ── -->
+    <!-- ════ DASHBOARD ════ -->
     <div id="page-dashboard" class="page">
       <div class="section-header">
         <div>
           <div class="section-title" id="dash-welcome">Welcome</div>
-          <div class="section-subtitle" id="dash-role">Loading…</div>
+          <div class="section-subtitle" id="dash-role"></div>
         </div>
         <div style="font-size:13px;color:var(--gray-500)">📅 <span id="current-date"></span></div>
       </div>
 
       <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-icon">👥</div>
-          <div class="stat-label">Total Members</div>
-          <div class="stat-value" id="dash-total">0</div>
-          <div class="stat-change">All registered members</div>
-        </div>
-        <div class="stat-card red">
-          <div class="stat-icon">📅</div>
-          <div class="stat-label">Today's Entries</div>
-          <div class="stat-value" id="dash-today">0</div>
-          <div class="stat-change">Entered today</div>
-        </div>
-        <div class="stat-card blue">
-          <div class="stat-icon">🏢</div>
-          <div class="stat-label">Active Stations</div>
-          <div class="stat-value" id="dash-stations">0</div>
-          <div class="stat-change">With records</div>
-        </div>
-        <div class="stat-card amber">
-          <div class="stat-icon">📶</div>
-          <div class="stat-label">Offline Queue</div>
-          <div class="stat-value" id="dash-offline">0</div>
-          <div class="stat-change">Pending sync</div>
-        </div>
+        <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">Total Members</div><div class="stat-value" id="dash-total">0</div><div class="stat-change">All registered</div></div>
+        <div class="stat-card red"><div class="stat-icon">📅</div><div class="stat-label">Today's Entries</div><div class="stat-value" id="dash-today">0</div></div>
+        <div class="stat-card blue"><div class="stat-icon">🏢</div><div class="stat-label">Active Stations</div><div class="stat-value" id="dash-stations">0</div></div>
+        <div class="stat-card amber"><div class="stat-icon">📶</div><div class="stat-label">Offline Queue</div><div class="stat-value" id="dash-offline">0</div></div>
       </div>
 
-      <div class="two-col">
+      <!-- Gender summary row -->
+      <div class="two-col" style="margin-bottom:20px">
         <div class="card">
-          <div class="card-header">
-            <div class="card-icon">📊</div>
-            <h3>Entries — Last 7 Days</h3>
-          </div>
+          <div class="card-header"><div class="card-icon">📊</div><h3>Entries — Last 7 Days</h3></div>
+          <div class="card-body"><canvas id="dash-chart" style="width:100%"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-icon red">⚧</div><h3>Gender Distribution</h3></div>
           <div class="card-body">
-            <canvas id="dash-chart" style="width:100%"></canvas>
+            <div style="display:flex;gap:20px;align-items:center">
+              <canvas id="dash-gender-chart" style="width:160px;flex-shrink:0"></canvas>
+              <div style="flex:1">
+                <div style="margin-bottom:14px">
+                  <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:var(--ndc-green-dk);margin-bottom:4px">
+                    <span>🟢 Male</span><span id="dash-male">0</span>
+                  </div>
+                  <div class="progress-bar"><div class="progress-fill" id="dash-male-bar" style="width:0%"></div></div>
+                  <div style="font-size:11px;color:var(--gray-400);margin-top:2px" id="dash-male-pct">0%</div>
+                </div>
+                <div>
+                  <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:var(--ndc-red-dk);margin-bottom:4px">
+                    <span>🔴 Female</span><span id="dash-female">0</span>
+                  </div>
+                  <div class="progress-bar"><div class="progress-fill red" id="dash-female-bar" style="width:0%"></div></div>
+                  <div style="font-size:11px;color:var(--gray-400);margin-top:2px" id="dash-female-pct">0%</div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="card">
-          <div class="card-header">
-            <div class="card-icon red">🕓</div>
-            <h3>Recent Entries</h3>
-          </div>
-          <div class="table-wrap" style="margin:0;border-radius:0;border:none">
-            <table>
-              <thead><tr><th>Name</th><th>Party ID</th><th>Station</th><th>Officer</th><th>Time</th></tr></thead>
-              <tbody id="dash-recent-tbody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── DATA ENTRY ── -->
-    <div id="page-entry" class="page">
-      <div class="section-header">
-        <div>
-          <div class="section-title">New Member Registration</div>
-          <div class="section-subtitle">Complete all required fields to register a member</div>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-header">
-          <div class="card-icon">✍️</div>
-          <h2>Member Registration Form</h2>
+        <div class="card-header"><div class="card-icon red">🕓</div><h3>Recent Entries</h3></div>
+        <div class="table-wrap" style="border:none">
+          <table>
+            <thead><tr><th>Name</th><th>Gender</th><th>Party ID</th><th>Station</th><th>Officer</th><th>Time</th></tr></thead>
+            <tbody id="dash-recent-tbody"></tbody>
+          </table>
         </div>
+      </div>
+    </div>
+
+    <!-- ════ DATA ENTRY ════ -->
+    <div id="page-entry" class="page">
+      <div class="section-header">
+        <div><div class="section-title">New Member Registration</div><div class="section-subtitle">Complete all required fields</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-icon">✍️</div><h2>Member Registration Form</h2></div>
         <div class="card-body">
 
-          <!-- Auto-filled Section -->
+          <!-- Station Lookup -->
           <div style="background:var(--ndc-green-pale);border:1px solid var(--ndc-green-lt);border-radius:var(--radius);padding:16px 20px;margin-bottom:24px">
-            <div style="font-size:12px;font-weight:600;color:var(--ndc-green-dk);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">
-              🔍 Station Lookup — Search by Branch Code
-            </div>
-            <div style="font-size:12px;color:var(--gray-500);margin-bottom:14px">
-              Type a Branch Code, Station Name or Ward below. The other fields will fill automatically.
-            </div>
-
-            <!-- Branch Code (search trigger) -->
+            <div style="font-size:12px;font-weight:600;color:var(--ndc-green-dk);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">🔍 Station Lookup — Search by Branch Code</div>
+            <div style="font-size:12px;color:var(--gray-500);margin-bottom:14px">Type a Branch Code, Station Name, Zone or Ward. All station fields will fill automatically.</div>
             <div class="form-group" style="margin-bottom:14px">
-              <label>Branch Code <span class="required">*</span> <span style="font-size:11px;font-weight:400;color:var(--ndc-green-dk);text-transform:none;letter-spacing:0">— start typing to search</span></label>
+              <label>Branch Code <span class="required">*</span> <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--ndc-green-dk)">— start typing to search</span></label>
               <div class="search-dropdown-wrap">
                 <input type="text" id="f-branch-code" placeholder="e.g. BR-001 or Aflao…" autocomplete="off">
                 <div id="branch-code-dropdown" class="search-dropdown"></div>
               </div>
             </div>
-
-            <!-- Auto-filled grid -->
             <div class="form-grid">
-              <div class="form-group">
-                <label>Ward Name</label>
-                <input type="text" id="f-ward-name" readonly class="auto-filled" placeholder="Auto-filled from selection">
-              </div>
-              <div class="form-group">
-                <label>Polling Station Name</label>
-                <input type="text" id="f-station-name" readonly class="auto-filled" placeholder="Auto-filled from selection">
-              </div>
-              <div class="form-group">
-                <label>Branch Name</label>
-                <input type="text" id="f-branch-name" readonly class="auto-filled" placeholder="Auto-filled from selection">
-              </div>
-              <div class="form-group">
-                <label>Polling Station Code</label>
-                <input type="text" id="f-station-code" readonly class="auto-filled" placeholder="Auto-filled from selection">
-              </div>
+              <div class="form-group"><label>Zone</label><input type="text" id="f-zone" readonly class="auto-filled" placeholder="Auto-filled"></div>
+              <div class="form-group"><label>Ward Name</label><input type="text" id="f-ward-name" readonly class="auto-filled" placeholder="Auto-filled"></div>
+              <div class="form-group"><label>Polling Station Name</label><input type="text" id="f-station-name" readonly class="auto-filled" placeholder="Auto-filled"></div>
+              <div class="form-group"><label>Branch Name</label><input type="text" id="f-branch-name" readonly class="auto-filled" placeholder="Auto-filled"></div>
+              <div class="form-group"><label>Polling Station Code</label><input type="text" id="f-station-code" readonly class="auto-filled" placeholder="Auto-filled"></div>
             </div>
           </div>
 
           <!-- Member Details -->
           <div class="form-grid">
+            <div class="form-group"><label>Last Name / Surname <span class="required">*</span></label><input type="text" id="f-last-name" placeholder="e.g. Mensah"></div>
+            <div class="form-group"><label>First Name <span class="required">*</span></label><input type="text" id="f-first-name" placeholder="e.g. Kofi"></div>
+            <div class="form-group"><label>Other Names</label><input type="text" id="f-other-names" placeholder="e.g. Agyei"></div>
             <div class="form-group">
-              <label>Last Name / Surname <span class="required">*</span></label>
-              <input type="text" id="f-last-name" placeholder="e.g. Mensah">
+              <label>Gender <span class="required">*</span></label>
+              <select id="f-gender">
+                <option value="">— Select Gender —</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+              </select>
             </div>
-            <div class="form-group">
-              <label>First Name <span class="required">*</span></label>
-              <input type="text" id="f-first-name" placeholder="e.g. Kofi">
-            </div>
-            <div class="form-group">
-              <label>Other Names</label>
-              <input type="text" id="f-other-names" placeholder="e.g. Agyei">
-            </div>
-            <div class="form-group">
-              <label>Party ID Number <span class="required">*</span></label>
-              <input type="text" id="f-party-id" placeholder="e.g. NDC-2024-001">
-            </div>
-            <div class="form-group">
-              <label>Voter ID Number</label>
-              <input type="text" id="f-voter-id" placeholder="e.g. GH-V-001234">
-            </div>
-            <div class="form-group">
-              <label>Telephone Number</label>
-              <input type="tel" id="f-phone" placeholder="e.g. 0244001122">
-            </div>
+            <div class="form-group"><label>Party ID Number <span class="required">*</span></label><input type="text" id="f-party-id" placeholder="e.g. NDC-2024-001"></div>
+            <div class="form-group"><label>Voter ID Number</label><input type="text" id="f-voter-id" placeholder="e.g. GH-V-001234"></div>
+            <div class="form-group"><label>Telephone Number</label><input type="tel" id="f-phone" placeholder="e.g. 0244001122"></div>
           </div>
 
           <hr class="divider">
-
           <div class="btn-group">
-            <button class="btn btn-primary btn-lg" onclick="PageRenderers.submitEntry()">
-              ✅ Save Member Record
-            </button>
-            <button class="btn btn-secondary" onclick="PageRenderers.entry()">
-              🔄 Reset Auto-Fill
-            </button>
+            <button class="btn btn-primary btn-lg" onclick="PageRenderers.submitEntry()">✅ Save Member Record</button>
+            <button class="btn btn-secondary" onclick="PageRenderers.entry()">🔄 Reset</button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ── MY RECORDS ── -->
+    <!-- ════ MY RECORDS ════ -->
     <div id="page-my-records" class="page">
       <div class="section-header">
-        <div>
-          <div class="section-title">My Records</div>
-          <div class="section-subtitle" id="my-records-count">Loading…</div>
-        </div>
-        <button class="btn btn-outline" onclick="PageRenderers.exportExcel()">⬇️ Export CSV</button>
+        <div><div class="section-title">My Records</div><div class="section-subtitle" id="my-records-count"></div></div>
+        <button class="btn btn-outline" onclick="PageRenderers.exportExcel()">⬇️ Export Excel</button>
       </div>
       <div class="card">
         <div class="table-wrap" style="border:none">
           <table>
-            <thead><tr><th>Name</th><th>Party ID</th><th>Voter ID</th><th>Phone</th><th>Station</th><th>Branch</th><th>Date/Time</th></tr></thead>
+            <thead><tr><th>Name</th><th>Gender</th><th>Zone</th><th>Party ID</th><th>Voter ID</th><th>Phone</th><th>Station</th><th>Branch</th><th>Date/Time</th></tr></thead>
             <tbody id="my-records-tbody"></tbody>
           </table>
         </div>
       </div>
     </div>
 
-    <!-- ── ALL RECORDS ── -->
+    <!-- ════ ALL RECORDS ════ -->
     <div id="page-records" class="page">
       <div class="section-header">
-        <div>
-          <div class="section-title">All Records</div>
-          <div class="section-subtitle" id="records-count">Loading…</div>
-        </div>
+        <div><div class="section-title">All Records</div><div class="section-subtitle" id="records-count"></div></div>
         <div class="btn-group">
-          <button class="btn btn-outline" onclick="PageRenderers.exportExcel()">⬇️ Export CSV</button>
+          <button class="btn btn-outline" onclick="PageRenderers.exportExcel()">⬇️ Export Excel</button>
           <button class="btn btn-secondary" onclick="PageRenderers.exportPDF()">🖨️ Print/PDF</button>
         </div>
       </div>
-
       <div class="search-bar">
-        <div class="search-input-wrap">
+        <div class="search-input-wrap" style="flex:2;min-width:200px">
           <span class="search-ico">🔍</span>
-          <input type="text" placeholder="Search by name, Party ID, Voter ID, phone or station…"
-            oninput="PageRenderers._allRecordsState={q:this.value,page:1};PageRenderers._renderAllRecords()">
+          <input type="text" placeholder="Search name, ID, phone, station, zone…" oninput="PageRenderers._allState={...PageRenderers._allState,q:this.value,page:1};PageRenderers._renderAllRecords()">
         </div>
-        <select onchange="PageRenderers._allRecordsState.page=1;PageRenderers._renderAllRecords()" style="width:auto">
-          <option value="">All Stations</option>
+        <select id="filter-ward"    onchange="PageRenderers._allState={...PageRenderers._allState,ward:this.value,page:1};PageRenderers._renderAllRecords()" style="width:auto"><option value="">All Wards</option></select>
+        <select id="filter-station" onchange="PageRenderers._allState={...PageRenderers._allState,station:this.value,page:1};PageRenderers._renderAllRecords()" style="width:auto"><option value="">All Stations</option></select>
+        <select id="filter-branch"  onchange="PageRenderers._allState={...PageRenderers._allState,branch:this.value,page:1};PageRenderers._renderAllRecords()" style="width:auto"><option value="">All Branches</option></select>
+        <select                     onchange="PageRenderers._allState={...PageRenderers._allState,gender:this.value,page:1};PageRenderers._renderAllRecords()" style="width:auto">
+          <option value="">All Genders</option><option value="Male">Male</option><option value="Female">Female</option>
         </select>
       </div>
-
       <div class="card">
         <div class="table-wrap" style="border:none">
           <table>
-            <thead>
-              <tr>
-                <th>Full Name</th><th>Party ID</th><th>Voter ID</th><th>Phone</th>
-                <th>Station</th><th>Branch</th><th>Date/Time</th><th>Actions</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Full Name</th><th>Gender</th><th>Zone</th><th>Party ID</th><th>Voter ID</th><th>Phone</th><th>Ward</th><th>Station</th><th>Branch</th><th>Date/Time</th><th>Actions</th></tr></thead>
             <tbody id="records-tbody"></tbody>
           </table>
         </div>
@@ -320,30 +250,48 @@
       </div>
     </div>
 
-    <!-- ── REPORTS ── -->
+    <!-- ════ REPORTS ════ -->
     <div id="page-reports" class="page">
       <div class="section-header">
-        <div>
-          <div class="section-title">Reports & Summary</div>
-          <div class="section-subtitle">Membership statistics by polling station and branch</div>
-        </div>
+        <div><div class="section-title">Reports & Summary</div></div>
         <div class="btn-group">
           <button class="btn btn-primary" onclick="PageRenderers.exportExcel()">⬇️ Export Excel</button>
           <button class="btn btn-secondary" onclick="PageRenderers.exportPDF()">🖨️ Print PDF</button>
         </div>
       </div>
 
-      <!-- Daily Report Banner -->
+      <!-- Filters -->
+      <div class="search-bar" style="margin-bottom:16px">
+        <select id="rep-filter-ward"    onchange="PageRenderers._repState={...PageRenderers._repState,ward:this.value};PageRenderers._renderReports()" style="width:auto"><option value="">All Wards</option></select>
+        <select id="rep-filter-station" onchange="PageRenderers._repState={...PageRenderers._repState,station:this.value};PageRenderers._renderReports()" style="width:auto"><option value="">All Stations</option></select>
+        <select id="rep-filter-branch"  onchange="PageRenderers._repState={...PageRenderers._repState,branch:this.value};PageRenderers._renderReports()" style="width:auto"><option value="">All Branches</option></select>
+        <select onchange="PageRenderers._repState={...PageRenderers._repState,gender:this.value};PageRenderers._renderReports()" style="width:auto">
+          <option value="">All Genders</option><option value="Male">Male</option><option value="Female">Female</option>
+        </select>
+      </div>
+
+      <!-- Daily banner -->
       <div class="card" style="background:linear-gradient(135deg,var(--ndc-green-dk),var(--ndc-green));color:white;margin-bottom:20px">
         <div class="card-body" style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
           <div class="card-icon" style="background:rgba(255,255,255,.2);font-size:28px;width:52px;height:52px">📋</div>
           <div>
-            <div style="font-size:12px;opacity:.8;text-transform:uppercase;letter-spacing:.5px">Daily Report — <span id="daily-date"></span></div>
+            <div style="font-size:12px;opacity:.8;text-transform:uppercase;letter-spacing:.5px">Daily — <span id="daily-date"></span></div>
             <div style="font-family:var(--font-head);font-size:36px;font-weight:800;line-height:1"><span id="daily-count">0</span></div>
-            <div style="font-size:13px;opacity:.8">Members registered today</div>
+            <div style="font-size:13px;opacity:.8">members registered today</div>
           </div>
           <div style="flex:1"></div>
-          <div style="font-size:13px;opacity:.8">Total: <strong id="report-total" style="font-size:24px;font-weight:800">0</strong></div>
+          <div style="text-align:right">
+            <div style="font-size:12px;opacity:.8">Total</div>
+            <div style="font-size:28px;font-weight:800;font-family:var(--font-head)" id="report-total">0</div>
+          </div>
+          <div style="text-align:center;padding:12px 20px;background:rgba(255,255,255,.15);border-radius:var(--radius)">
+            <div style="font-size:11px;opacity:.7">Male</div>
+            <div style="font-size:22px;font-weight:800;font-family:var(--font-head)" id="rep-male-count">0</div>
+          </div>
+          <div style="text-align:center;padding:12px 20px;background:rgba(200,16,46,.3);border-radius:var(--radius)">
+            <div style="font-size:11px;opacity:.7">Female</div>
+            <div style="font-size:22px;font-weight:800;font-family:var(--font-head)" id="rep-female-count">0</div>
+          </div>
         </div>
       </div>
 
@@ -352,151 +300,121 @@
           <div class="card-header"><div class="card-icon">🏢</div><h3>By Polling Station</h3></div>
           <div class="table-wrap" style="border:none;border-radius:0">
             <table>
-              <thead><tr><th>#</th><th>Ward</th><th>Station</th><th>Branch</th><th>Members</th><th>Progress</th><th>%</th></tr></thead>
+              <thead><tr><th>#</th><th>Zone</th><th>Ward</th><th>Station</th><th>Branch</th><th>Total</th><th>♂</th><th>♀</th><th>Progress</th><th>%</th></tr></thead>
               <tbody id="report-tbody"></tbody>
             </table>
           </div>
         </div>
-        <div class="card">
-          <div class="card-header"><div class="card-icon red">🥧</div><h3>Distribution</h3></div>
-          <div class="card-body">
-            <canvas id="report-chart" style="width:100%"></canvas>
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="card">
+            <div class="card-header"><div class="card-icon red">🥧</div><h3>Station Distribution</h3></div>
+            <div class="card-body"><canvas id="report-chart" style="width:100%"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-icon">⚧</div><h3>Gender Distribution</h3></div>
+            <div class="card-body"><canvas id="rep-gender-chart" style="width:100%"></canvas></div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ── ANALYTICS ── -->
+    <!-- ════ ANALYTICS ════ -->
     <div id="page-analytics" class="page">
-      <div class="section-header">
-        <div class="section-title">Analytics Dashboard</div>
-        <div class="section-subtitle">Deep insights into membership data</div>
+      <div class="section-header"><div class="section-title">Analytics Dashboard</div></div>
+      <!-- Filters -->
+      <div class="search-bar" style="margin-bottom:16px">
+        <select id="ana-filter-ward"    onchange="PageRenderers._anaState={...PageRenderers._anaState,ward:this.value};PageRenderers._renderAnalytics()" style="width:auto"><option value="">All Wards</option></select>
+        <select id="ana-filter-station" onchange="PageRenderers._anaState={...PageRenderers._anaState,station:this.value};PageRenderers._renderAnalytics()" style="width:auto"><option value="">All Stations</option></select>
+        <select id="ana-filter-branch"  onchange="PageRenderers._anaState={...PageRenderers._anaState,branch:this.value};PageRenderers._renderAnalytics()" style="width:auto"><option value="">All Branches</option></select>
+        <select onchange="PageRenderers._anaState={...PageRenderers._anaState,gender:this.value};PageRenderers._renderAnalytics()" style="width:auto">
+          <option value="">All Genders</option><option value="Male">Male</option><option value="Female">Female</option>
+        </select>
       </div>
 
       <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-icon">👥</div>
-          <div class="stat-label">Total Members</div>
-          <div class="stat-value" id="ana-total">0</div>
+        <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">Total</div><div class="stat-value" id="ana-total">0</div></div>
+        <div class="stat-card red"><div class="stat-icon">📅</div><div class="stat-label">Today</div><div class="stat-value" id="ana-today">0</div></div>
+        <div class="stat-card blue"><div class="stat-icon">🏢</div><div class="stat-label">Stations</div><div class="stat-value" id="ana-stations">0</div></div>
+        <div class="stat-card purple"><div class="stat-icon">📈</div><div class="stat-label">Day-over-Day</div><div class="stat-value" id="ana-growth">—</div></div>
+      </div>
+
+      <!-- Gender stats -->
+      <div class="two-col" style="margin-bottom:20px">
+        <div class="card" style="border-left:4px solid var(--ndc-green)">
+          <div class="card-body" style="display:flex;align-items:center;gap:16px">
+            <div style="font-size:36px">♂</div>
+            <div>
+              <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-500)">Male Members</div>
+              <div style="font-family:var(--font-head);font-size:32px;font-weight:800;color:var(--ndc-green-dk)" id="ana-male">0</div>
+              <div style="font-size:13px;color:var(--gray-400)" id="ana-male-pct">0%</div>
+            </div>
+          </div>
         </div>
-        <div class="stat-card red">
-          <div class="stat-icon">📅</div>
-          <div class="stat-label">Today</div>
-          <div class="stat-value" id="ana-today">0</div>
-        </div>
-        <div class="stat-card blue">
-          <div class="stat-icon">🏢</div>
-          <div class="stat-label">Stations</div>
-          <div class="stat-value" id="ana-stations">0</div>
-        </div>
-        <div class="stat-card purple">
-          <div class="stat-icon">📈</div>
-          <div class="stat-label">Day-over-Day</div>
-          <div class="stat-value" id="ana-growth">—</div>
+        <div class="card" style="border-left:4px solid var(--ndc-red)">
+          <div class="card-body" style="display:flex;align-items:center;gap:16px">
+            <div style="font-size:36px">♀</div>
+            <div>
+              <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-500)">Female Members</div>
+              <div style="font-family:var(--font-head);font-size:32px;font-weight:800;color:var(--ndc-red-dk)" id="ana-female">0</div>
+              <div style="font-size:13px;color:var(--gray-400)" id="ana-female-pct">0%</div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="two-col">
-        <div class="card">
-          <div class="card-header"><div class="card-icon">📊</div><h3>7-Day Trend</h3></div>
-          <div class="card-body"><canvas id="ana-chart" style="width:100%"></canvas></div>
-        </div>
-        <div class="card">
-          <div class="card-header"><div class="card-icon red">🥧</div><h3>By Station</h3></div>
-          <div class="card-body"><canvas id="ana-pie" style="width:100%"></canvas></div>
-        </div>
+      <div class="two-col" style="margin-bottom:20px">
+        <div class="card"><div class="card-header"><div class="card-icon">📊</div><h3>7-Day Trend</h3></div><div class="card-body"><canvas id="ana-chart" style="width:100%"></canvas></div></div>
+        <div class="card"><div class="card-header"><div class="card-icon red">⚧</div><h3>Gender Split</h3></div><div class="card-body"><canvas id="ana-gender-chart" style="width:100%"></canvas></div></div>
       </div>
 
-      <div class="card" style="margin-top:20px">
+      <div class="card">
         <div class="card-header"><div class="card-icon amber">🏆</div><h3>Top Officers by Entries</h3></div>
         <div class="table-wrap" style="border:none;border-radius:0">
-          <table>
-            <thead><tr><th>Officer</th><th>Records</th><th>Progress</th><th>Share</th></tr></thead>
-            <tbody id="ana-officers-tbody"></tbody>
-          </table>
+          <table><thead><tr><th>Officer</th><th>Records</th><th>Progress</th><th>Share</th></tr></thead><tbody id="ana-officers-tbody"></tbody></table>
         </div>
       </div>
     </div>
 
-    <!-- ── AUDIT LOG ── -->
+    <!-- ════ AUDIT LOG ════ -->
     <div id="page-audit" class="page">
-      <div class="section-header">
-        <div class="section-title">Audit Log</div>
-        <div class="section-subtitle">Complete record of all system activities</div>
-      </div>
-
+      <div class="section-header"><div class="section-title">Audit Log</div><div class="section-subtitle">All system activities</div></div>
       <div class="search-bar">
-        <div class="search-input-wrap">
-          <span class="search-ico">🔍</span>
-          <input type="text" id="audit-search" placeholder="Search audit log…" oninput="PageRenderers.audit()">
-        </div>
+        <div class="search-input-wrap"><span class="search-ico">🔍</span><input type="text" id="audit-search" placeholder="Search…" oninput="PageRenderers.audit()"></div>
         <select id="audit-filter" onchange="PageRenderers.audit()" style="width:auto">
           <option value="">All Actions</option>
-          <option value="LOGIN">LOGIN</option>
-          <option value="LOGOUT">LOGOUT</option>
-          <option value="AUTO_LOGOUT">AUTO_LOGOUT</option>
-          <option value="LOCKOUT">LOCKOUT</option>
-          <option value="ADD_MEMBER">ADD_MEMBER</option>
-          <option value="EDIT_MEMBER">EDIT_MEMBER</option>
-          <option value="DELETE_MEMBER">DELETE_MEMBER</option>
-          <option value="EXPORT_EXCEL">EXPORT_EXCEL</option>
-          <option value="EXPORT_PDF">EXPORT_PDF</option>
-          <option value="ADD_USER">ADD_USER</option>
-          <option value="EDIT_USER">EDIT_USER</option>
-          <option value="ENABLE_USER">ENABLE_USER</option>
-          <option value="DISABLE_USER">DISABLE_USER</option>
-          <option value="ASSIGN_STATIONS">ASSIGN_STATIONS</option>
-          <option value="SETTINGS_CHANGE">SETTINGS_CHANGE</option>
-          <option value="ADD_STATION">ADD_STATION</option>
-          <option value="REMOVE_STATION">REMOVE_STATION</option>
+          <option>LOGIN</option><option>LOGOUT</option><option>AUTO_LOGOUT</option><option>LOCKOUT</option>
+          <option>ADD_MEMBER</option><option>EDIT_MEMBER</option><option>DELETE_MEMBER</option>
+          <option>EXPORT_EXCEL</option><option>EXPORT_PDF</option>
+          <option>ADD_USER</option><option>EDIT_USER</option><option>ENABLE_USER</option><option>DISABLE_USER</option>
+          <option>PASSWORD_CHANGE</option><option>PASSWORD_RESET</option><option>ASSIGN_STATIONS</option>
+          <option>SETTINGS_CHANGE</option><option>ADD_STATION</option><option>REMOVE_STATION</option>
+          <option>CLEAR_DEMO</option>
         </select>
-        <button class="btn btn-danger btn-sm" onclick="if(confirm('Clear ALL audit logs?')){App.auditLog=[];App.saveAudit();PageRenderers.audit();Toast.show('Log Cleared','Audit log has been cleared.','warning');}">
-          🗑️ Clear Log
-        </button>
+        <button class="btn btn-danger btn-sm" onclick="if(confirm('Clear ALL audit logs?')){App.auditLog=[];App.saveAudit();PageRenderers.audit();Toast.show('Log Cleared','','warning');}">🗑️ Clear</button>
       </div>
-
       <div id="audit-entries"></div>
     </div>
 
-    <!-- ── USERS ── -->
+    <!-- ════ USERS ════ -->
     <div id="page-users" class="page">
       <div class="section-header">
-        <div>
-          <div class="section-title">User Management</div>
-          <div class="section-subtitle">Manage accounts, passwords, roles and station assignments</div>
-        </div>
+        <div><div class="section-title">User Management</div><div class="section-subtitle">Manage accounts, roles and station assignments</div></div>
         <button class="btn btn-primary" onclick="PageRenderers.openAddUser()">➕ Add New User</button>
       </div>
       <div class="card">
         <div class="table-wrap" style="border:none">
           <table>
-            <thead>
-              <tr>
-                <th></th>
-                <th>Name / Username</th>
-                <th>Role</th>
-                <th>Password</th>
-                <th>Ward</th>
-                <th>Assigned Stations</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
+            <thead><tr><th></th><th>Name / Username</th><th>Role</th><th>Password Status</th><th>Ward</th><th>Assigned Stations</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody id="users-tbody"></tbody>
           </table>
         </div>
       </div>
     </div>
 
-    <!-- ── SETTINGS ── -->
+    <!-- ════ SETTINGS ════ -->
     <div id="page-settings" class="page">
-      <div class="section-header">
-        <div class="section-title">System Settings</div>
-        <div class="section-subtitle">Configure application name, Google Sheets, polling stations, and more</div>
-      </div>
-
+      <div class="section-header"><div class="section-title">System Settings</div></div>
       <div class="settings-layout">
-        <!-- Sidebar -->
         <div>
           <div class="card">
             <div class="card-body" style="padding:12px">
@@ -509,120 +427,68 @@
             </div>
           </div>
         </div>
-
-        <!-- Content -->
         <div>
-          <!-- General -->
           <div id="stab-general" class="settings-tab">
             <div class="card">
               <div class="card-header"><div class="card-icon">⚙️</div><h3>General Configuration</h3></div>
               <div class="card-body">
                 <div class="form-grid">
-                  <div class="form-group full-width">
-                    <label>Application Name <span class="required">*</span></label>
-                    <input type="text" id="set-app-name" placeholder="e.g. Ketu North NDC Members Database">
-                    <span class="input-hint">This appears on the header of all pages.</span>
-                  </div>
-                  <div class="form-group">
-                    <label>Constituency Name</label>
-                    <input type="text" id="set-constituency" placeholder="e.g. Ketu North">
-                  </div>
+                  <div class="form-group full-width"><label>Application Name <span class="required">*</span></label><input type="text" id="set-app-name"><span class="input-hint">Appears on every page header.</span></div>
+                  <div class="form-group"><label>Constituency Name</label><input type="text" id="set-constituency"></div>
                 </div>
-                <div style="margin-top:20px">
+                <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
                   <button class="btn btn-primary" onclick="PageRenderers.saveGeneralSettings()">💾 Save Settings</button>
+                  <button class="btn btn-danger" onclick="Modal.open('modal-demo-clear')" style="margin-left:auto">🗑️ Clear Demo Data</button>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Google Sheets -->
           <div id="stab-sheets" class="settings-tab" style="display:none">
             <div class="card">
               <div class="card-header"><div class="card-icon">📊</div><h3>Google Sheets Integration</h3></div>
               <div class="card-body">
-                <div style="background:var(--ndc-green-pale);border-radius:var(--radius);padding:14px;margin-bottom:20px;font-size:13px;color:var(--ndc-green-dk)">
-                  💡 See the setup guide for how to get your Sheet ID, API Key, and Script URL.
-                </div>
+                <div style="background:var(--ndc-green-pale);border-radius:var(--radius);padding:14px;margin-bottom:20px;font-size:13px;color:var(--ndc-green-dk)">💡 The app automatically fetches new records from Sheets every 2 minutes. You can also click 🔄 in the header to sync now.</div>
                 <div class="form-grid">
-                  <div class="form-group full-width">
-                    <label>Google Sheet ID</label>
-                    <input type="text" id="set-sheet-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms">
-                    <span class="input-hint">Found in your Google Sheet URL.</span>
-                  </div>
-                  <div class="form-group full-width">
-                    <label>API Key</label>
-                    <input type="text" id="set-api-key" placeholder="AIzaSy...">
-                    <span class="input-hint">From Google Cloud Console → Credentials.</span>
-                  </div>
-                  <div class="form-group full-width">
-                    <label>Apps Script Web App URL</label>
-                    <input type="text" id="set-script-url" placeholder="https://script.google.com/macros/s/.../exec">
-                    <span class="input-hint">From Google Apps Script → Deploy → Web App.</span>
-                  </div>
+                  <div class="form-group full-width"><label>Google Sheet ID</label><input type="text" id="set-sheet-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"><span class="input-hint">Found in the Google Sheet URL.</span></div>
+                  <div class="form-group full-width"><label>API Key</label><input type="text" id="set-api-key" placeholder="AIzaSy…"></div>
+                  <div class="form-group full-width"><label>Apps Script Web App URL</label><input type="text" id="set-script-url" placeholder="https://script.google.com/macros/s/…/exec"></div>
                 </div>
-                <div style="margin-top:20px">
-                  <button class="btn btn-primary" onclick="PageRenderers.saveGeneralSettings()">💾 Save Connection</button>
-                  <button class="btn btn-secondary" style="margin-left:10px" onclick="App.flushOfflineQueue()">🔄 Sync Offline Queue</button>
+                <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
+                  <button class="btn btn-primary" onclick="PageRenderers.saveGeneralSettings()">💾 Save</button>
+                  <button class="btn btn-secondary" onclick="App.fetchFromSheets().then(()=>Toast.show('Synced','Data refreshed.','success'))">🔄 Sync Now</button>
+                  <button class="btn btn-secondary" onclick="App.flushOfflineQueue()">📤 Upload Offline Queue</button>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Polling Stations -->
           <div id="stab-stations" class="settings-tab" style="display:none">
-              <div class="card" style="margin-bottom:16px">
-              <div class="card-header"><div class="card-icon">➕</div><h3>Add Polling Station / Branch</h3></div>
+            <div class="card" style="margin-bottom:16px">
+              <div class="card-header"><div class="card-icon">➕</div><h3>Add Polling Station</h3></div>
               <div class="card-body">
                 <div class="form-grid">
-                  <div class="form-group">
-                    <label>Ward Name <span class="required">*</span></label>
-                    <input type="text" id="st-ward" placeholder="e.g. Aflao Ward">
-                  </div>
-                  <div class="form-group">
-                    <label>Station Name <span class="required">*</span></label>
-                    <input type="text" id="st-name" placeholder="e.g. Aflao A Polling Station">
-                  </div>
-                  <div class="form-group">
-                    <label>Branch Name <span class="required">*</span></label>
-                    <input type="text" id="st-branch" placeholder="e.g. Aflao Branch">
-                  </div>
-                  <div class="form-group">
-                    <label>Station Code <span class="required">*</span></label>
-                    <input type="text" id="st-code" placeholder="e.g. PS-001">
-                  </div>
-                  <div class="form-group">
-                    <label>Branch Code <span class="required">*</span></label>
-                    <input type="text" id="st-bcode" placeholder="e.g. BR-001">
-                  </div>
+                  <div class="form-group"><label>Zone <span class="required">*</span></label><input type="text" id="st-zone" placeholder="e.g. Zone A"></div>
+                  <div class="form-group"><label>Ward Name <span class="required">*</span></label><input type="text" id="st-ward" placeholder="e.g. Aflao Ward"></div>
+                  <div class="form-group"><label>Station Name <span class="required">*</span></label><input type="text" id="st-name" placeholder="e.g. Aflao A Polling Station"></div>
+                  <div class="form-group"><label>Branch Name <span class="required">*</span></label><input type="text" id="st-branch" placeholder="e.g. Aflao Branch"></div>
+                  <div class="form-group"><label>Station Code <span class="required">*</span></label><input type="text" id="st-code" placeholder="e.g. PS-001"></div>
+                  <div class="form-group"><label>Branch Code <span class="required">*</span></label><input type="text" id="st-bcode" placeholder="e.g. BR-001"></div>
                 </div>
-                <div style="margin-top:16px">
-                  <button class="btn btn-primary" onclick="PageRenderers.addStation()">➕ Add Station</button>
-                </div>
+                <div style="margin-top:16px"><button class="btn btn-primary" onclick="PageRenderers.addStation()">➕ Add Station</button></div>
               </div>
             </div>
-
-            <div class="card">
-              <div class="card-header"><div class="card-icon">🏢</div><h3>Configured Stations</h3></div>
-              <div class="card-body">
-                <div id="stations-list"></div>
-              </div>
-            </div>
+            <div class="card"><div class="card-header"><div class="card-icon">🏢</div><h3>Configured Stations</h3></div><div class="card-body"><div id="stations-list"></div></div></div>
           </div>
 
-          <!-- About -->
           <div id="stab-about" class="settings-tab" style="display:none">
             <div class="card">
               <div class="card-header"><div class="card-icon blue">ℹ️</div><h3>About KNNDCmdb</h3></div>
               <div class="card-body" style="text-align:center;padding:40px">
                 <img src="assets/ndc-logo.png" style="width:80px;margin-bottom:16px">
-                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v1.0.0</div>
+                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v1.3.0</div>
                 <div style="color:var(--gray-500);margin-top:8px">Ketu North NDC Members Database</div>
                 <div style="color:var(--gray-400);font-size:13px;margin-top:4px">Elections & IT Directorate, 2026</div>
-                <div class="divider"></div>
-                <div style="font-size:13px;color:var(--gray-600)">
-                  Built for the National Democratic Congress, Ketu North Constituency.<br>
-                  Supports offline data entry, Google Sheets sync, role-based access, and full audit logging.
-                </div>
               </div>
             </div>
           </div>
@@ -630,275 +496,226 @@
       </div>
     </div>
 
-  </main><!-- /main -->
+  </main>
 
-  <!-- FOOTER -->
-  <footer class="site-footer">
-    <strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v1.0.0
-  </footer>
-</div><!-- /app-shell -->
+  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v1.3.0</footer>
+</div>
 
-<!-- ════════════ TOAST CONTAINER ════════════ -->
 <div id="toast-container"></div>
 
-<!-- ════════════ MODALS ════════════ -->
-
-<!-- Edit Member Modal -->
+<!-- ═══ MODAL: EDIT MEMBER ═══ -->
 <div id="modal-edit" class="modal-overlay">
   <div class="modal">
-    <div class="modal-header">
-      <div class="card-icon">✏️</div>
-      <h3>Edit Member Record</h3>
-      <button class="modal-close" onclick="Modal.close('modal-edit')">✕</button>
-    </div>
+    <div class="modal-header"><div class="card-icon">✏️</div><h3>Edit Member Record</h3><button class="modal-close" onclick="Modal.close('modal-edit')">✕</button></div>
     <div class="modal-body">
       <div id="edit-current-info" style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:var(--radius);padding:10px 14px;font-size:12px;color:var(--gray-600);margin-bottom:16px"></div>
       <input type="hidden" id="edit-id">
       <div class="form-grid">
-        <div class="form-group">
-          <label>First Name <span class="required">*</span></label>
-          <input type="text" id="edit-first">
-        </div>
-        <div class="form-group">
-          <label>Last Name <span class="required">*</span></label>
-          <input type="text" id="edit-last">
-        </div>
-        <div class="form-group">
-          <label>Other Names</label>
-          <input type="text" id="edit-other">
-        </div>
-        <div class="form-group">
-          <label>Party ID <span class="required">*</span></label>
-          <input type="text" id="edit-party">
-        </div>
-        <div class="form-group">
-          <label>Voter ID</label>
-          <input type="text" id="edit-voter">
-        </div>
-        <div class="form-group">
-          <label>Phone</label>
-          <input type="text" id="edit-phone">
-        </div>
-        <div class="form-group full-width">
-          <label>Reason for Change <span class="required">*</span></label>
-          <textarea id="edit-reason" rows="2" placeholder="Required: Explain why this record is being modified…"></textarea>
-        </div>
+        <div class="form-group"><label>First Name <span class="required">*</span></label><input type="text" id="edit-first"></div>
+        <div class="form-group"><label>Last Name <span class="required">*</span></label><input type="text" id="edit-last"></div>
+        <div class="form-group"><label>Other Names</label><input type="text" id="edit-other"></div>
+        <div class="form-group"><label>Gender</label><select id="edit-gender"><option value="">—</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
+        <div class="form-group"><label>Party ID</label><input type="text" id="edit-party"></div>
+        <div class="form-group"><label>Voter ID</label><input type="text" id="edit-voter"></div>
+        <div class="form-group"><label>Phone</label><input type="text" id="edit-phone"></div>
+        <div class="form-group full-width"><label>Reason for Change <span class="required">*</span></label><textarea id="edit-reason" rows="2" placeholder="Required: explain why this record is being modified…"></textarea></div>
       </div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="Modal.close('modal-edit')">Cancel</button>
-      <button class="btn btn-primary" onclick="PageRenderers.submitEdit()">💾 Save Changes</button>
-    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="Modal.close('modal-edit')">Cancel</button><button class="btn btn-primary" onclick="PageRenderers.submitEdit()">💾 Save Changes</button></div>
   </div>
 </div>
 
-<!-- Delete Confirmation Modal -->
+<!-- ═══ MODAL: DELETE ═══ -->
 <div id="modal-delete" class="modal-overlay">
   <div class="modal">
-    <div class="modal-header">
-      <div class="card-icon red">🗑️</div>
-      <h3>Delete Member Record</h3>
-      <button class="modal-close" onclick="Modal.close('modal-delete')">✕</button>
-    </div>
+    <div class="modal-header"><div class="card-icon red">🗑️</div><h3>Delete Member Record</h3><button class="modal-close" onclick="Modal.close('modal-delete')">✕</button></div>
     <div class="modal-body">
       <input type="hidden" id="del-id">
-      <div style="background:var(--ndc-red-pale);border:1px solid var(--ndc-red);border-radius:var(--radius);padding:14px;margin-bottom:16px">
-        ⚠️ You are about to permanently delete: <strong id="del-name"></strong>.<br>
-        This action will be logged and <strong>cannot be undone</strong>.
-      </div>
-      <div class="form-group">
-        <label>Reason for Deletion <span class="required">*</span></label>
-        <textarea id="del-reason" rows="3" placeholder="Required: Explain why this record is being deleted…"></textarea>
-      </div>
+      <div style="background:var(--ndc-red-pale);border:1px solid var(--ndc-red);border-radius:var(--radius);padding:14px;margin-bottom:16px">⚠️ Permanently deleting: <strong id="del-name"></strong>. This action cannot be undone.</div>
+      <div class="form-group"><label>Reason <span class="required">*</span></label><textarea id="del-reason" rows="3" placeholder="Required: explain why this record is being deleted…"></textarea></div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="Modal.close('modal-delete')">Cancel</button>
-      <button class="btn btn-danger" onclick="PageRenderers.submitDelete()">🗑️ Confirm Delete</button>
-    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="Modal.close('modal-delete')">Cancel</button><button class="btn btn-danger" onclick="PageRenderers.submitDelete()">🗑️ Confirm Delete</button></div>
   </div>
 </div>
 
-<!-- Add/Edit User Modal -->
+<!-- ═══ MODAL: ADD/EDIT USER ═══ -->
 <div id="modal-user" class="modal-overlay">
   <div class="modal">
-    <div class="modal-header">
-      <div class="card-icon">👤</div>
-      <h3 id="user-modal-title">Add New User</h3>
-      <button class="modal-close" onclick="Modal.close('modal-user')">✕</button>
-    </div>
+    <div class="modal-header"><div class="card-icon">👤</div><h3 id="user-modal-title">Add New User</h3><button class="modal-close" onclick="Modal.close('modal-user')">✕</button></div>
     <div class="modal-body">
       <input type="hidden" id="edit-user-id">
       <div class="form-grid" id="user-form">
-        <div class="form-group full-width">
-          <label>Full Name <span class="required">*</span></label>
-          <input type="text" id="u-name" placeholder="e.g. Kofi Mensah">
+        <div class="form-group full-width"><label>Full Name <span class="required">*</span></label><input type="text" id="u-name" placeholder="e.g. Kofi Mensah"></div>
+        <div class="form-group"><label>Username <span class="required">*</span></label><input type="text" id="u-username"></div>
+        <div class="form-group"><label>Password <span class="required">*</span></label><input type="text" id="u-password"></div>
+        <div class="form-group"><label>Role <span class="required">*</span></label>
+          <select id="u-role"><option value="officer">Data Entry Officer</option><option value="ward">Ward Coordinator</option><option value="exec">Constituency Executive</option><option value="admin">System Administrator</option></select>
         </div>
-        <div class="form-group">
-          <label>Username <span class="required">*</span></label>
-          <input type="text" id="u-username" placeholder="e.g. kofi.mensah">
-        </div>
-        <div class="form-group">
-          <label>Password <span class="required">*</span></label>
-          <input type="text" id="u-password" placeholder="Set a strong password">
-        </div>
-        <div class="form-group">
-          <label>Role <span class="required">*</span></label>
-          <select id="u-role">
-            <option value="officer">Data Entry Officer</option>
-            <option value="ward">Ward Coordinator</option>
-            <option value="exec">Constituency Executive</option>
-            <option value="admin">System Administrator</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Ward</label>
-          <input type="text" id="u-ward" placeholder="e.g. Aflao Ward">
-        </div>
-        <div class="form-group">
-          <label>Primary Station Code</label>
-          <input type="text" id="u-station" placeholder="e.g. PS-001">
-        </div>
-        <div class="form-group full-width">
-          <label>Branch</label>
-          <input type="text" id="u-branch" placeholder="e.g. Aflao Branch">
-          <span class="input-hint">For Data Entry Officers, use the 📍 Assign button to set stations via checkboxes.</span>
-        </div>
+        <div class="form-group"><label>Ward</label><input type="text" id="u-ward"></div>
+        <div class="form-group"><label>Primary Station Code</label><input type="text" id="u-station" placeholder="e.g. PS-001"></div>
+        <div class="form-group full-width"><label>Branch</label><input type="text" id="u-branch"><span class="input-hint">For Data Entry Officers, use 📍 Assign to set stations via checkboxes.</span></div>
       </div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="Modal.close('modal-user')">Cancel</button>
-      <button class="btn btn-primary" onclick="PageRenderers.submitUser()">💾 Save User</button>
-    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="Modal.close('modal-user')">Cancel</button><button class="btn btn-primary" onclick="PageRenderers.submitUser()">💾 Save User</button></div>
   </div>
 </div>
 
-<!-- Assign Stations Modal -->
+<!-- ═══ MODAL: ASSIGN STATIONS ═══ -->
 <div id="modal-assign" class="modal-overlay">
   <div class="modal" style="max-width:720px">
-    <div class="modal-header">
-      <div class="card-icon">📍</div>
-      <h3>Assign Polling Stations</h3>
-      <button class="modal-close" onclick="Modal.close('modal-assign')">✕</button>
-    </div>
+    <div class="modal-header"><div class="card-icon">📍</div><h3>Assign Polling Stations</h3><button class="modal-close" onclick="Modal.close('modal-assign')">✕</button></div>
     <div class="modal-body">
       <input type="hidden" id="assign-user-id">
       <div style="background:var(--ndc-green-pale);border:1px solid var(--ndc-green-lt);border-radius:var(--radius);padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;gap:12px">
         <div style="font-size:28px">👤</div>
-        <div>
-          <div style="font-weight:700;color:var(--ndc-green-dk);font-size:14px" id="assign-user-name">—</div>
-          <div style="font-size:12px;color:var(--gray-500)" id="assign-user-role">—</div>
-        </div>
+        <div><div style="font-weight:700;color:var(--ndc-green-dk)" id="assign-user-name">—</div><div style="font-size:12px;color:var(--gray-500)" id="assign-user-role">—</div></div>
         <div style="flex:1"></div>
-        <div style="font-size:12px;color:var(--gray-500);text-align:right">
-          ✅ Check the wards and/or individual stations<br>to assign to this officer.
+        <div style="font-size:12px;color:var(--gray-500);text-align:right">✅ Check ward to select all, or pick individual stations.</div>
+      </div>
+      <div style="max-height:420px;overflow-y:auto" id="assign-stations-container"></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="Modal.close('modal-assign')">Cancel</button><button class="btn btn-primary" onclick="PageRenderers.submitAssignment()">💾 Save Assignment</button></div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: CHANGE PASSWORD (first login) ═══ -->
+<div id="modal-change-password" class="modal-overlay">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header" style="background:linear-gradient(to right,var(--ndc-green-pale),transparent)">
+      <div class="card-icon">🔑</div>
+      <h3>Set Your New Password</h3>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--ndc-green-pale);border-radius:var(--radius);padding:12px 16px;margin-bottom:18px;font-size:13px;color:var(--ndc-green-dk)">
+        🔐 This is your first login. You must set a personal password before continuing.
+      </div>
+      <div class="form-grid">
+        <div class="form-group full-width">
+          <label>New Password <span class="required">*</span></label>
+          <input type="password" id="new-pwd" placeholder="Enter a strong password">
+        </div>
+        <div class="form-group full-width">
+          <label>Confirm Password <span class="required">*</span></label>
+          <input type="password" id="new-pwd-confirm" placeholder="Repeat your new password">
         </div>
       </div>
-
-      <div style="max-height:420px;overflow-y:auto;padding-right:4px" id="assign-stations-container">
-        <div class="empty-state"><div class="empty-icon">🏢</div><div class="empty-title">Loading stations…</div></div>
-      </div>
+      <div id="pwd-strength-msg" style="font-size:12px;margin-top:8px;color:var(--gray-400)"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="Modal.close('modal-assign')">Cancel</button>
-      <button class="btn btn-primary" onclick="PageRenderers.submitAssignment()">💾 Save Assignment</button>
+      <button class="btn btn-primary btn-lg" style="width:100%" onclick="submitPasswordChange()">🔑 Set Password & Continue</button>
     </div>
   </div>
 </div>
 
-<!-- SCRIPTS -->
+<!-- ═══ MODAL: DEMO DATA CLEAR ═══ -->
+<div id="modal-demo-clear" class="modal-overlay">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header" style="background:linear-gradient(to right,var(--ndc-red-pale),transparent)">
+      <div class="card-icon red">🗑️</div>
+      <h3>Clear Demo Data</h3>
+      <button class="modal-close" onclick="Modal.close('modal-demo-clear')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--ndc-red-pale);border:1px solid var(--ndc-red);border-radius:var(--radius);padding:16px;margin-bottom:16px">
+        <div style="font-weight:700;color:var(--ndc-red-dk);margin-bottom:6px">⚠️ This action cannot be undone</div>
+        <p style="font-size:13px;color:var(--ndc-red-dk)">This will permanently remove all <strong>sample/demo member records</strong> from the database. Any records you have entered yourself will be kept.</p>
+      </div>
+      <p style="font-size:13px;color:var(--gray-600)">This is recommended before going live. Users, settings and polling stations are not affected.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('modal-demo-clear')">Cancel — Keep Demo Data</button>
+      <button class="btn btn-danger" onclick="App.clearDemoData();Modal.close('modal-demo-clear');PageRenderers.dashboard()">🗑️ Yes, Remove Demo Data</button>
+    </div>
+  </div>
+</div>
+
 <script src="js/app.js"></script>
 <script src="js/pages.js"></script>
 <script>
-
-// ── PASSWORD TOGGLE ──
+// ── PASSWORD TOGGLE ──────────────────────────────────────────
 function togglePassword() {
-  const pwdInput = document.getElementById('login-password');
-  const check    = document.getElementById('show-pwd-check');
-  const isShown  = pwdInput.type === 'text';
-  pwdInput.type  = isShown ? 'password' : 'text';
-  if (check) check.checked = !isShown;
+  const p=document.getElementById('login-password'), c=document.getElementById('show-pwd-check');
+  const show=p.type==='password'; p.type=show?'text':'password'; if(c) c.checked=show;
 }
 
-// ── LOCKOUT COUNTDOWN ──
-let _lockTimer = null;
+// ── LOCKOUT COUNTDOWN ────────────────────────────────────────
+let _lockTimer=null;
 function startLockoutCountdown(seconds) {
-  const banner   = document.getElementById('lockout-banner');
-  const timerEl  = document.getElementById('lockout-timer');
-  const loginBtn = document.getElementById('login-btn');
-  const attemptW = document.getElementById('attempt-warning');
-  if (banner)   banner.style.display = 'block';
-  if (attemptW) attemptW.style.display = 'none';
-  if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = '🔒 Locked'; }
-
-  let remaining = seconds;
-  if (_lockTimer) clearInterval(_lockTimer);
-  _lockTimer = setInterval(() => {
-    remaining--;
-    const m = Math.floor(remaining / 60);
-    const s = remaining % 60;
-    if (timerEl) timerEl.textContent = `${m}:${String(s).padStart(2,'0')}`;
-    if (remaining <= 0) {
-      clearInterval(_lockTimer);
-      if (banner)   banner.style.display = 'none';
-      if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = '🔐 Sign In'; }
-    }
-  }, 1000);
+  const banner=document.getElementById('lockout-banner'), timer=document.getElementById('lockout-timer');
+  const btn=document.getElementById('login-btn'), aw=document.getElementById('attempt-warning');
+  if(banner) banner.style.display='block'; if(aw) aw.style.display='none';
+  if(btn){btn.disabled=true;btn.textContent='🔒 Locked';}
+  let rem=seconds;
+  if(_lockTimer) clearInterval(_lockTimer);
+  _lockTimer=setInterval(()=>{
+    rem--;
+    const m=Math.floor(rem/60),s=rem%60;
+    if(timer) timer.textContent=`${m}:${String(s).padStart(2,'0')}`;
+    if(rem<=0){clearInterval(_lockTimer);if(banner)banner.style.display='none';if(btn){btn.disabled=false;btn.textContent='🔐 Sign In';}}
+  },1000);
 }
 
-// ── LOGIN HANDLER ──
+// ── LOGIN ────────────────────────────────────────────────────
 function doLogin() {
-  const u = document.getElementById('login-username').value.trim();
-  const p = document.getElementById('login-password').value;
-  if (!u || !p) { Toast.show('Error','Please enter username and password.','error'); return; }
-
-  const result = App.login(u, p);
-
-  if (result.success) {
-    document.getElementById('attempt-warning').style.display = 'none';
-    document.getElementById('lockout-banner').style.display  = 'none';
-    if (_lockTimer) clearInterval(_lockTimer);
-    App.showApp();
-
-  } else if (result.locked) {
+  const u=document.getElementById('login-username').value.trim();
+  const p=document.getElementById('login-password').value;
+  if(!u||!p){Toast.show('Error','Please enter username and password.','error');return;}
+  const result=App.login(u,p);
+  if(result.success) {
+    document.getElementById('attempt-warning').style.display='none';
+    document.getElementById('lockout-banner').style.display='none';
+    if(_lockTimer) clearInterval(_lockTimer);
+    if(result.mustChangePassword) {
+      // Show change-password modal before entering app
+      document.getElementById('login-screen').style.display='none';
+      document.getElementById('app-shell').style.display='flex';
+      document.getElementById('app-shell').style.flexDirection='column';
+      App.renderNav(); App.renderUserHeader();
+      Modal.open('modal-change-password');
+    } else {
+      App.showApp();
+    }
+  } else if(result.locked) {
     startLockoutCountdown(result.seconds);
-    Toast.show('Account Locked', `Too many failed attempts. Wait ${Math.ceil(result.seconds/60)} minute(s).`, 'error', 6000);
-
-  } else if (result.failed) {
-    const w = document.getElementById('attempt-warning');
-    const al = document.getElementById('attempts-left');
-    if (w)  w.style.display = 'block';
-    if (al) al.textContent  = result.attemptsLeft;
-    Toast.show('Login Failed', `Invalid credentials. ${result.attemptsLeft} attempt(s) left.`, 'error');
-    document.getElementById('login-password').value = '';
+    Toast.show('Locked',`Wait ${Math.ceil(result.seconds/60)} minute(s).`,'error',6000);
+  } else if(result.failed) {
+    const w=document.getElementById('attempt-warning'),al=document.getElementById('attempts-left');
+    if(w) w.style.display='block'; if(al) al.textContent=result.attemptsLeft;
+    Toast.show('Login Failed',`${result.attemptsLeft} attempt(s) left.`,'error');
+    document.getElementById('login-password').value='';
     document.getElementById('login-password').focus();
   }
 }
 
-// Check if already locked on page load
-(function checkInitialLock() {
-  const lockData = JSON.parse(localStorage.getItem('knndc_lockout') || 'null');
-  if (lockData) {
-    const remaining = Math.ceil((lockData.until - Date.now()) / 1000);
-    if (remaining > 0) startLockoutCountdown(remaining);
-  }
-})();
-
-// ── SETTINGS TABS ──
-function setTab(el, tabId) {
-  document.querySelectorAll('.settings-nav-item').forEach(i=>i.classList.remove('active'));
-  document.querySelectorAll('.settings-tab').forEach(t=>t.style.display='none');
-  el.classList.add('active');
-  document.getElementById(tabId).style.display='block';
+// ── PASSWORD CHANGE (first login) ───────────────────────────
+function submitPasswordChange() {
+  const np=document.getElementById('new-pwd').value;
+  const nc=document.getElementById('new-pwd-confirm').value;
+  const msg=document.getElementById('pwd-strength-msg');
+  if(!np||np.length<6){if(msg)msg.textContent='⚠️ Password must be at least 6 characters.';msg.style.color='var(--ndc-red)';return;}
+  if(np!==nc){if(msg)msg.textContent='⚠️ Passwords do not match.';msg.style.color='var(--ndc-red)';return;}
+  App.changePassword(App.currentUser.id,np);
+  Modal.close('modal-change-password');
+  Toast.show('Password Set','Your password has been updated. Welcome!','success');
+  App.setupInactivityTracking();
+  App.navigate('dashboard');
 }
 
-// ── DATE ──
-document.getElementById('current-date').textContent = new Date().toLocaleDateString('en-GH',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+// ── SETTINGS TABS ────────────────────────────────────────────
+function setTab(el,tabId) {
+  document.querySelectorAll('.settings-nav-item').forEach(i=>i.classList.remove('active'));
+  document.querySelectorAll('.settings-tab').forEach(t=>t.style.display='none');
+  el.classList.add('active'); document.getElementById(tabId).style.display='block';
+}
 
-// ── INIT ──
+// ── INIT ─────────────────────────────────────────────────────
+document.getElementById('current-date').textContent=new Date().toLocaleDateString('en-GH',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+// Check lockout on page load
+(()=>{const l=JSON.parse(localStorage.getItem('knndc_lockout')||'null');if(l){const r=Math.ceil((l.until-Date.now())/1000);if(r>0) startLockoutCountdown(r);}})();
+
 App.init();
-
-// Live dashboard refresh
-setInterval(()=>{ if(App.currentPage==='dashboard') PageRenderers.dashboard(); }, 30000);
+setInterval(()=>{ if(App.currentUser&&App.currentPage==='dashboard') PageRenderers.dashboard(); },30000);
 </script>
 </body>
 </html>

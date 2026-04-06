@@ -1,28 +1,31 @@
 /**
  * ============================================================
- * KNNDCmdb – Google Apps Script Backend  v1.2
+ * KNNDCmdb – Google Apps Script Backend  v1.3
  * ============================================================
- * HOW TO DEPLOY (STEP BY STEP):
+ * DEPLOYMENT GUIDE:
  *
- * 1. Open your Google Sheet
- * 2. Click  Extensions → Apps Script
- * 3. Delete all existing code
- * 4. Paste THIS ENTIRE FILE
- * 5. Click 💾 Save (name the project "KNNDCmdb Backend")
- * 6. Click Run → setupSpreadsheet  (ONE-TIME SETUP — creates all tabs)
- *    → Authorise when prompted (click "Allow")
- *    → You will see "Setup complete!" in the log
- * 7. Click Deploy → New Deployment
- *    → Type: Web App
- *    → Execute as: Me
- *    → Who has access: Anyone
- *    → Click Deploy → Authorise → Allow
- * 8. Copy the Web App URL (looks like: https://script.google.com/macros/s/.../exec)
- * 9. Paste that URL into the KNNDCmdb app → Settings → Google Sheets → Script URL
+ * ── FIRST TIME SETUP ─────────────────────────────────────
+ * 1. Open your Google Sheet → Extensions → Apps Script
+ * 2. Delete all existing code, paste this entire file
+ * 3. Click 💾 Save (name: "KNNDCmdb Backend")
+ * 4. Run → setupSpreadsheet   (creates all tabs with correct columns)
+ *    → Authorise when prompted → Click Allow
+ *    → You'll see "Setup complete!" alert
+ * 5. Deploy → New Deployment → Type: Web App
+ *    → Execute as: Me  |  Who has access: Anyone
+ *    → Click Deploy → Authorise → Copy the Web App URL
+ * 6. Paste the URL into KNNDCmdb → Settings → Google Sheets → Script URL
+ *
+ * ── UPGRADING FROM v1.1 or v1.2 (adds Zone & Gender) ────
+ * 1. Paste this file over the old one in Apps Script
+ * 2. Run → migrateAddZoneAndGender
+ *    → This adds Zone column to Polling Stations sheet
+ *    → And Gender column to Members Database sheet
+ *    → Safe to run multiple times (skips if columns exist)
+ * 3. Re-deploy: Deploy → Manage Deployments → Edit → New version → Deploy
  * ============================================================
  */
 
-// ─── Sheet Names ─────────────────────────────────────────────
 const SHEETS = {
   MEMBERS:          'Members Database',
   POLLING_STATIONS: 'Polling Stations',
@@ -31,7 +34,6 @@ const SHEETS = {
   SUMMARY:          'Summary',
 };
 
-// ─── NDC Brand Colours ───────────────────────────────────────
 const NDC_GREEN  = '#1a6b3a';
 const NDC_GREEN2 = '#134d2a';
 const NDC_RED    = '#c8102e';
@@ -40,173 +42,192 @@ const LIGHT_GRN  = '#e8f5ec';
 
 
 // ════════════════════════════════════════════════════════════
-//  ONE-TIME SETUP — Run this manually ONCE after pasting code
+//  ONE-TIME SETUP — Run this once after pasting code
 // ════════════════════════════════════════════════════════════
 function setupSpreadsheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.rename('KNNDCmdb – Ketu North NDC Members Database'); // FIX 1: was ss.setSpreadsheetName()
-
+  ss.setSpreadsheetName('KNNDCmdb – Ketu North NDC Members Database');
   _setupMembersSheet(ss);
   _setupPollingStationsSheet(ss);
   _setupUsersSheet(ss);
   _setupAuditSheet(ss);
   _setupSummarySheet(ss);
-
-  // Reorder tabs — FIX 3: split chained call into two statements
   const order = [SHEETS.MEMBERS, SHEETS.POLLING_STATIONS, SHEETS.USERS, SHEETS.AUDIT, SHEETS.SUMMARY];
-  order.forEach((name, i) => {
-    const s = ss.getSheetByName(name);
-    if (s) { ss.setActiveSheet(s); ss.moveActiveSheet(i + 1); }
-  });
-
-  Logger.log('✅ Setup complete! All tabs created successfully.');
-  SpreadsheetApp.getUi().alert('✅ KNNDCmdb Setup Complete!\n\nAll tabs have been created:\n• Members Database\n• Polling Stations\n• Users\n• Audit Log\n• Summary\n\nNow deploy this script as a Web App (Deploy → New Deployment).');
+  order.forEach((name,i)=>{ const s=ss.getSheetByName(name); if(s) ss.setActiveSheet(s).moveActiveSheet(i+1); });
+  Logger.log('✅ Setup complete!');
+  SpreadsheetApp.getUi().alert('✅ KNNDCmdb v1.3 Setup Complete!\n\nTabs created:\n• Members Database (with Zone & Gender columns)\n• Polling Stations (with Zone column)\n• Users\n• Audit Log\n• Summary\n\nNext: Deploy as Web App.');
 }
 
 
-// ─── Members Database Sheet ──────────────────────────────────
+// ════════════════════════════════════════════════════════════
+//  MIGRATION — Run this if upgrading from v1.1 or v1.2
+//  Adds Zone to Polling Stations + Gender to Members Database
+// ════════════════════════════════════════════════════════════
+function migrateAddZoneAndGender() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const log = [];
+
+  // ── 1. Polling Stations: Add Zone column ──
+  const psSheet = ss.getSheetByName(SHEETS.POLLING_STATIONS);
+  if (psSheet) {
+    const psHdrs = psSheet.getRange(2, 1, 1, psSheet.getLastColumn()).getValues()[0];
+    if (!psHdrs.includes('Zone')) {
+      // Insert Zone as column A (shift existing right)
+      psSheet.insertColumnBefore(1);
+      psSheet.getRange(2, 1).setValue('Zone').setFontWeight('bold').setBackground(NDC_GREEN2).setFontColor(WHITE);
+      psSheet.setColumnWidth(1, 120);
+      log.push('✅ Added "Zone" column to Polling Stations (column A).');
+      log.push('   ⚠️  Please fill in the Zone values for each station.');
+    } else {
+      log.push('ℹ️  Polling Stations already has a "Zone" column — skipped.');
+    }
+  } else {
+    log.push('⚠️  Polling Stations sheet not found — running full setup for it.');
+    _setupPollingStationsSheet(ss);
+  }
+
+  // ── 2. Members Database: Add Gender column after Telephone Number ──
+  const mSheet = ss.getSheetByName(SHEETS.MEMBERS);
+  if (mSheet) {
+    const mHdrs = mSheet.getRange(4, 1, 1, mSheet.getLastColumn()).getValues()[0];
+    if (!mHdrs.includes('Gender')) {
+      // Find position of "Telephone Number" (col E, index 4) — insert after it
+      const phoneIdx = mHdrs.indexOf('Telephone Number');
+      const insertAfterCol = phoneIdx >= 0 ? phoneIdx + 2 : 6; // 1-based
+      mSheet.insertColumnAfter(insertAfterCol);
+      const genderCol = insertAfterCol + 1;
+      mSheet.getRange(4, genderCol).setValue('Gender').setFontWeight('bold').setBackground(NDC_GREEN).setFontColor(WHITE);
+      mSheet.setColumnWidth(genderCol, 100);
+      // Also add Zone if missing
+      if (!mHdrs.includes('Zone')) {
+        mSheet.insertColumnAfter(genderCol);
+        const zoneCol = genderCol + 1;
+        mSheet.getRange(4, zoneCol).setValue('Zone').setFontWeight('bold').setBackground(NDC_GREEN).setFontColor(WHITE);
+        mSheet.setColumnWidth(zoneCol, 110);
+        log.push('✅ Added "Gender" and "Zone" columns to Members Database.');
+      } else {
+        log.push('✅ Added "Gender" column to Members Database.');
+      }
+    } else {
+      log.push('ℹ️  Members Database already has a "Gender" column — skipped.');
+      // Check Zone separately
+      if (!mHdrs.includes('Zone')) {
+        const genderIdx = mHdrs.indexOf('Gender');
+        mSheet.insertColumnAfter(genderIdx + 1);
+        const zoneCol = genderIdx + 2;
+        mSheet.getRange(4, zoneCol).setValue('Zone').setFontWeight('bold').setBackground(NDC_GREEN).setFontColor(WHITE);
+        mSheet.setColumnWidth(zoneCol, 110);
+        log.push('✅ Added "Zone" column to Members Database.');
+      } else {
+        log.push('ℹ️  Members Database already has a "Zone" column — skipped.');
+      }
+    }
+  } else {
+    log.push('⚠️  Members Database sheet not found — run setupSpreadsheet() first.');
+  }
+
+  const summary = log.join('\n');
+  Logger.log(summary);
+  SpreadsheetApp.getUi().alert('Migration Complete!\n\n' + summary + '\n\nDone. Remember to re-deploy your Web App after this.');
+}
+
+
+// ════════════════════════════════════════════════════════════
+//  SHEET SETUP HELPERS
+// ════════════════════════════════════════════════════════════
+
 function _setupMembersSheet(ss) {
   let sheet = ss.getSheetByName(SHEETS.MEMBERS);
   if (!sheet) sheet = ss.insertSheet(SHEETS.MEMBERS);
   sheet.clear();
 
-  // Row 1: Title (matching Excel template)
+  // Row 1: Title (matches Excel template format)
   sheet.getRange('A1:E1').merge().setValue('MEMBERSHIP DATABASE')
-    .setFontFamily('Outfit').setFontSize(16).setFontWeight('bold')
+    .setFontFamily('Arial').setFontSize(16).setFontWeight('bold')
     .setHorizontalAlignment('center').setBackground(NDC_GREEN2).setFontColor(WHITE);
-
-  // Row 2: Info line
   sheet.getRange('A2').setValue('Polling Station / Branch Name:').setFontWeight('bold');
   sheet.getRange('E2').setValue('Constituency: Ketu North').setHorizontalAlignment('right');
 
-  // Row 3: Blank
-  sheet.getRange('A3').setValue('');
-
-  // Row 4: Column headers (core 5 match the Excel template exactly)
-  const coreHdrs  = ['First Name','Surname','Party ID Number','Voter ID Number','Telephone Number'];
+  // Row 4: Headers — core 5 (matching Excel template) + Gender + Zone + tracking
+  const coreHdrs  = ['First Name','Surname','Party ID Number','Voter ID Number','Telephone Number','Gender','Zone'];
   const extraHdrs = ['Ward Name','Polling Station','Station Code','Branch Name','Branch Code','Other Names','Officer ID','Officer Name','Date/Time Added','Record ID'];
   const allHdrs   = [...coreHdrs, ...extraHdrs];
 
   const hdrRange = sheet.getRange(4, 1, 1, allHdrs.length);
   hdrRange.setValues([allHdrs]).setFontWeight('bold').setFontColor(WHITE).setBackground(NDC_GREEN);
-  sheet.getRange(4, 1, 1, 5).setBackground(NDC_GREEN2); // darker for core cols
+  sheet.getRange(4, 1, 1, 5).setBackground(NDC_GREEN2); // darker for core 5 cols
 
   sheet.setFrozenRows(4);
-  // FIX 2: Removed setFrozenColumns(2) — conflicts with merged cell A1:E1
+  sheet.setFrozenColumns(2);
 
-  // Column widths
-  const widths = [130,130,160,160,150,120,150,100,140,110,130,100,160,180,160];
+  const widths = [130,130,160,160,150,100,110, 120,150,100,140,110,130,100,160,180,160];
   widths.forEach((w,i) => sheet.setColumnWidth(i+1, w));
-
   sheet.setTabColor(NDC_GREEN);
-  Logger.log('✅ Members Database sheet ready.');
 }
 
-
-// ─── Polling Stations Sheet ──────────────────────────────────
 function _setupPollingStationsSheet(ss) {
   let sheet = ss.getSheetByName(SHEETS.POLLING_STATIONS);
   if (!sheet) sheet = ss.insertSheet(SHEETS.POLLING_STATIONS);
   sheet.clear();
 
-  sheet.getRange('A1:E1').merge().setValue('POLLING STATIONS REGISTER')
-    .setFontFamily('Outfit').setFontSize(14).setFontWeight('bold')
-    .setHorizontalAlignment('center').setBackground(NDC_GREEN).setFontColor(WHITE);
+  sheet.getRange('A1:F1').merge().setValue('POLLING STATIONS REGISTER')
+    .setFontSize(14).setFontWeight('bold').setHorizontalAlignment('center')
+    .setBackground(NDC_GREEN).setFontColor(WHITE);
 
-  const hdrs = ['Ward Name','Polling Station Name','Branch Name','Station Code','Branch Code'];
+  const hdrs = ['Zone','Ward Name','Polling Station Name','Branch Name','Station Code','Branch Code'];
   sheet.getRange(2, 1, 1, hdrs.length).setValues([hdrs])
     .setFontWeight('bold').setBackground(NDC_GREEN2).setFontColor(WHITE);
 
-  // Seed demo data
   const demo = [
-    ['Aflao Ward',    'Aflao A Polling Station',   'Aflao Branch',    'PS-001','BR-001'],
-    ['Aflao Ward',    'Aflao B Polling Station',   'Aflao Branch',    'PS-002','BR-001'],
-    ['Denu Ward',     'Denu Polling Station',      'Denu Branch',     'PS-003','BR-002'],
-    ['Agbozume Ward', 'Agbozume Polling Station',  'Agbozume Branch', 'PS-004','BR-003'],
-    ['Klikor Ward',   'Klikor Polling Station',    'Klikor Branch',   'PS-005','BR-004'],
-    ['Adafienu Ward', 'Adafienu Polling Station',  'Adafienu Branch', 'PS-006','BR-005'],
+    ['Zone A','Aflao Ward',    'Aflao A Polling Station',   'Aflao Branch',    'PS-001','BR-001'],
+    ['Zone A','Aflao Ward',    'Aflao B Polling Station',   'Aflao Branch',    'PS-002','BR-001'],
+    ['Zone B','Denu Ward',     'Denu Polling Station',      'Denu Branch',     'PS-003','BR-002'],
+    ['Zone B','Agbozume Ward', 'Agbozume Polling Station',  'Agbozume Branch', 'PS-004','BR-003'],
+    ['Zone C','Klikor Ward',   'Klikor Polling Station',    'Klikor Branch',   'PS-005','BR-004'],
+    ['Zone C','Adafienu Ward', 'Adafienu Polling Station',  'Adafienu Branch', 'PS-006','BR-005'],
   ];
-  sheet.getRange(3, 1, demo.length, 5).setValues(demo);
-
+  sheet.getRange(3, 1, demo.length, 6).setValues(demo);
   sheet.setFrozenRows(2);
-  [150,200,160,120,120].forEach((w,i) => sheet.setColumnWidth(i+1, w));
+  [120,150,200,160,120,120].forEach((w,i)=>sheet.setColumnWidth(i+1,w));
   sheet.setTabColor('#2563eb');
-  Logger.log('✅ Polling Stations sheet ready with demo data.');
 }
 
-
-// ─── Users Sheet ─────────────────────────────────────────────
 function _setupUsersSheet(ss) {
   let sheet = ss.getSheetByName(SHEETS.USERS);
   if (!sheet) sheet = ss.insertSheet(SHEETS.USERS);
   sheet.clear();
-
-  sheet.getRange('A1:H1').merge().setValue('SYSTEM USERS')
-    .setFontFamily('Outfit').setFontSize(14).setFontWeight('bold')
-    .setHorizontalAlignment('center').setBackground(NDC_RED).setFontColor(WHITE);
-
-  const hdrs = ['User ID','Full Name','Username','Password','Role','Ward','Station Code','Branch','Assigned Stations','Status'];
-  sheet.getRange(2, 1, 1, hdrs.length).setValues([hdrs])
-    .setFontWeight('bold').setBackground('#7f1d1d').setFontColor(WHITE);
-
-  const seed = [
-    ['u001','System Administrator','admin','Admin@2026','admin','','','','','Active'],
-    ['u002','Constituency Executive','exec','Exec@2026','exec','','','','','Active'],
-    ['u003','Ward Coordinator (Aflao)','ward1','Ward@2026','ward','Aflao Ward','PS-001','Aflao Branch','PS-001,PS-002','Active'],
-    ['u004','Data Entry Officer 1','officer1','Off1@2026','officer','Aflao Ward','PS-001','Aflao Branch','PS-001','Active'],
-    ['u005','Data Entry Officer 2','officer2','Off2@2026','officer','Denu Ward','PS-003','Denu Branch','PS-003','Active'],
-  ];
-  sheet.getRange(3, 1, seed.length, 10).setValues(seed);
-
+  sheet.getRange('A1:J1').merge().setValue('SYSTEM USERS')
+    .setFontSize(14).setFontWeight('bold').setHorizontalAlignment('center').setBackground(NDC_RED).setFontColor(WHITE);
+  const hdrs=['User ID','Full Name','Username','Password','Role','Ward','Station Code','Branch','Assigned Stations','Status'];
+  sheet.getRange(2,1,1,hdrs.length).setValues([hdrs]).setFontWeight('bold').setBackground('#7f1d1d').setFontColor(WHITE);
   sheet.setFrozenRows(2);
-  [80,180,120,120,80,120,100,130,150,80].forEach((w,i) => sheet.setColumnWidth(i+1, w));
+  [80,180,120,120,80,120,100,130,150,80].forEach((w,i)=>sheet.setColumnWidth(i+1,w));
   sheet.setTabColor(NDC_RED);
-  Logger.log('✅ Users sheet ready.');
 }
 
-
-// ─── Audit Log Sheet ─────────────────────────────────────────
 function _setupAuditSheet(ss) {
   let sheet = ss.getSheetByName(SHEETS.AUDIT);
   if (!sheet) sheet = ss.insertSheet(SHEETS.AUDIT);
   sheet.clear();
-
   sheet.getRange('A1:E1').merge().setValue('SYSTEM AUDIT LOG')
-    .setFontFamily('Outfit').setFontSize(14).setFontWeight('bold')
-    .setHorizontalAlignment('center').setBackground('#1e3a5f').setFontColor(WHITE);
-
-  const hdrs = ['Timestamp','Action','User','Details','Extra'];
-  sheet.getRange(2, 1, 1, hdrs.length).setValues([hdrs])
-    .setFontWeight('bold').setBackground('#1e3a5f').setFontColor(WHITE);
-
+    .setFontSize(14).setFontWeight('bold').setHorizontalAlignment('center').setBackground('#1e3a5f').setFontColor(WHITE);
+  sheet.getRange(2,1,1,5).setValues([['Timestamp','Action','User','Details','Extra']]).setFontWeight('bold').setBackground('#1e3a5f').setFontColor(WHITE);
   sheet.setFrozenRows(2);
-  [160,140,120,350,200].forEach((w,i) => sheet.setColumnWidth(i+1, w));
+  [160,140,120,350,200].forEach((w,i)=>sheet.setColumnWidth(i+1,w));
   sheet.setTabColor('#1e3a5f');
-  Logger.log('✅ Audit Log sheet ready.');
 }
 
-
-// ─── Summary Sheet ───────────────────────────────────────────
 function _setupSummarySheet(ss) {
   let sheet = ss.getSheetByName(SHEETS.SUMMARY);
   if (!sheet) sheet = ss.insertSheet(SHEETS.SUMMARY);
   sheet.clear();
-
   sheet.getRange('A1:D1').merge().setValue('MEMBERSHIP SUMMARY BY STATION')
-    .setFontFamily('Outfit').setFontSize(14).setFontWeight('bold')
-    .setHorizontalAlignment('center').setBackground(NDC_GREEN).setFontColor(WHITE);
-
-  sheet.getRange('A2').setValue('This sheet is auto-updated when records are exported from KNNDCmdb.')
-    .setFontColor('#6b7280').setFontStyle('italic');
-
-  const hdrs = ['Ward','Polling Station','Branch','Total Members'];
-  sheet.getRange(3, 1, 1, hdrs.length).setValues([hdrs])
-    .setFontWeight('bold').setBackground(NDC_GREEN2).setFontColor(WHITE);
-
+    .setFontSize(14).setFontWeight('bold').setHorizontalAlignment('center').setBackground(NDC_GREEN).setFontColor(WHITE);
+  sheet.getRange('A2').setValue('Auto-updated on export from KNNDCmdb.').setFontColor('#6b7280').setFontStyle('italic');
+  sheet.getRange(3,1,1,4).setValues([['Ward','Polling Station','Branch','Total Members']]).setFontWeight('bold').setBackground(NDC_GREEN2).setFontColor(WHITE);
   sheet.setFrozenRows(3);
-  [160,220,160,120].forEach((w,i) => sheet.setColumnWidth(i+1, w));
+  [160,220,160,120].forEach((w,i)=>sheet.setColumnWidth(i+1,w));
   sheet.setTabColor('#d97706');
-  Logger.log('✅ Summary sheet ready.');
 }
 
 
@@ -216,180 +237,169 @@ function _setupSummarySheet(ss) {
 
 function doGet(e) {
   const action = e?.parameter?.action || 'ping';
-  let result;
   try {
-    if (action === 'getMembers')         result = _getMembers();
-    else if (action === 'getStations')   result = _getPollingStations();
-    else if (action === 'ping')          result = { status:'ok', app:'KNNDCmdb', version:'1.2' };
-    else                                  result = { error: 'Unknown action: ' + action };
-  } catch(err) {
-    result = { error: err.message };
-  }
-  return _json(result);
+    if (action==='getMembers')        return _json(_getMembers());
+    if (action==='getStations')       return _json(_getPollingStations());
+    if (action==='ping')              return _json({status:'ok',app:'KNNDCmdb',version:'1.3'});
+    return _json({error:'Unknown action'});
+  } catch(err) { return _json({error:err.message}); }
 }
 
 function doPost(e) {
-  let result;
   try {
-    const data   = JSON.parse(e.postData.contents);
-    const action = data.action || 'addMember';
-    if      (action === 'addMember')    result = _addMember(data);
-    else if (action === 'updateMember') result = _updateMember(data);
-    else if (action === 'deleteMember') result = _deleteMember(data);
-    else if (action === 'logAudit')     result = _logAudit(data);
-    else if (action === 'syncSummary')  result = _syncSummary(data);
-    else                                result = _addMember(data); // default
-  } catch(err) {
-    result = { success: false, error: err.message };
-  }
-  return _json(result);
+    const data=JSON.parse(e.postData.contents);
+    const action=data.action||'addMember';
+    if (action==='addMember')    return _json(_addMember(data));
+    if (action==='updateMember') return _json(_updateMember(data));
+    if (action==='deleteMember') return _json(_deleteMember(data));
+    if (action==='logAudit')     return _json(_logAudit(data));
+    if (action==='syncSummary')  return _json(_refreshSummary(SpreadsheetApp.getActiveSpreadsheet()));
+    return _json(_addMember(data)); // default
+  } catch(err) { return _json({success:false,error:err.message}); }
 }
 
 function _json(data) {
-  return ContentService.createTextOutput(JSON.stringify(data))
-    .setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
 }
 
 
 // ════════════════════════════════════════════════════════════
-//  CRUD FUNCTIONS
+//  CRUD
 // ════════════════════════════════════════════════════════════
 
 function _addMember(data) {
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet   = ss.getSheetByName(SHEETS.MEMBERS);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEETS.MEMBERS);
   if (!sheet) { setupSpreadsheet(); sheet = ss.getSheetByName(SHEETS.MEMBERS); }
 
+  // Build row matching header order in _setupMembersSheet
+  // Core: First Name, Surname, Party ID, Voter ID, Phone, Gender, Zone
+  // Extra: Ward, Station, StationCode, Branch, BranchCode, OtherNames, OfficerID, OfficerName, Timestamp, RecordID
   sheet.appendRow([
-    data.firstName    || '',
-    data.lastName     || '',
-    data.partyId      || '',
-    data.voterId      || '',
-    data.phone        || '',
-    data.ward         || '',
-    data.station      || '',
-    data.stationCode  || '',
-    data.branch       || '',
-    data.branchCode   || '',
-    data.otherNames   || '',
-    data.officer      || '',
-    data.officerName  || '',
-    data.timestamp    || new Date().toLocaleString(),
-    data.id           || ('m' + Date.now()),
+    data.firstName   || '',
+    data.lastName    || '',
+    data.partyId     || '',
+    data.voterId     || '',
+    data.phone       || '',
+    data.gender      || '',   // NEW
+    data.zone        || '',   // NEW
+    data.ward        || '',
+    data.station     || '',
+    data.stationCode || '',
+    data.branch      || '',
+    data.branchCode  || '',
+    data.otherNames  || '',
+    data.officer     || '',
+    data.officerName || '',
+    data.timestamp   || new Date().toLocaleString(),
+    data.id          || 'm' + Date.now(),
   ]);
-
-  // Update summary
   _refreshSummary(ss);
-  return { success: true };
+  return { success:true };
 }
 
 function _updateMember(data) {
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEETS.MEMBERS);
-  if (!sheet) return { success:false, error:'Members sheet not found' };
-  const rows  = sheet.getDataRange().getValues();
-  for (let i = 4; i < rows.length; i++) { // data starts row 5 (index 4)
-    if (rows[i][14] === data.id) {
-      const r = i + 1;
-      sheet.getRange(r,1).setValue(data.firstName  || rows[i][0]);
-      sheet.getRange(r,2).setValue(data.lastName   || rows[i][1]);
-      sheet.getRange(r,3).setValue(data.partyId    || rows[i][2]);
-      sheet.getRange(r,4).setValue(data.voterId    || rows[i][3]);
-      sheet.getRange(r,5).setValue(data.phone      || rows[i][4]);
-      return { success: true };
+  const ss=SpreadsheetApp.getActiveSpreadsheet();
+  const sheet=ss.getSheetByName(SHEETS.MEMBERS); if(!sheet) return{success:false,error:'Sheet not found'};
+  const rows=sheet.getDataRange().getValues();
+  // Record ID is column 17 (index 16, header row 4 = data start row 5)
+  for(let i=4;i<rows.length;i++){
+    if(String(rows[i][16])===String(data.id)){
+      const r=i+1;
+      if(data.firstName)  sheet.getRange(r,1).setValue(data.firstName);
+      if(data.lastName)   sheet.getRange(r,2).setValue(data.lastName);
+      if(data.partyId)    sheet.getRange(r,3).setValue(data.partyId);
+      if(data.voterId)    sheet.getRange(r,4).setValue(data.voterId);
+      if(data.phone)      sheet.getRange(r,5).setValue(data.phone);
+      if(data.gender)     sheet.getRange(r,6).setValue(data.gender);
+      return{success:true};
     }
   }
-  return { success:false, error:'Record not found' };
+  return{success:false,error:'Record not found'};
 }
 
 function _deleteMember(data) {
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEETS.MEMBERS);
-  if (!sheet) return { success:false, error:'Members sheet not found' };
-  const rows  = sheet.getDataRange().getValues();
-  for (let i = 4; i < rows.length; i++) {
-    if (rows[i][14] === data.id) { sheet.deleteRow(i + 1); _refreshSummary(ss); return { success: true }; }
+  const ss=SpreadsheetApp.getActiveSpreadsheet();
+  const sheet=ss.getSheetByName(SHEETS.MEMBERS); if(!sheet) return{success:false,error:'Sheet not found'};
+  const rows=sheet.getDataRange().getValues();
+  for(let i=4;i<rows.length;i++){
+    if(String(rows[i][16])===String(data.id)){sheet.deleteRow(i+1);_refreshSummary(ss);return{success:true};}
   }
-  return { success:false, error:'Record not found' };
+  return{success:false,error:'Record not found'};
 }
 
 function _logAudit(data) {
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet   = ss.getSheetByName(SHEETS.AUDIT);
-  if (!sheet) { _setupAuditSheet(ss); sheet = ss.getSheetByName(SHEETS.AUDIT); }
-  sheet.appendRow([data.timestamp||new Date().toLocaleString(), data.action||'', data.user||'', data.details||'', data.extra||'']);
-  return { success: true };
+  const ss=SpreadsheetApp.getActiveSpreadsheet();
+  let sheet=ss.getSheetByName(SHEETS.AUDIT);
+  if(!sheet){_setupAuditSheet(ss);sheet=ss.getSheetByName(SHEETS.AUDIT);}
+  sheet.appendRow([data.timestamp||new Date().toLocaleString(),data.action||'',data.user||'',data.details||'',data.extra||'']);
+  return{success:true};
 }
 
 function _getMembers() {
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEETS.MEMBERS);
-  if (!sheet) return { members:[] };
-  const all = sheet.getDataRange().getValues();
-  // Headers on row 4 (index 3); data from row 5 (index 4)
-  const headers = all[3];
-  const members = [];
-  for (let i = 4; i < all.length; i++) {
-    const row = all[i];
-    if (!row[0] && !row[1] && !row[14]) continue;
-    const m = {};
-    headers.forEach((h, j) => { m[h] = row[j]; });
+  const ss=SpreadsheetApp.getActiveSpreadsheet();
+  const sheet=ss.getSheetByName(SHEETS.MEMBERS); if(!sheet) return{members:[]};
+  const all=sheet.getDataRange().getValues();
+  if(all.length<5) return{members:[]};
+  const headers=all[3]; // row 4 = index 3
+  const members=[];
+  for(let i=4;i<all.length;i++){
+    const row=all[i];
+    // Skip completely empty rows
+    if(!row[0]&&!row[1]&&!row[16]) continue;
+    const m={};
+    headers.forEach((h,j)=>{ m[h]=row[j]; });
     members.push(m);
   }
-  return { members, total: members.length };
+  return{members,total:members.length};
 }
 
 function _getPollingStations() {
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEETS.POLLING_STATIONS);
-  if (!sheet) return { stations:[] };
-  const rows = sheet.getDataRange().getValues();
-  // headers row 2 (index 1), data from row 3 (index 2)
-  const stations = [];
-  for (let i = 2; i < rows.length; i++) {
-    const r = rows[i];
-    if (!r[0] && !r[1]) continue;
-    stations.push({ ward:r[0], name:r[1], branch:r[2], code:r[3], branchCode:r[4] });
+  const ss=SpreadsheetApp.getActiveSpreadsheet();
+  const sheet=ss.getSheetByName(SHEETS.POLLING_STATIONS); if(!sheet) return{stations:[]};
+  const rows=sheet.getDataRange().getValues();
+  // Headers row 2 (index 1), data from row 3 (index 2)
+  const hdrs=rows[1];
+  const stations=[];
+  for(let i=2;i<rows.length;i++){
+    const r=rows[i]; if(!r[0]&&!r[1]) continue;
+    // Build station object from named columns
+    const s={};
+    hdrs.forEach((h,j)=>{ s[h]=r[j]; });
+    // Normalise keys
+    stations.push({
+      zone:       s['Zone']||s[0]||'',
+      ward:       s['Ward Name']||s[1]||'',
+      name:       s['Polling Station Name']||s[2]||'',
+      branch:     s['Branch Name']||s[3]||'',
+      code:       s['Station Code']||s[4]||'',
+      branchCode: s['Branch Code']||s[5]||'',
+    });
   }
-  return { stations };
+  return{stations};
 }
 
-function _syncSummary(data) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  _refreshSummary(ss, data.summaryData);
-  return { success: true };
-}
-
-function _refreshSummary(ss, summaryData) {
-  let sheet = ss.getSheetByName(SHEETS.SUMMARY);
-  if (!sheet) { _setupSummarySheet(ss); sheet = ss.getSheetByName(SHEETS.SUMMARY); }
-
-  // Clear existing data rows
-  const lastRow = sheet.getLastRow();
-  if (lastRow >= 4) sheet.getRange(4, 1, lastRow - 3, 4).clearContent();
-
-  // Compute from members sheet
-  const membersSheet = ss.getSheetByName(SHEETS.MEMBERS);
-  if (!membersSheet) return;
-  const all = membersSheet.getDataRange().getValues();
-  const byStation = {};
-  for (let i = 4; i < all.length; i++) {
-    const r = all[i];
-    if (!r[6]) continue; // station col (index 6)
-    const key = r[6];
-    if (!byStation[key]) byStation[key] = { ward:r[5]||'', station:r[6]||'', branch:r[8]||'', count:0 };
+function _refreshSummary(ss) {
+  let sheet=ss.getSheetByName(SHEETS.SUMMARY);
+  if(!sheet){_setupSummarySheet(ss);sheet=ss.getSheetByName(SHEETS.SUMMARY);}
+  const lastRow=sheet.getLastRow();
+  if(lastRow>=4) sheet.getRange(4,1,lastRow-3,4).clearContent();
+  const mSheet=ss.getSheetByName(SHEETS.MEMBERS); if(!mSheet) return{success:true};
+  const all=mSheet.getDataRange().getValues();
+  const byStation={};
+  for(let i=4;i<all.length;i++){
+    const r=all[i]; if(!r[8]) continue; // station col index 8 (Polling Station)
+    const key=r[8];
+    if(!byStation[key]) byStation[key]={ward:r[7]||'',station:r[8]||'',branch:r[10]||'',count:0};
     byStation[key].count++;
   }
-  const rows   = Object.values(byStation).sort((a,b) => b.count - a.count);
-  const total  = rows.reduce((s,r) => s+r.count, 0);
-  const dataToWrite = rows.map(r => [r.ward, r.station, r.branch, r.count]);
-  dataToWrite.push(['','','GRAND TOTAL', total]);
-
-  if (dataToWrite.length) {
-    sheet.getRange(4, 1, dataToWrite.length, 4).setValues(dataToWrite);
-    // Bold grand total row
-    const gtRow = 4 + dataToWrite.length - 1;
-    sheet.getRange(gtRow, 1, 1, 4).setFontWeight('bold').setBackground(LIGHT_GRN);
-  }
-  sheet.getRange('D2').setValue('Last updated: ' + new Date().toLocaleString()).setFontColor('#6b7280');
+  const rows=Object.values(byStation).sort((a,b)=>b.count-a.count);
+  const total=rows.reduce((s,r)=>s+r.count,0);
+  const toWrite=rows.map(r=>[r.ward,r.station,r.branch,r.count]);
+  toWrite.push(['','','GRAND TOTAL',total]);
+  if(toWrite.length) sheet.getRange(4,1,toWrite.length,4).setValues(toWrite);
+  const gtRow=4+toWrite.length-1;
+  sheet.getRange(gtRow,1,1,4).setFontWeight('bold').setBackground(LIGHT_GRN);
+  sheet.getRange('D2').setValue('Updated: '+new Date().toLocaleString()).setFontColor('#6b7280');
+  return{success:true};
 }
