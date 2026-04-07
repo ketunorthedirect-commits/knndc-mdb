@@ -330,17 +330,30 @@ const App = {
         }
       }
 
-      // Also fetch polling stations from sheet
+      // Also fetch polling stations from sheet — update existing + add new
       const stationsRes = await fetch(this.settings.scriptUrl + '?action=getStations&t=' + Date.now());
       const stationsData = await stationsRes.json();
       if (stationsData?.stations?.length) {
-        const merged = [...this.pollingStations];
+        const local = [...this.pollingStations];
+        let changed = false;
         stationsData.stations.forEach(s => {
-          if (!merged.find(ps => ps.code === s.code)) merged.push(s);
+          if (!s.code) return;
+          const idx = local.findIndex(ps => ps.code === s.code);
+          if (idx >= 0) {
+            // Update existing — sheet wins for zone/ward/name/branch
+            const before = JSON.stringify(local[idx]);
+            local[idx] = { ...local[idx], ...s };
+            if (JSON.stringify(local[idx]) !== before) changed = true;
+          } else {
+            local.push(s);
+            changed = true;
+          }
         });
-        this.pollingStations = merged;
-        this.settings.pollingStations = merged;
-        this.saveSettings();
+        if (changed) {
+          this.pollingStations = local;
+          this.settings.pollingStations = local;
+          this.saveSettings();
+        }
       }
     } catch(e) {
       // Silent fail — offline will handle it

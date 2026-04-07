@@ -775,13 +775,19 @@ const PageRenderers = {
 
   _renderStationsList() {
     const c=document.getElementById('stations-list'); if(!c) return;
-    if(!App.pollingStations.length){c.innerHTML='<div class="empty-state"><div class="empty-icon">🏢</div><div class="empty-title">No stations configured</div></div>';return;}
+    const sc=document.getElementById('station-count');
+    if(sc) sc.textContent=App.pollingStations.length;
+    if(!App.pollingStations.length){c.innerHTML='<div class="empty-state"><div class="empty-icon">🏢</div><div class="empty-title">No stations configured</div><div class="empty-text">Add manually or use "Import from Sheet" above.</div></div>';return;}
     c.innerHTML=`<div class="table-wrap"><table>
       <thead><tr><th>#</th><th>Zone</th><th>Ward</th><th>Polling Station</th><th>Branch</th><th>Stn Code</th><th>Branch Code</th><th>Action</th></tr></thead>
       <tbody>${App.pollingStations.map((s,i)=>`<tr>
-        <td>${i+1}</td><td>${s.zone||'—'}</td><td>${s.ward||'—'}</td><td><strong>${s.name}</strong></td><td>${s.branch}</td>
-        <td><span class="badge badge-blue">${s.code}</span></td>
-        <td><span class="badge badge-green">${s.branchCode}</span></td>
+        <td>${i+1}</td>
+        <td><span class="badge badge-green" style="font-size:11px">${s.zone||'—'}</span></td>
+        <td>${s.ward||'—'}</td>
+        <td><strong>${s.name||'—'}</strong></td>
+        <td>${s.branch||'—'}</td>
+        <td><span class="badge badge-blue">${s.code||'—'}</span></td>
+        <td><span class="badge" style="background:var(--gray-100);color:var(--gray-700)">${s.branchCode||'—'}</span></td>
         <td><button class="btn btn-sm btn-danger" onclick="PageRenderers.removeStation(${i})">🗑️</button></td>
       </tr>`).join('')}</tbody>
     </table></div>`;
