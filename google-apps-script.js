@@ -365,7 +365,15 @@ function _logAudit(data) {
   const ss=SpreadsheetApp.getActiveSpreadsheet();
   let sheet=ss.getSheetByName(SHEETS.AUDIT);
   if(!sheet){_setupAuditSheet(ss);sheet=ss.getSheetByName(SHEETS.AUDIT);}
-  sheet.appendRow([data.timestamp||new Date().toLocaleString(),data.action||'',data.user||'',data.details||'',data.extra||'']);
+  // auditAction = the event name; action = the HTTP routing key (always 'logAudit')
+  const auditAction = data.auditAction || data.action || '';
+  sheet.appendRow([
+    data.timestamp || new Date().toLocaleString(),
+    auditAction,
+    data.user    || '',
+    data.details || '',
+    data.extra   || '',
+  ]);
   return{success:true};
 }
 

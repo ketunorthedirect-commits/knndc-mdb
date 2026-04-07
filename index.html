@@ -470,8 +470,11 @@
                 </div>
                 <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
                   <button class="btn btn-primary" onclick="PageRenderers.saveGeneralSettings()">💾 Save</button>
-                  <button class="btn btn-secondary" onclick="App.fetchFromSheets().then(()=>Toast.show('Synced','Data refreshed.','success'))">🔄 Sync Now</button>
+                  <button class="btn btn-secondary" onclick="App.fetchFromSheets().then(()=>Toast.show('Synced','Data refreshed.','success'))">🔄 Pull from Sheet</button>
                   <button class="btn btn-secondary" onclick="App.flushOfflineQueue()">📤 Upload Offline Queue</button>
+                  <button class="btn btn-outline" onclick="App.bulkPushToSheets()" title="Push all local records to Google Sheets (for records entered before Sheets was configured)">
+                    ☁️ Push All Records to Sheet
+                  </button>
                 </div>
               </div>
             </div>
@@ -531,23 +534,70 @@
 
 <!-- ═══ MODAL: EDIT MEMBER ═══ -->
 <div id="modal-edit" class="modal-overlay">
-  <div class="modal">
+  <div class="modal" style="max-width:680px">
     <div class="modal-header"><div class="card-icon">✏️</div><h3>Edit Member Record</h3><button class="modal-close" onclick="Modal.close('modal-edit')">✕</button></div>
     <div class="modal-body">
       <div id="edit-current-info" style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:var(--radius);padding:10px 14px;font-size:12px;color:var(--gray-600);margin-bottom:16px"></div>
       <input type="hidden" id="edit-id">
+
+      <!-- Station Re-assignment (collapsible via branch code search) -->
+      <div style="background:var(--ndc-green-pale);border:1px solid var(--ndc-green-lt);border-radius:var(--radius);padding:14px 16px;margin-bottom:18px">
+        <div style="font-size:11px;font-weight:600;color:var(--ndc-green-dk);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
+          🔍 Change Station (optional) — search by Branch Code
+        </div>
+        <div class="form-group" style="margin-bottom:10px">
+          <label style="text-transform:none;letter-spacing:0;font-weight:600;font-size:12px;color:var(--gray-600)">Branch Code</label>
+          <div class="search-dropdown-wrap">
+            <input type="text" id="edit-branch-code" placeholder="Type to search and change station…" autocomplete="off">
+            <div id="edit-branch-dropdown" class="search-dropdown"></div>
+          </div>
+        </div>
+        <div class="form-grid" style="grid-template-columns:repeat(3,1fr);gap:8px">
+          <div class="form-group">
+            <label style="font-size:11px">Zone</label>
+            <input type="text" id="edit-zone" readonly class="auto-filled" placeholder="Auto-filled">
+          </div>
+          <div class="form-group">
+            <label style="font-size:11px">Ward</label>
+            <input type="text" id="edit-ward" readonly class="auto-filled" placeholder="Auto-filled">
+          </div>
+          <div class="form-group">
+            <label style="font-size:11px">Polling Station</label>
+            <input type="text" id="edit-station-name" readonly class="auto-filled" placeholder="Auto-filled">
+          </div>
+          <div class="form-group">
+            <label style="font-size:11px">Branch Name</label>
+            <input type="text" id="edit-branch-name" readonly class="auto-filled" placeholder="Auto-filled">
+          </div>
+          <div class="form-group">
+            <label style="font-size:11px">Station Code</label>
+            <input type="text" id="edit-station-code" readonly class="auto-filled" placeholder="Auto-filled">
+          </div>
+        </div>
+      </div>
+
+      <!-- Personal Details -->
       <div class="form-grid">
         <div class="form-group"><label>First Name <span class="required">*</span></label><input type="text" id="edit-first"></div>
         <div class="form-group"><label>Last Name <span class="required">*</span></label><input type="text" id="edit-last"></div>
         <div class="form-group"><label>Other Names</label><input type="text" id="edit-other"></div>
-        <div class="form-group"><label>Gender</label><select id="edit-gender"><option value="">—</option><option value="Male">Male</option><option value="Female">Female</option></select></div>
+        <div class="form-group">
+          <label>Gender</label>
+          <select id="edit-gender"><option value="">—</option><option value="Male">Male</option><option value="Female">Female</option></select>
+        </div>
         <div class="form-group"><label>Party ID</label><input type="text" id="edit-party"></div>
         <div class="form-group"><label>Voter ID</label><input type="text" id="edit-voter"></div>
         <div class="form-group"><label>Phone</label><input type="text" id="edit-phone"></div>
-        <div class="form-group full-width"><label>Reason for Change <span class="required">*</span></label><textarea id="edit-reason" rows="2" placeholder="Required: explain why this record is being modified…"></textarea></div>
+        <div class="form-group full-width">
+          <label>Reason for Change <span class="required">*</span></label>
+          <textarea id="edit-reason" rows="2" placeholder="Required: explain why this record is being modified…"></textarea>
+        </div>
       </div>
     </div>
-    <div class="modal-footer"><button class="btn btn-secondary" onclick="Modal.close('modal-edit')">Cancel</button><button class="btn btn-primary" onclick="PageRenderers.submitEdit()">💾 Save Changes</button></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('modal-edit')">Cancel</button>
+      <button class="btn btn-primary" onclick="PageRenderers.submitEdit()">💾 Save Changes</button>
+    </div>
   </div>
 </div>
 
