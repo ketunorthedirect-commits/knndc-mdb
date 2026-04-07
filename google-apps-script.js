@@ -313,17 +313,31 @@ function _addMember(data) {
 function _updateMember(data) {
   const ss=SpreadsheetApp.getActiveSpreadsheet();
   const sheet=ss.getSheetByName(SHEETS.MEMBERS); if(!sheet) return{success:false,error:'Sheet not found'};
-  const rows=sheet.getDataRange().getValues();
-  // Record ID is column 17 (index 16, header row 4 = data start row 5)
-  for(let i=4;i<rows.length;i++){
-    if(String(rows[i][16])===String(data.id)){
+  const all=sheet.getDataRange().getValues();
+  if(all.length<5) return{success:false,error:'No data'};
+
+  // Locate columns by header (row 4 = index 3)
+  const hdrs=all[3].map(h=>String(h).trim().toLowerCase());
+  const c=(names)=>{ for(const n of names){const i=hdrs.indexOf(n.toLowerCase());if(i>=0)return i;} return -1; };
+  const iId    =c(['record id','id']);
+  const iFirst =c(['first name','firstname']);
+  const iLast  =c(['surname','last name','lastname']);
+  const iParty =c(['party id number','party id']);
+  const iVoter =c(['voter id number','voter id']);
+  const iPhone =c(['telephone number','phone']);
+  const iGender=c(['gender']);
+
+  if(iId<0) return{success:false,error:'Record ID column not found'};
+
+  for(let i=4;i<all.length;i++){
+    if(String(all[i][iId]||'').trim()===String(data.id).trim()){
       const r=i+1;
-      if(data.firstName)  sheet.getRange(r,1).setValue(data.firstName);
-      if(data.lastName)   sheet.getRange(r,2).setValue(data.lastName);
-      if(data.partyId)    sheet.getRange(r,3).setValue(data.partyId);
-      if(data.voterId)    sheet.getRange(r,4).setValue(data.voterId);
-      if(data.phone)      sheet.getRange(r,5).setValue(data.phone);
-      if(data.gender)     sheet.getRange(r,6).setValue(data.gender);
+      if(data.firstName  && iFirst>=0)  sheet.getRange(r,iFirst+1).setValue(data.firstName);
+      if(data.lastName   && iLast>=0)   sheet.getRange(r,iLast+1).setValue(data.lastName);
+      if(data.partyId    && iParty>=0)  sheet.getRange(r,iParty+1).setValue(data.partyId);
+      if(data.voterId    && iVoter>=0)  sheet.getRange(r,iVoter+1).setValue(data.voterId);
+      if(data.phone      && iPhone>=0)  sheet.getRange(r,iPhone+1).setValue(data.phone);
+      if(data.gender     && iGender>=0) sheet.getRange(r,iGender+1).setValue(data.gender);
       return{success:true};
     }
   }
@@ -333,9 +347,16 @@ function _updateMember(data) {
 function _deleteMember(data) {
   const ss=SpreadsheetApp.getActiveSpreadsheet();
   const sheet=ss.getSheetByName(SHEETS.MEMBERS); if(!sheet) return{success:false,error:'Sheet not found'};
-  const rows=sheet.getDataRange().getValues();
-  for(let i=4;i<rows.length;i++){
-    if(String(rows[i][16])===String(data.id)){sheet.deleteRow(i+1);_refreshSummary(ss);return{success:true};}
+  const all=sheet.getDataRange().getValues();
+  if(all.length<5) return{success:false,error:'No data'};
+  // Find Record ID column by header name
+  const hdrs=all[3].map(h=>String(h).trim().toLowerCase());
+  const iId=hdrs.findIndex(h=>h==='record id'||h==='id');
+  if(iId<0) return{success:false,error:'Record ID column not found'};
+  for(let i=4;i<all.length;i++){
+    if(String(all[i][iId]||'').trim()===String(data.id).trim()){
+      sheet.deleteRow(i+1);_refreshSummary(ss);return{success:true};
+    }
   }
   return{success:false,error:'Record not found'};
 }
@@ -353,15 +374,65 @@ function _getMembers() {
   const sheet=ss.getSheetByName(SHEETS.MEMBERS); if(!sheet) return{members:[]};
   const all=sheet.getDataRange().getValues();
   if(all.length<5) return{members:[]};
-  const headers=all[3]; // row 4 = index 3
+
+  // Headers are on row 4 (index 3)
+  const rawHdrs = all[3];
+  const hdrs = rawHdrs.map(h => String(h).trim());
+  const col = (names) => {
+    for(const n of names){
+      const i = hdrs.findIndex(h => h.toLowerCase()===n.toLowerCase());
+      if(i>=0) return i;
+    }
+    return -1;
+  };
+
+  // Map every column by name — handles any column order
+  const iFirst   = col(['first name','firstname']);
+  const iLast    = col(['surname','last name','lastname']);
+  const iParty   = col(['party id number','party id','partyid']);
+  const iVoter   = col(['voter id number','voter id','voterid']);
+  const iPhone   = col(['telephone number','phone','telephone']);
+  const iGender  = col(['gender']);
+  const iZone    = col(['zone']);
+  const iWard    = col(['ward name','ward']);
+  const iStation = col(['polling station','station']);
+  const iStCode  = col(['station code','stationcode']);
+  const iBranch  = col(['branch name','branch']);
+  const iBrCode  = col(['branch code','branchcode']);
+  const iOther   = col(['other names','othernames']);
+  const iOfficer = col(['officer id','officer']);
+  const iOfficerN= col(['officer name','officername']);
+  const iTime    = col(['date/time added','timestamp','date added']);
+  const iId      = col(['record id','id']);
+
+  const g = (row, i) => i>=0 ? String(row[i]||'').trim() : '';
+
   const members=[];
   for(let i=4;i<all.length;i++){
     const row=all[i];
-    // Skip completely empty rows
-    if(!row[0]&&!row[1]&&!row[16]) continue;
-    const m={};
-    headers.forEach((h,j)=>{ m[h]=row[j]; });
-    members.push(m);
+    const firstName = g(row,iFirst);
+    const lastName  = g(row,iLast);
+    const id        = g(row,iId);
+    if(!firstName && !lastName && !id) continue; // skip empty rows
+    members.push({
+      id:          id,
+      firstName:   firstName,
+      lastName:    lastName,
+      otherNames:  g(row,iOther),
+      gender:      g(row,iGender),
+      zone:        g(row,iZone),
+      partyId:     g(row,iParty),
+      voterId:     g(row,iVoter),
+      phone:       g(row,iPhone),
+      ward:        g(row,iWard),
+      station:     g(row,iStation),
+      stationCode: g(row,iStCode),
+      branch:      g(row,iBranch),
+      branchCode:  g(row,iBrCode),
+      officer:     g(row,iOfficer),
+      officerName: g(row,iOfficerN),
+      timestamp:   g(row,iTime),
+    });
   }
   return{members,total:members.length};
 }
@@ -370,22 +441,39 @@ function _getPollingStations() {
   const ss=SpreadsheetApp.getActiveSpreadsheet();
   const sheet=ss.getSheetByName(SHEETS.POLLING_STATIONS); if(!sheet) return{stations:[]};
   const rows=sheet.getDataRange().getValues();
-  // Headers row 2 (index 1), data from row 3 (index 2)
-  const hdrs=rows[1];
+  if(rows.length<2) return{stations:[]};
+
+  // Headers are on row 2 (index 1) — find each column by name, case-insensitive
+  const hdrs = rows[1].map(h => String(h).trim().toLowerCase());
+  const col = (names) => {
+    for(const n of names){
+      const i = hdrs.indexOf(n.toLowerCase());
+      if(i>=0) return i;
+    }
+    return -1;
+  };
+
+  // Map all known header name variants for each field
+  const iZone   = col(['zone']);
+  const iWard   = col(['ward name','ward']);
+  const iName   = col(['polling station name','station name','name']);
+  const iBranch = col(['branch name','branch']);
+  const iCode   = col(['station code','code','polling station code']);
+  const iBCode  = col(['branch code','branchcode']);
+
   const stations=[];
   for(let i=2;i<rows.length;i++){
-    const r=rows[i]; if(!r[0]&&!r[1]) continue;
-    // Build station object from named columns
-    const s={};
-    hdrs.forEach((h,j)=>{ s[h]=r[j]; });
-    // Normalise keys
+    const r=rows[i];
+    const nameVal  = iName>=0  ? String(r[iName]||'').trim()  : '';
+    const codeVal  = iCode>=0  ? String(r[iCode]||'').trim()  : '';
+    if(!nameVal && !codeVal) continue; // skip truly empty rows
     stations.push({
-      zone:       s['Zone']||s[0]||'',
-      ward:       s['Ward Name']||s[1]||'',
-      name:       s['Polling Station Name']||s[2]||'',
-      branch:     s['Branch Name']||s[3]||'',
-      code:       s['Station Code']||s[4]||'',
-      branchCode: s['Branch Code']||s[5]||'',
+      zone:       iZone>=0   ? String(r[iZone]  ||'').trim() : '',
+      ward:       iWard>=0   ? String(r[iWard]  ||'').trim() : '',
+      name:       nameVal,
+      branch:     iBranch>=0 ? String(r[iBranch]||'').trim() : '',
+      code:       codeVal,
+      branchCode: iBCode>=0  ? String(r[iBCode] ||'').trim() : '',
     });
   }
   return{stations};
@@ -396,22 +484,35 @@ function _refreshSummary(ss) {
   if(!sheet){_setupSummarySheet(ss);sheet=ss.getSheetByName(SHEETS.SUMMARY);}
   const lastRow=sheet.getLastRow();
   if(lastRow>=4) sheet.getRange(4,1,lastRow-3,4).clearContent();
+
   const mSheet=ss.getSheetByName(SHEETS.MEMBERS); if(!mSheet) return{success:true};
   const all=mSheet.getDataRange().getValues();
+  if(all.length<5) return{success:true};
+
+  // Locate columns by header name (row 4 = index 3)
+  const hdrs=all[3].map(h=>String(h).trim().toLowerCase());
+  const c=(names)=>{ for(const n of names){const i=hdrs.indexOf(n.toLowerCase());if(i>=0)return i;} return -1; };
+  const iWard=c(['ward name','ward']);
+  const iStn =c(['polling station','station']);
+  const iBr  =c(['branch name','branch']);
+
   const byStation={};
   for(let i=4;i<all.length;i++){
-    const r=all[i]; if(!r[8]) continue; // station col index 8 (Polling Station)
-    const key=r[8];
-    if(!byStation[key]) byStation[key]={ward:r[7]||'',station:r[8]||'',branch:r[10]||'',count:0};
-    byStation[key].count++;
+    const r=all[i];
+    const stn=iStn>=0?String(r[iStn]||'').trim():'';
+    if(!stn) continue;
+    if(!byStation[stn]) byStation[stn]={ward:iWard>=0?String(r[iWard]||'').trim():'',station:stn,branch:iBr>=0?String(r[iBr]||'').trim():'',count:0};
+    byStation[stn].count++;
   }
   const rows=Object.values(byStation).sort((a,b)=>b.count-a.count);
   const total=rows.reduce((s,r)=>s+r.count,0);
   const toWrite=rows.map(r=>[r.ward,r.station,r.branch,r.count]);
   toWrite.push(['','','GRAND TOTAL',total]);
-  if(toWrite.length) sheet.getRange(4,1,toWrite.length,4).setValues(toWrite);
-  const gtRow=4+toWrite.length-1;
-  sheet.getRange(gtRow,1,1,4).setFontWeight('bold').setBackground(LIGHT_GRN);
+  if(toWrite.length){
+    sheet.getRange(4,1,toWrite.length,4).setValues(toWrite);
+    const gtRow=4+toWrite.length-1;
+    sheet.getRange(gtRow,1,1,4).setFontWeight('bold').setBackground(LIGHT_GRN);
+  }
   sheet.getRange('D2').setValue('Updated: '+new Date().toLocaleString()).setFontColor('#6b7280');
   return{success:true};
 }
