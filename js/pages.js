@@ -358,27 +358,125 @@ const PageRenderers = {
   },
 
   openEdit(id) {
-    const m=App.members.find(x=>x.id===id); if(!m) return;
-    const map={'edit-id':id,'edit-first':m.firstName,'edit-last':m.lastName,'edit-other':m.otherNames,'edit-gender':m.gender,'edit-party':m.partyId,'edit-voter':m.voterId,'edit-phone':m.phone,'edit-reason':''};
-    Object.entries(map).forEach(([fid,val])=>{ const el=document.getElementById(fid); if(el) el.value=val||''; });
-    document.getElementById('edit-current-info').textContent=`Editing: ${m.firstName} ${m.lastName} | Party ID: ${m.partyId} | Added: ${m.timestamp}`;
+    const m = App.members.find(x=>x.id===id); if (!m) return;
+
+    // Populate personal fields
+    const set = (fid, val) => { const el=document.getElementById(fid); if(el) el.value=val||''; };
+    set('edit-id',     id);
+    set('edit-first',  m.firstName);
+    set('edit-last',   m.lastName);
+    set('edit-other',  m.otherNames);
+    set('edit-gender', m.gender);
+    set('edit-party',  m.partyId);
+    set('edit-voter',  m.voterId);
+    set('edit-phone',  m.phone);
+    set('edit-reason', '');
+
+    // Populate station fields (read-only display, editable via search)
+    set('edit-branch-code',  m.branchCode);
+    set('edit-zone',         m.zone);
+    set('edit-ward',         m.ward);
+    set('edit-station-name', m.station);
+    set('edit-branch-name',  m.branch);
+    set('edit-station-code', m.stationCode);
+
+    document.getElementById('edit-current-info').textContent =
+      `Editing: ${m.firstName} ${m.lastName} | Party ID: ${m.partyId} | Station: ${m.station||'—'} | Added: ${m.timestamp}`;
+
+    // Setup branch-code search inside modal
+    this._setupEditStationSearch();
     Modal.open('modal-edit');
   },
 
+  _setupEditStationSearch() {
+    const input    = document.getElementById('edit-branch-code');
+    const dropdown = document.getElementById('edit-branch-dropdown');
+    if (!input || !dropdown) return;
+
+    input.removeAttribute('readonly');
+
+    const show = (q) => {
+      const hits = App.pollingStations.filter(s =>
+        !q ||
+        s.branchCode?.toLowerCase().includes(q) ||
+        s.branch?.toLowerCase().includes(q) ||
+        s.name?.toLowerCase().includes(q) ||
+        s.ward?.toLowerCase().includes(q) ||
+        s.zone?.toLowerCase().includes(q) ||
+        s.code?.toLowerCase().includes(q)
+      ).slice(0, 30);
+
+      dropdown.innerHTML = hits.length
+        ? hits.map(s => `
+            <div class="dropdown-item" data-sidx="${App.pollingStations.indexOf(s)}">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+                <div>
+                  <strong style="color:var(--ndc-green-dk)">${s.branchCode}</strong>
+                  <span style="color:var(--gray-500);font-size:11px;margin-left:6px">${s.name}</span>
+                </div>
+                <div style="display:flex;gap:4px">
+                  <span class="badge badge-green" style="font-size:10px">${s.zone||''}</span>
+                  <span class="badge badge-blue"  style="font-size:10px">${s.ward||''}</span>
+                </div>
+              </div>
+              <div style="font-size:11px;color:var(--gray-400);margin-top:2px">Branch: ${s.branch} · Code: ${s.code}</div>
+            </div>`)
+          .join('')
+        : '<div class="dropdown-item" style="color:var(--gray-400);text-align:center;padding:12px">No matching stations</div>';
+
+      dropdown.classList.add('open');
+
+      dropdown.querySelectorAll('.dropdown-item[data-sidx]').forEach(item => {
+        item.onclick = () => {
+          const s = App.pollingStations[parseInt(item.dataset.sidx)];
+          if (s) {
+            document.getElementById('edit-branch-code').value  = s.branchCode;
+            document.getElementById('edit-zone').value         = s.zone;
+            document.getElementById('edit-ward').value         = s.ward;
+            document.getElementById('edit-station-name').value = s.name;
+            document.getElementById('edit-branch-name').value  = s.branch;
+            document.getElementById('edit-station-code').value = s.code;
+            Toast.show('Station Updated', `${s.name} · ${s.branchCode}`, 'success');
+          }
+          dropdown.classList.remove('open');
+        };
+      });
+    };
+
+    // Clone to remove old listeners
+    const ni = input.cloneNode(true);
+    input.parentNode.replaceChild(ni, input);
+    ni.addEventListener('focus', () => show(ni.value.toLowerCase().trim()));
+    ni.addEventListener('input', () => show(ni.value.toLowerCase().trim()));
+    document.addEventListener('click', e => {
+      if (!ni.contains(e.target) && !dropdown.contains(e.target)) dropdown.classList.remove('open');
+    });
+  },
+
   submitEdit() {
-    const id=document.getElementById('edit-id').value;
-    const reason=document.getElementById('edit-reason').value.trim();
-    if(!reason){Toast.show('Reason Required','Please provide a reason for this change.','error');return;}
-    App.updateMember(id,{
-      firstName: document.getElementById('edit-first').value.trim(),
-      lastName:  document.getElementById('edit-last').value.trim(),
-      otherNames:document.getElementById('edit-other').value.trim(),
-      gender:    document.getElementById('edit-gender').value,
-      partyId:   document.getElementById('edit-party').value.trim(),
-      voterId:   document.getElementById('edit-voter').value.trim(),
-      phone:     document.getElementById('edit-phone').value.trim(),
-    },reason);
-    Modal.close('modal-edit'); Toast.show('Record Updated','Changes saved.','success');
+    const id     = document.getElementById('edit-id').value;
+    const reason = document.getElementById('edit-reason').value.trim();
+    if (!reason) { Toast.show('Reason Required','Please provide a reason for this change.','error'); return; }
+
+    const g = fid => document.getElementById(fid)?.value.trim() || '';
+    App.updateMember(id, {
+      firstName:   g('edit-first'),
+      lastName:    g('edit-last'),
+      otherNames:  g('edit-other'),
+      gender:      g('edit-gender'),
+      partyId:     g('edit-party'),
+      voterId:     g('edit-voter'),
+      phone:       g('edit-phone'),
+      // Station fields — updated if branch code was changed
+      zone:        g('edit-zone'),
+      ward:        g('edit-ward'),
+      station:     g('edit-station-name'),
+      stationCode: g('edit-station-code'),
+      branch:      g('edit-branch-name'),
+      branchCode:  g('edit-branch-code'),
+    }, reason);
+    Modal.close('modal-edit');
+    Toast.show('Record Updated','Changes saved and synced.','success');
     PageRenderers.records();
   },
 

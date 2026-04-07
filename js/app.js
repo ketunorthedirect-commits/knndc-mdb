@@ -461,6 +461,10 @@ const App = {
     this.members[idx] = {...this.members[idx],...updates, lastModified:new Date().toLocaleString('en-GH'), modifiedBy:this.currentUser.username};
     this.saveMembers();
     this.logAudit('EDIT_MEMBER',`Edited: ${before.firstName} ${before.lastName}. Reason: ${reason}`, this.currentUser.username, {before, after:this.members[idx], reason});
+    // Sync the update to Sheets
+    if (this.isOnline && this.settings.scriptUrl) {
+      this.syncToSheets({...this.members[idx], action:'updateMember'});
+    }
   },
 
   deleteMember(id, reason) {
@@ -469,6 +473,10 @@ const App = {
     this.members = this.members.filter(m=>m.id!==id);
     this.saveMembers();
     this.logAudit('DELETE_MEMBER',`Deleted: ${m?.firstName} ${m?.lastName} (${m?.partyId}). Reason: ${reason}`, this.currentUser.username);
+    // Sync the delete to Sheets
+    if (this.isOnline && this.settings.scriptUrl) {
+      this.syncToSheets({id, action:'deleteMember', reason});
+    }
   },
 
   getMembersForUser() {
@@ -489,6 +497,49 @@ const App = {
     this.auditLog.unshift(entry);
     if (this.auditLog.length>10000) this.auditLog=this.auditLog.slice(0,10000);
     this.saveAudit();
+    // Also write to Google Sheet Audit Log
+    if (this.isOnline && this.settings.scriptUrl) {
+      this._syncAuditEntry(entry).catch(()=>{});
+    }
+  },
+
+  async _syncAuditEntry(entry) {
+    if (!this.settings.scriptUrl) return;
+    try {
+      await fetch(this.settings.scriptUrl, {
+        method: 'POST',
+        body: JSON.stringify({
+          action:         'logAudit',  // HTTP routing action
+          auditAction:    entry.action, // the actual audit event name
+          timestamp:      entry.timestamp,
+          user:           entry.user,
+          details:        entry.details,
+          extra:          entry.reason || '',
+        })
+      });
+    } catch(_) { /* silent — audit sync failure should never break the app */ }
+  },
+
+  // Push ALL local members to Sheet (for existing records not yet in Sheet)
+  async bulkPushToSheets() {
+    if (!this.settings.scriptUrl) {
+      Toast.show('No Script URL','Configure the Apps Script URL in Settings → Google Sheets.','error');
+      return;
+    }
+    const all = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]').filter(m=>!m._demo);
+    if (!all.length) { Toast.show('No Records','There are no real member records to push.','warning'); return; }
+    Toast.show('Uploading…',`Pushing ${all.length} record(s) to Google Sheets…`,'info', 6000);
+    let ok=0, fail=0;
+    for (const m of all) {
+      try {
+        const res = await fetch(this.settings.scriptUrl, {method:'POST', body:JSON.stringify({...m, action:'addMember'})});
+        const data = await res.json();
+        if (data.success) ok++; else fail++;
+      } catch(_) { fail++; }
+    }
+    if (fail===0) Toast.show('Push Complete',`All ${ok} records uploaded to Google Sheets.`,'success');
+    else          Toast.show('Partial Upload',`${ok} uploaded, ${fail} failed. Try again.`,'warning');
+    this.logAudit('BULK_PUSH',`Bulk pushed ${ok}/${all.length} local records to Google Sheets`, this.currentUser?.username||'admin');
   },
 
   getStats() {
@@ -511,8 +562,16 @@ const App = {
 
   async syncToSheets(data) {
     if (!this.settings.scriptUrl) return;
-    try { await fetch(this.settings.scriptUrl,{method:'POST',body:JSON.stringify(data)}); }
-    catch(e) { this.offlineQueue.push({type:'add',data}); this.saveOfflineQ(); }
+    // action field tells the server what operation this is
+    const payload = data.action ? data : {...data, action:'addMember'};
+    try { await fetch(this.settings.scriptUrl,{method:'POST',body:JSON.stringify(payload)}); }
+    catch(e) {
+      // Queue non-delete operations for retry
+      if (payload.action !== 'deleteMember') {
+        this.offlineQueue.push({type:'add', data:payload});
+        this.saveOfflineQ();
+      }
+    }
   },
 
   async flushOfflineQueue() {
