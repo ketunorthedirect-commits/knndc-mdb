@@ -443,8 +443,28 @@ const App = {
 
   // ── MEMBER CRUD ───────────────────────────────────────────
   addMember(data) {
-    const member = { id:'m'+Date.now(), ...data, officer:this.currentUser.username, officerName:this.currentUser.name, timestamp:new Date().toLocaleString('en-GH') };
+    // ── PRIMARY KEY CHECK: Party ID must be unique ──────────
     this.members = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
+    if (data.partyId && data.partyId.trim()) {
+      const existing = this.members.find(m =>
+        m.partyId?.trim().toLowerCase() === data.partyId.trim().toLowerCase()
+        && !m._demo
+      );
+      if (existing) {
+        Toast.show(
+          'Duplicate Entry Blocked',
+          `Member with Party ID "${data.partyId}" is already enrolled as ${existing.firstName} ${existing.lastName} (${existing.station}).`,
+          'error', 7000
+        );
+        this.logAudit('DUPLICATE_BLOCKED',
+          `Blocked duplicate Party ID: ${data.partyId} — existing: ${existing.firstName} ${existing.lastName}`,
+          this.currentUser.username
+        );
+        return null; // signal to caller that save was rejected
+      }
+    }
+
+    const member = { id:'m'+Date.now(), ...data, officer:this.currentUser.username, officerName:this.currentUser.name, timestamp:new Date().toLocaleString('en-GH') };
     this.members.unshift(member);
     this.saveMembers();
     this.logAudit('ADD_MEMBER',`Added: ${data.firstName} ${data.lastName} (${data.partyId}) — ${data.station}`, this.currentUser.username);

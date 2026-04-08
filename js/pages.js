@@ -256,7 +256,7 @@ const PageRenderers = {
     });
     if(!ok){Toast.show('Validation Error','Please fill all required fields including Gender.','error');return;}
     const g=id=>document.getElementById(id)?.value.trim()||'';
-    App.addMember({
+    const result = App.addMember({
       zone:        g('f-zone'),
       ward:        g('f-ward-name'),
       station:     g('f-station-name'),
@@ -271,7 +271,9 @@ const PageRenderers = {
       voterId:     g('f-voter-id'),
       phone:       g('f-phone'),
     });
-    Toast.show('Record Saved',`${g('f-first-name')} ${g('f-last-name')} registered.`,'success');
+    // null = duplicate was blocked — toast already shown by App.addMember, do not clear form
+    if (result === null) return;
+    Toast.show('Record Saved',`${g('f-first-name')} ${g('f-last-name')} registered successfully.`,'success');
     ['f-last-name','f-first-name','f-other-names','f-gender','f-party-id','f-voter-id','f-phone']
       .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
     document.getElementById('f-last-name')?.focus();
