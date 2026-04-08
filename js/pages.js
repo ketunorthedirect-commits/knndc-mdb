@@ -337,30 +337,40 @@ const PageRenderers = {
 
   _renderMembersTable(tbodyId, members, showActions) {
     const tbody=document.getElementById(tbodyId); if(!tbody) return;
-    const canEdit=showActions&&['admin','exec','ward'].includes(App.currentUser?.role);
-    const canDel =showActions&&App.currentUser?.role==='admin';
+    // exec is view-only; admin can do anything; ward/officer are checked per-record
+    const role = App.currentUser?.role;
     tbody.innerHTML = members.length
-      ? members.map(m=>`<tr>
-          <td><strong>${m.lastName||''},</strong> ${m.firstName||''} ${m.otherNames||''}</td>
-          <td><span class="badge ${m.gender==='Male'?'badge-blue':'badge-red'}" style="font-size:11px">${m.gender||'—'}</span></td>
-          <td>${m.zone||'—'}</td>
-          <td>${m.partyId||'—'}</td>
-          <td>${m.voterId||'—'}</td>
-          <td>${m.phone||'—'}</td>
-          <td>${m.ward||'—'}</td>
-          <td>${m.station||'—'}</td>
-          <td>${m.branch||'—'}</td>
-          <td>${m.timestamp||'—'}</td>
-          ${showActions?`<td>
-            ${canEdit?`<button class="btn btn-sm btn-secondary" onclick="PageRenderers.openEdit('${m.id}')">✏️</button>`:''}
-            ${canDel?`<button class="btn btn-sm btn-danger"    onclick="PageRenderers.confirmDelete('${m.id}')">🗑️</button>`:''}
-          </td>`:''}
-        </tr>`).join('')
+      ? members.map(m => {
+          const canEdit = showActions && role !== 'exec' && App.canModifyMember(m);
+          const canDel  = showActions && (role === 'admin' || (role !== 'exec' && App.canModifyMember(m)));
+          return `<tr>
+            <td><strong>${m.lastName||''},</strong> ${m.firstName||''} ${m.otherNames||''}</td>
+            <td><span class="badge ${m.gender==='Male'?'badge-blue':'badge-red'}" style="font-size:11px">${m.gender||'—'}</span></td>
+            <td>${m.zone||'—'}</td>
+            <td>${m.partyId||'—'}</td>
+            <td>${m.voterId||'—'}</td>
+            <td>${m.phone||'—'}</td>
+            <td>${m.ward||'—'}</td>
+            <td>${m.station||'—'}</td>
+            <td>${m.branch||'—'}</td>
+            <td>${m.timestamp||'—'}</td>
+            ${showActions ? `<td>
+              ${canEdit ? `<button class="btn btn-sm btn-secondary" onclick="PageRenderers.openEdit('${m.id}')" title="Edit record">✏️</button>` : ''}
+              ${canDel  ? `<button class="btn btn-sm btn-danger"    onclick="PageRenderers.confirmDelete('${m.id}')" title="Delete record">🗑️</button>` : ''}
+              ${showActions && !canEdit && !canDel ? '<span style="color:var(--gray-300);font-size:11px">—</span>' : ''}
+            </td>` : ''}
+          </tr>`;
+        }).join('')
       : `<tr><td colspan="11"><div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">No records found</div></div></td></tr>`;
   },
 
   openEdit(id) {
     const m = App.members.find(x=>x.id===id); if (!m) return;
+    // Permission guard — re-check even if button was somehow shown
+    if (!App.canModifyMember(m)) {
+      Toast.show('Permission Denied','You can only edit records from your assigned stations.','error');
+      return;
+    }
 
     // Populate personal fields
     const set = (fid, val) => { const el=document.getElementById(fid); if(el) el.value=val||''; };
@@ -461,7 +471,7 @@ const PageRenderers = {
     if (!reason) { Toast.show('Reason Required','Please provide a reason for this change.','error'); return; }
 
     const g = fid => document.getElementById(fid)?.value.trim() || '';
-    App.updateMember(id, {
+    const saved = App.updateMember(id, {
       firstName:   g('edit-first'),
       lastName:    g('edit-last'),
       otherNames:  g('edit-other'),
@@ -469,7 +479,6 @@ const PageRenderers = {
       partyId:     g('edit-party'),
       voterId:     g('edit-voter'),
       phone:       g('edit-phone'),
-      // Station fields — updated if branch code was changed
       zone:        g('edit-zone'),
       ward:        g('edit-ward'),
       station:     g('edit-station-name'),
@@ -477,6 +486,7 @@ const PageRenderers = {
       branch:      g('edit-branch-name'),
       branchCode:  g('edit-branch-code'),
     }, reason);
+    if (saved === false) return; // permission denied — toast already shown
     Modal.close('modal-edit');
     Toast.show('Record Updated','Changes saved and synced.','success');
     PageRenderers.records();
@@ -484,8 +494,14 @@ const PageRenderers = {
 
   confirmDelete(id) {
     const m=App.members.find(x=>x.id===id);
+    if (!m) return;
+    // Permission guard — re-check before opening the modal
+    if (!App.canModifyMember(m)) {
+      Toast.show('Permission Denied','You can only delete records from your assigned stations.','error');
+      return;
+    }
     document.getElementById('del-id').value=id;
-    document.getElementById('del-name').textContent=m?`${m.firstName} ${m.lastName} (${m.partyId})`:id;
+    document.getElementById('del-name').textContent=`${m.firstName} ${m.lastName} (${m.partyId})`;
     document.getElementById('del-reason').value='';
     Modal.open('modal-delete');
   },
@@ -494,8 +510,11 @@ const PageRenderers = {
     const id=document.getElementById('del-id').value;
     const reason=document.getElementById('del-reason').value.trim();
     if(!reason){Toast.show('Reason Required','Please provide a reason.','error');return;}
-    App.deleteMember(id,reason); Modal.close('modal-delete');
-    Toast.show('Record Deleted','Member removed.','error'); PageRenderers.records();
+    const deleted = App.deleteMember(id,reason);
+    if (deleted === false) return; // permission denied — toast already shown
+    Modal.close('modal-delete');
+    Toast.show('Record Deleted','Member removed.','error');
+    PageRenderers.records();
   },
 
   // ══════════════════════════════════════════════════════════

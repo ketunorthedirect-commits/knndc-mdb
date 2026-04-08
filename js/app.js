@@ -473,30 +473,61 @@ const App = {
     return member;
   },
 
+  // ── PERMISSION CHECK — can this user edit/delete this record? ──
+  canModifyMember(m) {
+    const u = this.currentUser;
+    if (!u) return false;
+    if (u.role === 'admin') return true;   // admin can do anything
+    if (u.role === 'exec')  return false;  // exec view-only (no edit/delete)
+    const codes = (u.assignedStations||[]).length ? u.assignedStations : (u.station ? [u.station] : []);
+    if (u.role === 'ward') {
+      // Ward coordinator can only modify records in their assigned stations/ward
+      return codes.includes(m.stationCode) || m.ward === u.ward || m.branch === u.branch;
+    }
+    if (u.role === 'officer') {
+      // Officer can only modify records they personally entered AND in their assigned stations
+      return m.officer === u.username && codes.includes(m.stationCode);
+    }
+    return false;
+  },
+
   updateMember(id, updates, reason) {
     this.members = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
     const idx = this.members.findIndex(m=>m.id===id);
-    if (idx<0) return;
+    if (idx<0) return false;
+    // Permission check
+    if (!this.canModifyMember(this.members[idx])) {
+      Toast.show('Permission Denied','You can only edit records from your assigned stations.','error');
+      this.logAudit('EDIT_DENIED',`Blocked edit attempt on record ${id} by ${this.currentUser.username}`,this.currentUser.username);
+      return false;
+    }
     const before = {...this.members[idx]};
     this.members[idx] = {...this.members[idx],...updates, lastModified:new Date().toLocaleString('en-GH'), modifiedBy:this.currentUser.username};
     this.saveMembers();
     this.logAudit('EDIT_MEMBER',`Edited: ${before.firstName} ${before.lastName}. Reason: ${reason}`, this.currentUser.username, {before, after:this.members[idx], reason});
-    // Sync the update to Sheets
     if (this.isOnline && this.settings.scriptUrl) {
       this.syncToSheets({...this.members[idx], action:'updateMember'});
     }
+    return true;
   },
 
   deleteMember(id, reason) {
     this.members = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
     const m = this.members.find(m=>m.id===id);
-    this.members = this.members.filter(m=>m.id!==id);
+    if (!m) return false;
+    // Permission check
+    if (!this.canModifyMember(m)) {
+      Toast.show('Permission Denied','You can only delete records from your assigned stations.','error');
+      this.logAudit('DELETE_DENIED',`Blocked delete attempt on record ${id} by ${this.currentUser.username}`,this.currentUser.username);
+      return false;
+    }
+    this.members = this.members.filter(mx=>mx.id!==id);
     this.saveMembers();
-    this.logAudit('DELETE_MEMBER',`Deleted: ${m?.firstName} ${m?.lastName} (${m?.partyId}). Reason: ${reason}`, this.currentUser.username);
-    // Sync the delete to Sheets
+    this.logAudit('DELETE_MEMBER',`Deleted: ${m.firstName} ${m.lastName} (${m.partyId}). Reason: ${reason}`, this.currentUser.username);
     if (this.isOnline && this.settings.scriptUrl) {
       this.syncToSheets({id, action:'deleteMember', reason});
     }
+    return true;
   },
 
   getMembersForUser() {
@@ -505,9 +536,16 @@ const App = {
     const u = this.currentUser;
     if (!u) return [];
     if (u.role==='admin'||u.role==='exec') return all;
-    const codes = (u.assignedStations||[]).length ? u.assignedStations : (u.station?[u.station]:[]);
-    if (u.role==='ward')    return all.filter(m=>codes.includes(m.stationCode)||m.ward===u.ward||m.branch===u.branch);
-    if (u.role==='officer') return all.filter(m=>m.officer===u.username||codes.includes(m.stationCode));
+    // Stations this user is authorised to view
+    const codes = (u.assignedStations||[]).length ? u.assignedStations : (u.station ? [u.station] : []);
+    if (u.role==='ward') {
+      // Ward coordinators see all records in their assigned stations OR matching ward
+      return all.filter(m => codes.includes(m.stationCode) || m.ward === u.ward);
+    }
+    if (u.role==='officer') {
+      // Officers see only records from their assigned stations (not free-range across the DB)
+      return all.filter(m => codes.includes(m.stationCode));
+    }
     return [];
   },
 
