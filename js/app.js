@@ -193,33 +193,56 @@ const App = {
   // saveUsers: write to localStorage then push to Sheet with the PASSED array
   // Always call as App.saveUsers(usersArray) so we push the right data
   saveUsers(usersArray) {
-    // Accept either explicit array or fall back to this.users
-    const toSave = Array.isArray(usersArray) ? usersArray : this.users;
+    const toSave = Array.isArray(usersArray) ? usersArray : (this.users || []);
     this.users = toSave;
     localStorage.setItem(LS.USERS, JSON.stringify(toSave));
-    // Push to Sheet asynchronously — always use the array we just saved
-    if (this.isOnline && this.settings.scriptUrl) {
-      this._pushUsersToSheet(toSave).catch(() => {});
+
+    // Re-read settings fresh — they may have been updated since app loaded
+    const settings = JSON.parse(localStorage.getItem(LS.SETTINGS) || '{}');
+    const scriptUrl = settings.scriptUrl || this.settings.scriptUrl;
+
+    if (scriptUrl) {
+      this._pushUsersToSheet(toSave, scriptUrl);
     }
   },
 
-  saveAudit()    { localStorage.setItem(LS.AUDIT,     JSON.stringify(this.auditLog)); },
-  saveOfflineQ() { localStorage.setItem(LS.OFFLINE_Q, JSON.stringify(this.offlineQueue)); },
-
-  // Push the full users array to the Sheet.
-  // NOTE: No Content-Type header — Apps Script doesn't handle CORS preflight (OPTIONS).
-  // Sending without Content-Type avoids the preflight; Apps Script receives postData.contents fine.
-  async _pushUsersToSheet(usersArray) {
-    if (!this.settings.scriptUrl) return false;
+  // Push users to Sheet — takes an explicit scriptUrl to avoid stale closure
+  async _pushUsersToSheet(usersArray, scriptUrl) {
+    const url = scriptUrl || this.settings.scriptUrl || JSON.parse(localStorage.getItem(LS.SETTINGS)||'{}').scriptUrl;
+    if (!url) return false;
     try {
-      const users = usersArray || JSON.parse(localStorage.getItem(LS.USERS) || '[]');
-      await fetch(this.settings.scriptUrl, {
+      await fetch(url, {
         method: 'POST',
-        body:   JSON.stringify({ action: 'saveUsers', users }),
+        body:   JSON.stringify({ action: 'saveUsers', users: usersArray }),
       });
       return true;
     } catch(e) {
       return false;
+    }
+  },
+
+  // Manual trigger — called from the Sync Users button in Settings
+  async forcePushUsersToSheet() {
+    const url = this.settings.scriptUrl || JSON.parse(localStorage.getItem(LS.SETTINGS)||'{}').scriptUrl;
+    if (!url) {
+      Toast.show('No Script URL', 'Configure the Apps Script URL in Settings → Google Sheets first.', 'error');
+      return;
+    }
+    const users = JSON.parse(localStorage.getItem(LS.USERS) || '[]');
+    if (!users.length) {
+      Toast.show('No Users', 'No user accounts found in local storage.', 'warning');
+      return;
+    }
+    Toast.show('Pushing Users…', `Uploading ${users.length} user account(s) to Google Sheets…`, 'info', 4000);
+    try {
+      await fetch(url, {
+        method: 'POST',
+        body:   JSON.stringify({ action: 'saveUsers', users }),
+      });
+      Toast.show('Users Saved', `${users.length} user account(s) written to Google Sheets Users tab.`, 'success');
+      this.logAudit('SYNC_USERS', `Manually pushed ${users.length} users to Google Sheets`, this.currentUser?.username || 'admin');
+    } catch(e) {
+      Toast.show('Push Failed', 'Could not reach Google Sheets. Check your Script URL and internet connection.', 'error');
     }
   },
 
