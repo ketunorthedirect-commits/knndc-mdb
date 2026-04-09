@@ -871,25 +871,37 @@ const PageRenderers = {
   // SETTINGS
   // ══════════════════════════════════════════════════════════
   settings() {
-    const s=App.settings;
-    ['set-app-name','set-constituency','set-sheet-id','set-api-key','set-script-url'].forEach(id=>{
-      const map={'set-app-name':s.appName,'set-constituency':s.constituency,'set-sheet-id':s.sheetId,'set-api-key':s.apiKey,'set-script-url':s.scriptUrl};
-      const el=document.getElementById(id);if(el)el.value=map[id]||'';
+    const s = App.settings;
+    ['set-app-name','set-constituency','set-sheet-id','set-api-key','set-script-url'].forEach(id => {
+      const map = { 'set-app-name':s.appName,'set-constituency':s.constituency,'set-sheet-id':s.sheetId,'set-api-key':s.apiKey,'set-script-url':s.scriptUrl };
+      const el = document.getElementById(id); if (el) el.value = map[id] || '';
     });
+    // Show bootstrap banner if this device has no Script URL yet
+    const banner = document.getElementById('bootstrap-banner');
+    if (banner) banner.style.display = s.scriptUrl ? 'none' : 'block';
     this._renderStationsList();
   },
 
   saveGeneralSettings() {
-    App.settings.appName     =document.getElementById('set-app-name').value.trim()||CONFIG.APP_NAME;
-    App.settings.constituency=document.getElementById('set-constituency').value.trim();
-    App.settings.sheetId     =document.getElementById('set-sheet-id').value.trim();
-    App.settings.apiKey      =document.getElementById('set-api-key').value.trim();
-    App.settings.scriptUrl   =document.getElementById('set-script-url').value.trim();
-    App.saveSettings();App.applyAppName();
-    App.logAudit('SETTINGS_CHANGE','Updated general settings',App.currentUser.username);
-    Toast.show('Settings Saved','Configuration updated.','success');
-    // Re-start sync timer if script URL changed
-    App._startSyncTimer();
+    App.settings.appName      = document.getElementById('set-app-name').value.trim()      || CONFIG.APP_NAME;
+    App.settings.constituency = document.getElementById('set-constituency').value.trim();
+    App.settings.sheetId      = document.getElementById('set-sheet-id').value.trim();
+    App.settings.apiKey       = document.getElementById('set-api-key').value.trim();
+    App.settings.scriptUrl    = document.getElementById('set-script-url').value.trim();
+    App.saveSettings();      // saves to localStorage AND pushes to Sheet
+    App.applyAppName();
+    App.logAudit('SETTINGS_CHANGE','Updated and pushed settings to Google Sheets', App.currentUser.username);
+    Toast.show('Settings Saved','Configuration saved locally and syncing to Google Sheets…','success');
+    App._startSyncTimer();   // restart timer with possibly new script URL
+
+    // Show confirmation once push completes
+    if (App.isOnline && App.settings.scriptUrl) {
+      App._pushSettingsToSheet().then(() => {
+        Toast.show('Settings Synced ☁️','Settings saved to Google Sheets — all future logins on any device will use these settings.','success', 6000);
+      }).catch(() => {
+        Toast.show('Sheet Sync Warning','Settings saved locally but could not reach Google Sheets. Check your Script URL.','warning', 6000);
+      });
+    }
   },
 
   _renderStationsList() {

@@ -88,7 +88,83 @@ const App = {
     };
     this.pollingStations = this.settings.pollingStations;
   },
-  saveSettings() { localStorage.setItem(LS.SETTINGS, JSON.stringify(this.settings)); },
+  saveSettings() {
+    localStorage.setItem(LS.SETTINGS, JSON.stringify(this.settings));
+    // Push to Google Sheet so all devices can pick them up
+    if (this.isOnline && this.settings.scriptUrl) {
+      this._pushSettingsToSheet().catch(() => {}); // fire and forget
+    }
+  },
+
+  // Push settings to the Sheet's App Settings tab
+  async _pushSettingsToSheet() {
+    if (!this.settings.scriptUrl) return;
+    try {
+      await fetch(this.settings.scriptUrl, {
+        method: 'POST',
+        body: JSON.stringify({
+          action:       'saveSettings',
+          scriptUrl:    this.settings.scriptUrl,
+          appName:      this.settings.appName,
+          constituency: this.settings.constituency,
+          sheetId:      this.settings.sheetId,
+          // NOTE: apiKey is intentionally NOT sent to the Sheet for security
+          demoCleared:  localStorage.getItem(LS.DEMO_CLEARED) || '',
+          updatedBy:    this.currentUser?.username || 'system',
+        })
+      });
+    } catch(_) { /* silent — settings sync failure should not disrupt the user */ }
+  },
+
+  // Fetch remote settings from the Sheet and apply them to this device
+  // Called on every login; safe to call without a scriptUrl (returns early)
+  async _fetchAndApplyRemoteSettings() {
+    if (!this.isOnline || !this.settings.scriptUrl) return false;
+    try {
+      const res  = await fetch(this.settings.scriptUrl + '?action=getSettings&t=' + Date.now());
+      const data = await res.json();
+      if (!data?.settings || !data.exists) return false;
+
+      const remote = data.settings;
+      let changed = false;
+
+      // Apply remote values — remote wins for everything except apiKey (never stored server-side)
+      const apply = (key, remoteKey) => {
+        const rv = remote[remoteKey || key];
+        if (rv && rv !== this.settings[key]) {
+          this.settings[key] = rv;
+          changed = true;
+        }
+      };
+
+      apply('scriptUrl');
+      apply('appName');
+      apply('constituency');
+      apply('sheetId');
+
+      // Sync demoCleared flag across devices
+      if (remote.demoCleared === '1' && !localStorage.getItem(LS.DEMO_CLEARED)) {
+        localStorage.setItem(LS.DEMO_CLEARED, '1');
+        // Remove demo members on this device too
+        const local = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
+        const clean = local.filter(m => !m._demo);
+        if (clean.length !== local.length) {
+          localStorage.setItem(LS.MEMBERS, JSON.stringify(clean));
+          this.members = clean;
+        }
+        changed = true;
+      }
+
+      if (changed) {
+        localStorage.setItem(LS.SETTINGS, JSON.stringify(this.settings));
+        this.pollingStations = this.settings.pollingStations;
+        this.applyAppName();
+      }
+      return changed;
+    } catch(_) {
+      return false;
+    }
+  },
 
   // ── DATA LOADING ──────────────────────────────────────────
   loadData() {
@@ -209,6 +285,10 @@ const App = {
     localStorage.setItem(LS.DEMO_CLEARED, '1');
     this.logAudit('CLEAR_DEMO','Administrator cleared all demo data', this.currentUser?.username || 'admin');
     Toast.show('Demo Data Cleared','All sample data has been removed. Only real records remain.','success', 5000);
+    // Push the cleared flag to the Sheet so other devices skip demo data too
+    if (this.isOnline && this.settings.scriptUrl) {
+      this._pushSettingsToSheet().catch(() => {});
+    }
   },
 
   // ── PASSWORD MANAGEMENT ───────────────────────────────────
@@ -262,8 +342,7 @@ const App = {
     if (this.currentUser?.role === 'admin' && !demoCleared) {
       const hasDemo = (JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]')).some(m => m._demo);
       if (hasDemo) {
-        // Show demo clear prompt AFTER app renders
-        setTimeout(() => Modal.open('modal-demo-clear'), 600);
+        setTimeout(() => Modal.open('modal-demo-clear'), 800);
       }
     }
 
@@ -273,18 +352,32 @@ const App = {
     this.renderNav();
     this.renderUserHeader();
     this.setupInactivityTracking();
-
-    // Periodic sync from Sheets every 2 minutes if connected
-    this._startSyncTimer();
     this.navigate('dashboard');
+
+    // On login: fetch remote settings first (so this device gets the latest
+    // Script URL, App Name, constituency etc.), then start sync
+    if (this.isOnline && this.settings.scriptUrl) {
+      this._fetchAndApplyRemoteSettings().then(changed => {
+        if (changed) {
+          // Re-render header in case app name changed
+          this.applyAppName();
+          this.renderUserHeader();
+          // Update settings form if currently open
+          if (this.currentPage === 'settings') PageRenderers.settings();
+          Toast.show('Settings Synced', 'App settings updated from Google Sheets.', 'info', 3000);
+        }
+        this._startSyncTimer();
+      });
+    } else {
+      this._startSyncTimer();
+    }
   },
 
   _startSyncTimer() {
     if (this._syncInterval) clearInterval(this._syncInterval);
     if (this.settings.scriptUrl) {
       this._syncInterval = setInterval(() => this.fetchFromSheets(), 2 * 60 * 1000);
-      // Also fetch immediately on login
-      this.fetchFromSheets();
+      this.fetchFromSheets(); // immediate fetch on login
     }
   },
 
