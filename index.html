@@ -52,14 +52,6 @@
       </label>
     </div>
     <button class="btn btn-primary btn-lg" id="login-btn" style="width:100%" onclick="doLogin()">🔐 Sign In</button>
-    <div style="margin-top:16px;text-align:center">
-      <small style="color:var(--gray-400)">Default password: <code>Ketu@2026</code></small>
-    </div>
-    <div style="margin-top:10px;text-align:center">
-      <button type="button" onclick="emergencyReset()" style="background:none;border:none;font-size:11px;color:var(--gray-300);cursor:pointer;text-decoration:underline" title="Use only if locked out — resets to default admin credentials">
-        Can't log in? Reset to defaults
-      </button>
-    </div>
   </div>
   <div style="color:rgba(255,255,255,.6);font-size:12px">Powered by the Elections and IT Directorate, 2026</div>
 </div>
@@ -555,7 +547,7 @@
               <div class="card-header"><div class="card-icon blue">ℹ️</div><h3>About KNNDCmdb</h3></div>
               <div class="card-body" style="text-align:center;padding:40px">
                 <img src="assets/ndc-logo.png" style="width:80px;margin-bottom:16px">
-                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v1.3.0</div>
+                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v2.0.0</div>
                 <div style="color:var(--gray-500);margin-top:8px">Ketu North NDC Members Database</div>
                 <div style="color:var(--gray-400);font-size:13px;margin-top:4px">Elections & IT Directorate, 2026</div>
               </div>
@@ -567,7 +559,7 @@
 
   </main>
 
-  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v1.3.0</footer>
+  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v2.0.0</footer>
 </div>
 
 <div id="toast-container"></div>
@@ -846,11 +838,11 @@ async function syncStationsFromSheet() {
 }
 // ── EMERGENCY RESET ──────────────────────────────────────────
 // Clears cached user data so the app falls back to built-in defaults.
-// Admin can then log in with: admin / Ketu@2026
+// Admin can then log in with: admin / admin123
 function emergencyReset() {
   if (!confirm(
     'This will clear cached user accounts on THIS device and restore built-in defaults.\n\n' +
-    'After resetting, log in with:\n  Username: admin\n  Password: Ketu@2026\n\n' +
+    'After resetting, log in with:\n  Username: admin\n  Password: admin123\n\n' +
     'Member records and settings are NOT affected.\n\nContinue?'
   )) return;
   localStorage.removeItem('knndc_users');
@@ -864,7 +856,7 @@ function emergencyReset() {
   document.getElementById('login-username').value = 'admin';
   document.getElementById('login-password').value = '';
   document.getElementById('login-password').focus();
-  Toast.show('Reset Complete','Local user cache cleared. Log in with admin / Ketu@2026.','success',6000);
+  Toast.show('Reset Complete','Local user cache cleared. Log in with admin / admin123.','success',6000);
 }
 
 function setTab(el,tabId) {
@@ -882,28 +874,50 @@ document.getElementById('current-date').textContent=new Date().toLocaleDateStrin
 App.init();
 
 // ── PRE-LOGIN USER SYNC ───────────────────────────────────────
-// On a brand-new device, localStorage has no user accounts yet.
-// Silently pull users from the Sheet so credentials work on first attempt.
+// On every device load, silently pull users from the Sheet so
+// credentials (new accounts, updated passwords, station assignments)
+// are current before the user attempts to sign in.
 (async function prefetchUsersOnLoad() {
-  // Only run if we're on the login screen (not already logged in),
-  // we have a Script URL configured, and we appear to have no real users yet
-  const storedUsers = localStorage.getItem('knndc_users');
-  const hasRealUsers = storedUsers && JSON.parse(storedUsers).length > 0;
-  const scriptUrl   = JSON.parse(localStorage.getItem('knndc_settings')||'{}').scriptUrl;
-  if (!scriptUrl || hasRealUsers) return; // nothing to do
+  const scriptUrl = JSON.parse(localStorage.getItem('knndc_settings')||'{}').scriptUrl;
+  if (!scriptUrl || !navigator.onLine) return;
 
   const banner = document.getElementById('user-sync-banner');
-  if (banner) banner.style.display = 'block';
+  const storedUsers = localStorage.getItem('knndc_users');
+  const hasLocalUsers = storedUsers && JSON.parse(storedUsers).length > 0;
+
+  // Show syncing banner only on brand-new devices (no local users yet)
+  if (!hasLocalUsers && banner) banner.style.display = 'block';
 
   try {
     const res  = await fetch(scriptUrl + '?action=getUsers&t=' + Date.now());
     const data = await res.json();
+    if (banner) banner.style.display = 'none';
+
     if (data?.users?.length) {
-      localStorage.setItem('knndc_users', JSON.stringify(data.users));
-      if (banner) banner.style.display = 'none';
-      // Subtly notify the user that accounts are ready
-      const subtitle = document.querySelector('.login-subtitle');
-      if (subtitle) subtitle.textContent = '✅ Accounts loaded — please sign in';
+      if (!hasLocalUsers) {
+        // Brand-new device — write sheet users directly
+        localStorage.setItem('knndc_users', JSON.stringify(data.users));
+        const subtitle = document.querySelector('.login-subtitle');
+        if (subtitle) subtitle.textContent = '✅ Accounts loaded — please sign in';
+      } else {
+        // Existing device — merge: sheet wins for role/stations/active, local wins for password
+        const local  = JSON.parse(storedUsers);
+        const merged = [...local];
+        data.users.forEach(sheetUser => {
+          if (!sheetUser.username && !sheetUser.id) return;
+          const idx = merged.findIndex(u => u.id === sheetUser.id || u.username === sheetUser.username);
+          if (idx >= 0) {
+            const localPwd = merged[idx].password;
+            const sheetPwd = sheetUser.password?.trim();
+            merged[idx] = { ...merged[idx], ...sheetUser, password: sheetPwd || localPwd };
+          } else if (sheetUser.password?.trim()) {
+            merged.push(sheetUser); // new account added by admin on another device
+          }
+        });
+        // Safety: always keep at least one active admin
+        const hasAdmin = merged.some(u => u.role === 'admin' && u.password && u.active !== false);
+        if (hasAdmin) localStorage.setItem('knndc_users', JSON.stringify(merged));
+      }
     } else {
       if (banner) banner.style.display = 'none';
     }
