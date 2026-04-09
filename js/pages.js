@@ -169,10 +169,15 @@ const PageRenderers = {
   // ══════════════════════════════════════════════════════════
   entry() {
     const u = App.currentUser;
-    if (u.role==='officer' && u.assignedStations?.length===1) {
-      const s = App.pollingStations.find(ps=>ps.code===u.assignedStations[0]);
+    const assigned = u.assignedStations || [];
+
+    // Auto-fill station fields when the user has exactly one assigned station
+    // (applies to both officers and ward coordinators)
+    if (assigned.length === 1) {
+      const s = App.pollingStations.find(ps => ps.code === assigned[0]);
       if (s) this._fillStationFields(s);
     }
+
     // Clear gender selection
     const gEl = document.getElementById('f-gender');
     if (gEl) gEl.value = '';
@@ -194,16 +199,21 @@ const PageRenderers = {
     const dropdown = document.getElementById('branch-code-dropdown');
     if (!input||!dropdown) return;
 
-    const isLocked = role==='officer' && App.currentUser?.assignedStations?.length===1;
+    const u = App.currentUser;
+    const assigned = u.assignedStations || [];
+
+    // Lock the field to readonly when the user has exactly one assigned station
+    // (applies to both officers and ward coordinators)
+    const isLocked = assigned.length === 1;
     if (isLocked) { input.setAttribute('readonly',true); input.classList.add('auto-filled'); return; }
 
     input.removeAttribute('readonly'); input.classList.remove('auto-filled');
     input.placeholder='Type branch code, zone, ward or station name…';
 
-    const u = App.currentUser;
     const getPool = () => {
-      if (u.role==='officer' && u.assignedStations?.length)
-        return App.pollingStations.filter(s=>u.assignedStations.includes(s.code));
+      // Restrict dropdown to assigned stations for officers and ward coordinators
+      if ((role==='officer' || role==='ward') && assigned.length)
+        return App.pollingStations.filter(s => assigned.includes(s.code));
       return App.pollingStations;
     };
 
@@ -243,7 +253,9 @@ const PageRenderers = {
     ni.addEventListener('focus',()=>show(ni.value.toLowerCase().trim()));
     ni.addEventListener('input',()=>show(ni.value.toLowerCase().trim()));
     document.addEventListener('click',e=>{if(!ni.contains(e.target)&&!dropdown.contains(e.target))dropdown.classList.remove('open');});
-    if(role!=='officer') setTimeout(()=>show(''),150);
+    // Auto-open dropdown on focus for users with multiple assigned stations
+    if (role !== 'officer' && role !== 'ward') setTimeout(()=>show(''),150);
+    else if (assigned.length > 1)              setTimeout(()=>show(''),150);
   },
 
   submitEntry() {

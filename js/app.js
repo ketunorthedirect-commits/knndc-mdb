@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v2.0
+   KNNDCmdb – Core Application Logic  v2.1
    ============================================================ */
 'use strict';
 
@@ -9,7 +9,7 @@ const CONFIG = {
   SCRIPT_URL:    '',
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '2.0.0',
+  VERSION:       '2.1.0',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -501,45 +501,92 @@ const App = {
   },
 
   // After fetching users from Sheet, check the current session is still valid.
+  // Propagates any assignment changes (ward, stations, branch, role) to the live session
+  // without requiring a re-login.
   _revalidateSession() {
     if (!App.currentUser) return;
     const fresh = App.users.find(u => u.id === App.currentUser.id || u.username === App.currentUser.username);
     if (!fresh) return; // user not in merged set — don't touch session
-    // Only force logout if the account is explicitly marked inactive
+
+    // Force logout if the account has been deactivated
     if (fresh.active === false) {
       Toast.show('Account Disabled','Your account has been deactivated. Contact your administrator.','error', 8000);
       setTimeout(() => App.logout(), 2500);
       return;
     }
-    const prevStations = JSON.stringify(App.currentUser.assignedStations || []);
-    // Update session with latest non-sensitive fields (role, name, stations)
-    // Never overwrite password in session from a Sheet fetch
+
+    // Snapshot fields that affect data access and UI before overwrite
+    const prev = {
+      stations: JSON.stringify(App.currentUser.assignedStations || []),
+      ward:     App.currentUser.ward     || '',
+      station:  App.currentUser.station  || '',
+      branch:   App.currentUser.branch   || '',
+      role:     App.currentUser.role     || '',
+    };
+
+    // Update session — never overwrite password from a Sheet fetch
     App.currentUser = {
       ...fresh,
-      password: App.currentUser.password, // keep session password (user's own device knows it)
+      password: App.currentUser.password,
     };
     sessionStorage.setItem(LS.SESSION, JSON.stringify(App.currentUser));
 
-    // If assigned stations changed, refresh nav and entry page so new stations are usable
-    const newStations = JSON.stringify(App.currentUser.assignedStations || []);
-    if (prevStations !== newStations) {
-      App.renderNav();
-      if (['entry','my-records'].includes(App.currentPage)) {
-        PageRenderers[App.currentPage]?.();
-      }
-      if (App.currentUser.assignedStations?.length) {
-        Toast.show('Stations Updated', `Your assigned polling stations have been synced (${App.currentUser.assignedStations.length} station${App.currentUser.assignedStations.length!==1?'s':''}).`, 'info', 4000);
-      }
+    // Detect what changed
+    const now = {
+      stations: JSON.stringify(App.currentUser.assignedStations || []),
+      ward:     App.currentUser.ward     || '',
+      station:  App.currentUser.station  || '',
+      branch:   App.currentUser.branch   || '',
+      role:     App.currentUser.role     || '',
+    };
+
+    const stationsChanged = prev.stations !== now.stations;
+    const wardChanged     = prev.ward     !== now.ward;
+    const branchChanged   = prev.branch   !== now.branch;
+    const roleChanged     = prev.role     !== now.role;
+    const anyChanged      = stationsChanged || wardChanged || branchChanged || roleChanged;
+
+    if (!anyChanged) return;
+
+    // Re-render nav (role may have changed) and header (ward/role display)
+    App.renderNav();
+    App.renderUserHeader();
+
+    // Re-render the active page if it uses assignment data
+    const pagesAffected = ['entry','my-records','records','dashboard','reports','analytics'];
+    if (pagesAffected.includes(App.currentPage)) {
+      PageRenderers[App.currentPage]?.();
+    }
+
+    // Build a meaningful toast message listing what changed
+    const parts = [];
+    if (stationsChanged) {
+      const count = (App.currentUser.assignedStations || []).length;
+      parts.push(`${count} polling station${count !== 1 ? 's' : ''}`);
+    }
+    if (wardChanged && now.ward)   parts.push(`ward: ${now.ward}`);
+    if (branchChanged && now.branch) parts.push(`branch: ${now.branch}`);
+    if (roleChanged)               parts.push(`role: ${now.role}`);
+
+    if (parts.length) {
+      Toast.show(
+        'Assignments Updated',
+        `Your account has been updated — ${parts.join(', ')}.`,
+        'info', 5000
+      );
     }
   },
 
   _startSyncTimer() {
     if (App._syncInterval) clearInterval(App._syncInterval);
     if (App.settings.scriptUrl) {
-      // Every 2 minutes: sync members AND users
-      App._syncInterval = setInterval(() => {
+      // Every 2 minutes: sync members AND users; re-validate session after user fetch
+      App._syncInterval = setInterval(async () => {
         App.fetchFromSheets();
-        App._fetchUsersFromSheet();
+        const changed = await App._fetchUsersFromSheet();
+        // Always re-validate so live assignment changes (ward, stations, role)
+        // are applied to the active session without requiring a re-login
+        if (changed !== false) App._revalidateSession();
       }, 2 * 60 * 1000);
       App.fetchFromSheets(); // immediate member sync on login
     }
