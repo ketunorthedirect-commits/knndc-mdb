@@ -547,7 +547,7 @@
               <div class="card-header"><div class="card-icon blue">ℹ️</div><h3>About KNNDCmdb</h3></div>
               <div class="card-body" style="text-align:center;padding:40px">
                 <img src="assets/ndc-logo.png" style="width:80px;margin-bottom:16px">
-                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v2.1.0</div>
+                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v2.2.0</div>
                 <div style="color:var(--gray-500);margin-top:8px">Ketu North NDC Members Database</div>
                 <div style="color:var(--gray-400);font-size:13px;margin-top:4px">Elections & IT Directorate, 2026</div>
               </div>
@@ -559,7 +559,7 @@
 
   </main>
 
-  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v2.1.0</footer>
+  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v2.2.0</footer>
 </div>
 
 <div id="toast-container"></div>
@@ -873,11 +873,11 @@ document.getElementById('current-date').textContent=new Date().toLocaleDateStrin
 
 App.init();
 
-// ── PRE-LOGIN USER SYNC ───────────────────────────────────────
-// On every device load, silently pull users from the Sheet so
-// credentials (new accounts, updated passwords, station assignments)
-// are current before the user attempts to sign in.
-(async function prefetchUsersOnLoad() {
+// ── PRE-LOGIN SYNC ────────────────────────────────────────────
+// On every device load, silently pull users AND polling stations
+// from the Sheet so credentials, assignments, and the station
+// lookup dropdown are fully current before the user signs in.
+(async function prefetchOnLoad() {
   const scriptUrl = JSON.parse(localStorage.getItem('knndc_settings')||'{}').scriptUrl;
   if (!scriptUrl || !navigator.onLine) return;
 
@@ -885,44 +885,73 @@ App.init();
   const storedUsers = localStorage.getItem('knndc_users');
   const hasLocalUsers = storedUsers && JSON.parse(storedUsers).length > 0;
 
-  // Show syncing banner only on brand-new devices (no local users yet)
+  // Show syncing indicator only on brand-new devices (no local users yet)
   if (!hasLocalUsers && banner) banner.style.display = 'block';
 
-  try {
-    const res  = await fetch(scriptUrl + '?action=getUsers&t=' + Date.now());
-    const data = await res.json();
-    if (banner) banner.style.display = 'none';
+  // ── Fetch users and stations in parallel ─────────────────
+  const [usersResult, stationsResult] = await Promise.allSettled([
+    fetch(scriptUrl + '?action=getUsers&t='    + Date.now()).then(r => r.json()),
+    fetch(scriptUrl + '?action=getStations&t=' + Date.now()).then(r => r.json()),
+  ]);
 
-    if (data?.users?.length) {
-      if (!hasLocalUsers) {
-        // Brand-new device — write sheet users directly
-        localStorage.setItem('knndc_users', JSON.stringify(data.users));
-        const subtitle = document.querySelector('.login-subtitle');
-        if (subtitle) subtitle.textContent = '✅ Accounts loaded — please sign in';
-      } else {
-        // Existing device — merge: sheet wins for role/stations/active, local wins for password
-        const local  = JSON.parse(storedUsers);
-        const merged = [...local];
-        data.users.forEach(sheetUser => {
-          if (!sheetUser.username && !sheetUser.id) return;
-          const idx = merged.findIndex(u => u.id === sheetUser.id || u.username === sheetUser.username);
-          if (idx >= 0) {
-            const localPwd = merged[idx].password;
-            const sheetPwd = sheetUser.password?.trim();
-            merged[idx] = { ...merged[idx], ...sheetUser, password: sheetPwd || localPwd };
-          } else if (sheetUser.password?.trim()) {
-            merged.push(sheetUser); // new account added by admin on another device
-          }
-        });
-        // Safety: always keep at least one active admin
-        const hasAdmin = merged.some(u => u.role === 'admin' && u.password && u.active !== false);
-        if (hasAdmin) localStorage.setItem('knndc_users', JSON.stringify(merged));
-      }
+  if (banner) banner.style.display = 'none';
+
+  // ── Merge users ──────────────────────────────────────────
+  if (usersResult.status === 'fulfilled' && usersResult.value?.users?.length) {
+    const data = usersResult.value;
+    if (!hasLocalUsers) {
+      // Brand-new device — write sheet users directly
+      localStorage.setItem('knndc_users', JSON.stringify(data.users));
+      const subtitle = document.querySelector('.login-subtitle');
+      if (subtitle) subtitle.textContent = '✅ Accounts loaded — please sign in';
     } else {
-      if (banner) banner.style.display = 'none';
+      // Existing device — merge: sheet wins for role/stations/active, local password preserved
+      const local  = JSON.parse(storedUsers);
+      const merged = [...local];
+      data.users.forEach(sheetUser => {
+        if (!sheetUser.username && !sheetUser.id) return;
+        const idx = merged.findIndex(u => u.id === sheetUser.id || u.username === sheetUser.username);
+        if (idx >= 0) {
+          const localPwd = merged[idx].password;
+          const sheetPwd = sheetUser.password?.trim();
+          merged[idx] = { ...merged[idx], ...sheetUser, password: sheetPwd || localPwd };
+        } else if (sheetUser.password?.trim()) {
+          merged.push(sheetUser); // new account from another device
+        }
+      });
+      const hasAdmin = merged.some(u => u.role === 'admin' && u.password && u.active !== false);
+      if (hasAdmin) localStorage.setItem('knndc_users', JSON.stringify(merged));
     }
-  } catch(_) {
-    if (banner) banner.style.display = 'none';
+  }
+
+  // ── Merge polling stations ────────────────────────────────
+  if (stationsResult.status === 'fulfilled' && stationsResult.value?.stations?.length) {
+    const sheetStations = stationsResult.value.stations;
+    const settings = JSON.parse(localStorage.getItem('knndc_settings') || '{}');
+    const local    = settings.pollingStations || [];
+    const merged   = [...local];
+    let   changed  = false;
+
+    sheetStations.forEach(s => {
+      if (!s.code) return;
+      const idx = merged.findIndex(ps => ps.code === s.code);
+      if (idx >= 0) {
+        const before = JSON.stringify(merged[idx]);
+        merged[idx] = { ...merged[idx], ...s };
+        if (JSON.stringify(merged[idx]) !== before) changed = true;
+      } else {
+        merged.push(s);
+        changed = true;
+      }
+    });
+
+    if (changed || !local.length) {
+      settings.pollingStations = merged;
+      localStorage.setItem('knndc_settings', JSON.stringify(settings));
+      // Keep App.pollingStations in sync for the login page (used by entry page immediately after login)
+      App.pollingStations = merged;
+      App.settings.pollingStations = merged;
+    }
   }
 })();
 
