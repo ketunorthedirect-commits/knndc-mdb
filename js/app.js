@@ -224,26 +224,63 @@ const App = {
     }
   },
 
-  // Pull users from the Sheet — Sheet is authoritative; replace local copy
+  // Pull users from the Sheet and MERGE safely into localStorage.
+  // Rules:
+  //  - Sheet adds new users that aren't local yet
+  //  - Sheet updates non-password fields (name, role, ward, station, assignedStations, active)
+  //  - Password in Sheet only wins if it is non-empty AND different from local
+  //  - Local admin record is ALWAYS preserved — it is never deleted by a Sheet fetch
   async _fetchUsersFromSheet() {
     if (!this.isOnline || !this.settings.scriptUrl) return false;
     try {
       const res  = await fetch(this.settings.scriptUrl + '?action=getUsers&t=' + Date.now());
-      // Apps Script may redirect; if response isn't JSON-parseable, skip silently
       const text = await res.text();
       let data;
       try { data = JSON.parse(text); } catch(_) { return false; }
 
       if (!data?.users || !Array.isArray(data.users) || data.users.length === 0) {
-        return false; // Sheet empty or not set up yet — keep local users
+        return false; // Sheet empty — keep local users as-is
       }
 
-      // Filter out any rows that are missing both id and username (malformed rows)
-      const valid = data.users.filter(u => u.id || u.username);
-      if (!valid.length) return false;
+      // Start from current local users as the base
+      const local  = JSON.parse(localStorage.getItem(LS.USERS) || '[]');
+      const merged = [...local];
 
-      localStorage.setItem(LS.USERS, JSON.stringify(valid));
-      this.users = valid;
+      data.users.forEach(sheetUser => {
+        if (!sheetUser.username && !sheetUser.id) return; // skip malformed rows
+        const idx = merged.findIndex(u =>
+          u.id === sheetUser.id || u.username === sheetUser.username
+        );
+        if (idx >= 0) {
+          // Update existing user — but preserve local password if Sheet has empty/same
+          const localPwd = merged[idx].password;
+          const sheetPwd = sheetUser.password?.trim();
+          merged[idx] = {
+            ...merged[idx],
+            ...sheetUser,
+            // Keep local password if sheet password is missing or blank
+            password: sheetPwd || localPwd,
+          };
+        } else {
+          // New user from Sheet — add only if they have a password
+          if (sheetUser.password?.trim()) {
+            merged.push(sheetUser);
+          }
+        }
+      });
+
+      // Safety net: ensure admin account is always present and has a password
+      const hasAdmin = merged.some(u => u.role === 'admin' && u.password && u.active !== false);
+      if (!hasAdmin) {
+        // Don't overwrite — abort this sync to protect login
+        return false;
+      }
+
+      // Only write back if we ended up with a valid set
+      if (!merged.length) return false;
+
+      localStorage.setItem(LS.USERS, JSON.stringify(merged));
+      this.users = merged;
       return true;
     } catch(_) {
       return false;
@@ -439,18 +476,22 @@ const App = {
   },
 
   // After fetching users from Sheet, check the current session is still valid.
-  // Handles: admin disabled this account on another device, or changed this user's password.
   _revalidateSession() {
     if (!this.currentUser) return;
-    const fresh = this.users.find(u => u.id === this.currentUser.id);
-    if (!fresh) return; // user not in sheet yet — let them continue
-    if (!fresh.active) {
+    const fresh = this.users.find(u => u.id === this.currentUser.id || u.username === this.currentUser.username);
+    if (!fresh) return; // user not in merged set — don't touch session
+    // Only force logout if the account is explicitly marked inactive
+    if (fresh.active === false) {
       Toast.show('Account Disabled','Your account has been deactivated. Contact your administrator.','error', 8000);
       setTimeout(() => this.logout(), 2500);
       return;
     }
-    // Update session with latest user data (picks up new assignments, name changes etc.)
-    this.currentUser = { ...fresh };
+    // Update session with latest non-sensitive fields (role, name, stations)
+    // Never overwrite password in session from a Sheet fetch
+    this.currentUser = {
+      ...fresh,
+      password: this.currentUser.password, // keep session password (user's own device knows it)
+    };
     sessionStorage.setItem(LS.SESSION, JSON.stringify(this.currentUser));
   },
 
