@@ -413,12 +413,12 @@ const App = {
 
   // ── PASSWORD MANAGEMENT ───────────────────────────────────
   changePassword(userId, newPassword) {
-    this.users = JSON.parse(localStorage.getItem(LS.USERS) || 'null') || [];
+    const stored = localStorage.getItem(LS.USERS);
+    this.users = (stored ? JSON.parse(stored) : null) || JSON.parse(JSON.stringify(SYSTEM_USERS));
     const u = this.users.find(x => x.id === userId);
     if (!u) return false;
     u.password = newPassword;
     u.mustChangePassword = false;
-    // Update session too
     if (this.currentUser?.id === userId) {
       this.currentUser = { ...this.currentUser, password:newPassword, mustChangePassword:false };
       sessionStorage.setItem(LS.SESSION, JSON.stringify(this.currentUser));
@@ -429,7 +429,8 @@ const App = {
   },
 
   resetPasswordToDefault(userId) {
-    this.users = JSON.parse(localStorage.getItem(LS.USERS) || 'null') || [];
+    const stored = localStorage.getItem(LS.USERS);
+    this.users = (stored ? JSON.parse(stored) : null) || JSON.parse(JSON.stringify(SYSTEM_USERS));
     const u = this.users.find(x => x.id === userId);
     if (!u) return false;
     u.password = CONFIG.DEFAULT_PASSWORD;

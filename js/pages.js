@@ -733,7 +733,8 @@ const PageRenderers = {
     const tbody=document.getElementById('users-tbody'); if(!tbody) return;
     const rLabels={officer:'Data Entry Officer',ward:'Ward Coordinator',exec:'Constituency Exec',admin:'System Admin'};
     const rBadge={officer:'badge-green',ward:'badge-amber',exec:'badge-blue',admin:'badge-red'};
-    App.users=JSON.parse(localStorage.getItem('knndc_users')||'null')||[];
+    const stored = localStorage.getItem(LS.USERS);
+    App.users = (stored ? JSON.parse(stored) : null) || JSON.parse(JSON.stringify(SYSTEM_USERS));
 
     tbody.innerHTML=App.users.map(u=>`
       <tr>
@@ -789,36 +790,58 @@ const PageRenderers = {
   },
 
   submitUser() {
-    const id=document.getElementById('edit-user-id').value;
-    const data={name:document.getElementById('u-name').value.trim(),username:document.getElementById('u-username').value.trim(),password:document.getElementById('u-password').value.trim(),role:document.getElementById('u-role').value,ward:document.getElementById('u-ward').value.trim(),station:document.getElementById('u-station').value.trim(),branch:document.getElementById('u-branch').value.trim(),active:true};
-    if(!data.name||!data.username||!data.password){Toast.show('Error','Name, username and password are required.','error');return;}
-    App.users=JSON.parse(localStorage.getItem('knndc_users')||'null')||[];
-    if(id){
-      const idx=App.users.findIndex(u=>u.id===id);
-      App.users[idx]={...App.users[idx],...data};
-      App.logAudit('EDIT_USER',`Edited user: ${data.username} (${data.role})`,App.currentUser.username);
+    const id   = document.getElementById('edit-user-id').value;
+    const data = {
+      name:     document.getElementById('u-name').value.trim(),
+      username: document.getElementById('u-username').value.trim(),
+      password: document.getElementById('u-password').value.trim(),
+      role:     document.getElementById('u-role').value,
+      ward:     document.getElementById('u-ward').value.trim(),
+      station:  document.getElementById('u-station').value.trim(),
+      branch:   document.getElementById('u-branch').value.trim(),
+      active:   true,
+    };
+    if (!data.name || !data.username || !data.password) {
+      Toast.show('Error','Name, username and password are required.','error'); return;
+    }
+    // Always load from localStorage with SYSTEM_USERS as the safe fallback
+    const stored = localStorage.getItem(LS.USERS);
+    App.users = (stored ? JSON.parse(stored) : null) || JSON.parse(JSON.stringify(SYSTEM_USERS));
+
+    if (id) {
+      const idx = App.users.findIndex(u => u.id === id);
+      if (idx < 0) { Toast.show('Error','User not found — refresh and try again.','error'); return; }
+      App.users[idx] = { ...App.users[idx], ...data };
+      App.logAudit('EDIT_USER', `Edited user: ${data.username} (${data.role})`, App.currentUser.username);
       Toast.show('User Updated','Changes saved.','success');
     } else {
-      if(App.users.find(u=>u.username===data.username)){Toast.show('Error','Username already exists.','error');return;}
-      App.users.push({id:'u'+Date.now(),...data,assignedStations:[],mustChangePassword:true});
-      App.logAudit('ADD_USER',`Created: ${data.username} (${data.role})`,App.currentUser.username);
+      if (App.users.find(u => u.username === data.username)) {
+        Toast.show('Error','Username already exists.','error'); return;
+      }
+      App.users.push({ id:'u'+Date.now(), ...data, assignedStations:[], mustChangePassword:true });
+      App.logAudit('ADD_USER', `Created: ${data.username} (${data.role})`, App.currentUser.username);
       Toast.show('User Created','New user added. They must change password on first login.','success');
     }
-    App.saveUsers(App.users);Modal.close('modal-user');PageRenderers.users();
+    App.saveUsers(App.users);
+    Modal.close('modal-user');
+    PageRenderers.users();
   },
 
   toggleUser(id) {
-    App.users=JSON.parse(localStorage.getItem('knndc_users')||'null')||[];
-    const u=App.users.find(x=>x.id===id); if(!u) return;
-    u.active=!u.active;App.saveUsers(App.users);
-    App.logAudit(u.active?'ENABLE_USER':'DISABLE_USER',`${u.active?'Enabled':'Disabled'}: ${u.username}`,App.currentUser.username);
-    Toast.show('Status Updated',`${u.name} is now ${u.active?'active':'inactive'}.`,u.active?'success':'warning');
+    const stored = localStorage.getItem(LS.USERS);
+    App.users = (stored ? JSON.parse(stored) : null) || JSON.parse(JSON.stringify(SYSTEM_USERS));
+    const u = App.users.find(x => x.id === id); if (!u) return;
+    u.active = !u.active;
+    App.saveUsers(App.users);
+    App.logAudit(u.active?'ENABLE_USER':'DISABLE_USER', `${u.active?'Enabled':'Disabled'}: ${u.username}`, App.currentUser.username);
+    Toast.show('Status Updated', `${u.name} is now ${u.active?'active':'inactive'}.`, u.active?'success':'warning');
     PageRenderers.users();
   },
 
   openAssignModal(userId) {
-    App.users=JSON.parse(localStorage.getItem('knndc_users')||'null')||[];
-    const u=App.users.find(x=>x.id===userId); if(!u) return;
+    const stored = localStorage.getItem(LS.USERS);
+    App.users = (stored ? JSON.parse(stored) : null) || JSON.parse(JSON.stringify(SYSTEM_USERS));
+    const u = App.users.find(x => x.id === userId); if (!u) return;
     document.getElementById('assign-user-id').value=userId;
     document.getElementById('assign-user-name').textContent=u.name;
     document.getElementById('assign-user-role').textContent='Data Entry Officer';
@@ -853,17 +876,21 @@ const PageRenderers = {
   },
 
   submitAssignment() {
-    const userId=document.getElementById('assign-user-id').value;
-    const selected=[...document.querySelectorAll('.station-check:checked')].map(cb=>cb.value);
-    App.users=JSON.parse(localStorage.getItem('knndc_users')||'null')||[];
-    const u=App.users.find(x=>x.id===userId); if(!u) return;
-    const prev=u.assignedStations||[];
-    u.assignedStations=selected;
-    if(selected.length>0){const p=App.pollingStations.find(s=>s.code===selected[0]);if(p){u.station=p.code;u.ward=p.ward;u.branch=p.branch;}}
+    const userId  = document.getElementById('assign-user-id').value;
+    const selected = [...document.querySelectorAll('.station-check:checked')].map(cb => cb.value);
+    const stored  = localStorage.getItem(LS.USERS);
+    App.users = (stored ? JSON.parse(stored) : null) || JSON.parse(JSON.stringify(SYSTEM_USERS));
+    const u = App.users.find(x => x.id === userId); if (!u) return;
+    const prev = u.assignedStations || [];
+    u.assignedStations = selected;
+    if (selected.length > 0) {
+      const p = App.pollingStations.find(s => s.code === selected[0]);
+      if (p) { u.station = p.code; u.ward = p.ward; u.branch = p.branch; }
+    }
     App.saveUsers(App.users);
-    App.logAudit('ASSIGN_STATIONS',`Assigned ${selected.length} station(s) to ${u.username}: [${selected.join(', ')}]. Prev: [${prev.join(', ')}]`,App.currentUser.username);
+    App.logAudit('ASSIGN_STATIONS', `Assigned ${selected.length} station(s) to ${u.username}: [${selected.join(', ')}]. Prev: [${prev.join(', ')}]`, App.currentUser.username);
     Modal.close('modal-assign');
-    Toast.show('Assignment Saved',`${u.name} assigned to ${selected.length} station${selected.length!==1?'s':''}.`,'success');
+    Toast.show('Assignment Saved', `${u.name} assigned to ${selected.length} station${selected.length!==1?'s':''}.`, 'success');
     PageRenderers.users();
   },
 
