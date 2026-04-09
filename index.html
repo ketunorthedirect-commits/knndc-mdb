@@ -55,6 +55,11 @@
     <div style="margin-top:16px;text-align:center">
       <small style="color:var(--gray-400)">Default password: <code>Ketu@2026</code></small>
     </div>
+    <div style="margin-top:10px;text-align:center">
+      <button type="button" onclick="emergencyReset()" style="background:none;border:none;font-size:11px;color:var(--gray-300);cursor:pointer;text-decoration:underline" title="Use only if locked out — resets to default admin credentials">
+        Can't log in? Reset to defaults
+      </button>
+    </div>
   </div>
   <div style="color:rgba(255,255,255,.6);font-size:12px">Powered by the Elections and IT Directorate, 2026</div>
 </div>
@@ -835,6 +840,29 @@ async function syncStationsFromSheet() {
     Toast.show('Sync Failed', 'Could not reach Google Sheets. Check your Script URL and internet connection.', 'error');
   }
 }
+// ── EMERGENCY RESET ──────────────────────────────────────────
+// Clears cached user data so the app falls back to built-in defaults.
+// Admin can then log in with: admin / Ketu@2026
+function emergencyReset() {
+  if (!confirm(
+    'This will clear cached user accounts on THIS device and restore built-in defaults.\n\n' +
+    'After resetting, log in with:\n  Username: admin\n  Password: Ketu@2026\n\n' +
+    'Member records and settings are NOT affected.\n\nContinue?'
+  )) return;
+  localStorage.removeItem('knndc_users');
+  localStorage.removeItem('knndc_lockout');
+  localStorage.removeItem('knndc_attempts');
+  sessionStorage.removeItem('knndc_session');
+  document.getElementById('attempt-warning').style.display = 'none';
+  document.getElementById('lockout-banner').style.display  = 'none';
+  const btn = document.getElementById('login-btn');
+  if (btn) { btn.disabled = false; btn.textContent = '🔐 Sign In'; }
+  document.getElementById('login-username').value = 'admin';
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-password').focus();
+  Toast.show('Reset Complete','Local user cache cleared. Log in with admin / Ketu@2026.','success',6000);
+}
+
 function setTab(el,tabId) {
   document.querySelectorAll('.settings-nav-item').forEach(i=>i.classList.remove('active'));
   document.querySelectorAll('.settings-tab').forEach(t=>t.style.display='none');
