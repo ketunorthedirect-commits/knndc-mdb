@@ -1,15 +1,16 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v2.3
+   KNNDCmdb – Core Application Logic  v2.4
    ============================================================ */
 'use strict';
 
 const CONFIG = {
   SHEET_ID:      '',
   API_KEY:       '',
-  SCRIPT_URL:    '',
+  SCRIPT_URL:    '',          // ← Fill this once before deploying: paste your Apps Script Web App URL here.
+                              //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '2.3.0',
+  VERSION:       '2.4.0',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -82,6 +83,7 @@ const App = {
     App.settings = {
       sheetId:         saved.sheetId         || CONFIG.SHEET_ID,
       apiKey:          saved.apiKey          || CONFIG.API_KEY,
+      // CONFIG.SCRIPT_URL is the baked-in fallback — lets fresh devices bootstrap without manual entry
       scriptUrl:       saved.scriptUrl       || CONFIG.SCRIPT_URL,
       appName:         saved.appName         || CONFIG.APP_NAME,
       constituency:    saved.constituency    || CONFIG.CONSTITUENCY,
@@ -99,13 +101,14 @@ const App = {
   _pushSettingsToSheet() {
     if (!App.settings.scriptUrl) return;
     App._xhrPost(App.settings.scriptUrl, {
-      action:       'saveSettings',
-      scriptUrl:    App.settings.scriptUrl,
-      appName:      App.settings.appName,
-      constituency: App.settings.constituency,
-      sheetId:      App.settings.sheetId,
-      demoCleared:  localStorage.getItem(LS.DEMO_CLEARED) || '',
-      updatedBy:    App.currentUser?.username || 'system',
+      action:          'saveSettings',
+      scriptUrl:       App.settings.scriptUrl,
+      appName:         App.settings.appName,
+      constituency:    App.settings.constituency,
+      sheetId:         App.settings.sheetId,
+      demoCleared:     localStorage.getItem(LS.DEMO_CLEARED) || '',
+      pollingStations: JSON.stringify(App.pollingStations || []),
+      updatedBy:       App.currentUser?.username || 'system',
     });
   },
 
