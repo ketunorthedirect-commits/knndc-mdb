@@ -101,9 +101,8 @@ const App = {
     if (!this.settings.scriptUrl) return;
     try {
       await fetch(this.settings.scriptUrl, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
+        method: 'POST',
+        body:   JSON.stringify({
           action:       'saveSettings',
           scriptUrl:    this.settings.scriptUrl,
           appName:      this.settings.appName,
@@ -113,7 +112,7 @@ const App = {
           updatedBy:    this.currentUser?.username || 'system',
         }),
       });
-    } catch(_) { /* silent */ }
+    } catch(_) {}
   },
 
   // Fetch remote settings from the Sheet and apply them to this device
@@ -207,17 +206,17 @@ const App = {
   saveAudit()    { localStorage.setItem(LS.AUDIT,     JSON.stringify(this.auditLog)); },
   saveOfflineQ() { localStorage.setItem(LS.OFFLINE_Q, JSON.stringify(this.offlineQueue)); },
 
-  // Push the full users array to the Sheet — must include Content-Type header
+  // Push the full users array to the Sheet.
+  // NOTE: No Content-Type header — Apps Script doesn't handle CORS preflight (OPTIONS).
+  // Sending without Content-Type avoids the preflight; Apps Script receives postData.contents fine.
   async _pushUsersToSheet(usersArray) {
     if (!this.settings.scriptUrl) return false;
     try {
       const users = usersArray || JSON.parse(localStorage.getItem(LS.USERS) || '[]');
-      const res = await fetch(this.settings.scriptUrl, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ action: 'saveUsers', users }),
+      await fetch(this.settings.scriptUrl, {
+        method: 'POST',
+        body:   JSON.stringify({ action: 'saveUsers', users }),
       });
-      // Apps Script POSTs may return a redirect; that's OK — data was received
       return true;
     } catch(e) {
       return false;
@@ -780,24 +779,6 @@ const App = {
     }
   },
 
-  async _syncAuditEntry(entry) {
-    if (!this.settings.scriptUrl) return;
-    try {
-      await fetch(this.settings.scriptUrl, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          action:      'logAudit',
-          auditAction: entry.action,
-          timestamp:   entry.timestamp,
-          user:        entry.user,
-          details:     entry.details,
-          extra:       entry.reason || '',
-        }),
-      });
-    } catch(_) { /* silent */ }
-  },
-
   // Push ALL local members to Sheet (for existing records not yet in Sheet)
   async bulkPushToSheets() {
     if (!this.settings.scriptUrl) {
@@ -810,12 +791,10 @@ const App = {
     let ok=0, fail=0;
     for (const m of all) {
       try {
-        const res = await fetch(this.settings.scriptUrl, {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({...m, action:'addMember'}),
+        await fetch(this.settings.scriptUrl, {
+          method: 'POST',
+          body:   JSON.stringify({...m, action:'addMember'}),
         });
-        // Apps Script returns opaque response on redirect — treat non-throw as success
         ok++;
       } catch(_) { fail++; }
     }
@@ -847,9 +826,8 @@ const App = {
     const payload = data.action ? data : {...data, action:'addMember'};
     try {
       await fetch(this.settings.scriptUrl, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(payload),
+        method: 'POST',
+        body:   JSON.stringify(payload),
       });
     } catch(e) {
       if (payload.action !== 'deleteMember') {
@@ -863,9 +841,8 @@ const App = {
     if (!this.settings.scriptUrl) return;
     try {
       await fetch(this.settings.scriptUrl, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
+        method: 'POST',
+        body:   JSON.stringify({
           action:      'logAudit',
           auditAction: entry.action,
           timestamp:   entry.timestamp,
