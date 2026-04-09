@@ -68,17 +68,17 @@ const App = {
   _syncInterval:    null,
 
   init() {
-    App.loadSettings();
-    App.loadData();
-    App.applyAppName();
-    App.setupNetworkListeners();
-    App.checkSession();
+    this.loadSettings();
+    this.loadData();
+    this.applyAppName();
+    this.setupNetworkListeners();
+    this.checkSession();
   },
 
   // ── SETTINGS ──────────────────────────────────────────────
   loadSettings() {
     const saved = JSON.parse(localStorage.getItem(LS.SETTINGS) || '{}');
-    App.settings = {
+    this.settings = {
       sheetId:         saved.sheetId         || CONFIG.SHEET_ID,
       apiKey:          saved.apiKey          || CONFIG.API_KEY,
       scriptUrl:       saved.scriptUrl       || CONFIG.SCRIPT_URL,
@@ -86,7 +86,7 @@ const App = {
       constituency:    saved.constituency    || CONFIG.CONSTITUENCY,
       pollingStations: saved.pollingStations || DEMO_POLLING_STATIONS,
     };
-    App.pollingStations = App.settings.pollingStations;
+    this.pollingStations = this.settings.pollingStations;
   },
   saveSettings() {
     localStorage.setItem(LS.SETTINGS, JSON.stringify(App.settings));
@@ -96,24 +96,24 @@ const App = {
 
   // Push settings to the Sheet's App Settings tab
   _pushSettingsToSheet() {
-    if (!App.settings.scriptUrl) return;
-    App._xhrPost(App.settings.scriptUrl, {
+    if (!this.settings.scriptUrl) return;
+    this._xhrPost(this.settings.scriptUrl, {
       action:       'saveSettings',
-      scriptUrl:    App.settings.scriptUrl,
-      appName:      App.settings.appName,
-      constituency: App.settings.constituency,
-      sheetId:      App.settings.sheetId,
+      scriptUrl:    this.settings.scriptUrl,
+      appName:      this.settings.appName,
+      constituency: this.settings.constituency,
+      sheetId:      this.settings.sheetId,
       demoCleared:  localStorage.getItem(LS.DEMO_CLEARED) || '',
-      updatedBy:    App.currentUser?.username || 'system',
+      updatedBy:    this.currentUser?.username || 'system',
     });
   },
 
-  // Fetch remote settings from the Sheet and apply them to App device
+  // Fetch remote settings from the Sheet and apply them to this device
   // Called on every login; safe to call without a scriptUrl (returns early)
   async _fetchAndApplyRemoteSettings() {
-    if (!App.isOnline || !App.settings.scriptUrl) return false;
+    if (!this.isOnline || !this.settings.scriptUrl) return false;
     try {
-      const res  = await fetch(App.settings.scriptUrl + '?action=getSettings&t=' + Date.now());
+      const res  = await fetch(this.settings.scriptUrl + '?action=getSettings&t=' + Date.now());
       const data = await res.json();
       if (!data?.settings || !data.exists) return false;
 
@@ -123,8 +123,8 @@ const App = {
       // Apply remote values — remote wins for everything except apiKey (never stored server-side)
       const apply = (key, remoteKey) => {
         const rv = remote[remoteKey || key];
-        if (rv && rv !== App.settings[key]) {
-          App.settings[key] = rv;
+        if (rv && rv !== this.settings[key]) {
+          this.settings[key] = rv;
           changed = true;
         }
       };
@@ -137,20 +137,20 @@ const App = {
       // Sync demoCleared flag across devices
       if (remote.demoCleared === '1' && !localStorage.getItem(LS.DEMO_CLEARED)) {
         localStorage.setItem(LS.DEMO_CLEARED, '1');
-        // Remove demo members on App device too
+        // Remove demo members on this device too
         const local = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
         const clean = local.filter(m => !m._demo);
         if (clean.length !== local.length) {
           localStorage.setItem(LS.MEMBERS, JSON.stringify(clean));
-          App.members = clean;
+          this.members = clean;
         }
         changed = true;
       }
 
       if (changed) {
-        localStorage.setItem(LS.SETTINGS, JSON.stringify(App.settings));
-        App.pollingStations = App.settings.pollingStations;
-        App.applyAppName();
+        localStorage.setItem(LS.SETTINGS, JSON.stringify(this.settings));
+        this.pollingStations = this.settings.pollingStations;
+        this.applyAppName();
       }
       return changed;
     } catch(_) {
@@ -163,54 +163,54 @@ const App = {
     const su = localStorage.getItem(LS.USERS);
     const parsedUsers = su ? JSON.parse(su) : null;
     if (parsedUsers && parsedUsers.length > 0) {
-      App.users = parsedUsers;
+      this.users = parsedUsers;
     } else {
       // No users in storage — seed with SYSTEM_USERS defaults
-      App.users = JSON.parse(JSON.stringify(SYSTEM_USERS));
-      localStorage.setItem(LS.USERS, JSON.stringify(App.users)); // write directly, no push to Sheet
+      this.users = JSON.parse(JSON.stringify(SYSTEM_USERS));
+      localStorage.setItem(LS.USERS, JSON.stringify(this.users)); // write directly, no push to Sheet
     }
 
     const sm = localStorage.getItem(LS.MEMBERS);
     const demoCleared = localStorage.getItem(LS.DEMO_CLEARED);
     if (sm) {
-      App.members = JSON.parse(sm);
+      this.members = JSON.parse(sm);
     } else if (!demoCleared) {
-      App.members = JSON.parse(JSON.stringify(DEMO_MEMBERS));
-      App.saveMembers();
+      this.members = JSON.parse(JSON.stringify(DEMO_MEMBERS));
+      this.saveMembers();
     } else {
-      App.members = [];
-      App.saveMembers();
+      this.members = [];
+      this.saveMembers();
     }
 
-    App.auditLog     = JSON.parse(localStorage.getItem(LS.AUDIT)    || '[]');
-    App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q)|| '[]');
+    this.auditLog     = JSON.parse(localStorage.getItem(LS.AUDIT)    || '[]');
+    this.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q)|| '[]');
   },
 
-  saveMembers()  { localStorage.setItem(LS.MEMBERS,   JSON.stringify(App.members)); },
-  saveAudit()    { localStorage.setItem(LS.AUDIT,     JSON.stringify(App.auditLog)); },
+  saveMembers()  { localStorage.setItem(LS.MEMBERS,   JSON.stringify(this.members)); },
+  saveAudit()    { localStorage.setItem(LS.AUDIT,     JSON.stringify(this.auditLog)); },
 
   // saveUsers: write to localStorage instantly, then push to Sheet in background
   saveUsers(usersArray) {
-    const toSave = Array.isArray(usersArray) ? usersArray : (App.users || []);
+    const toSave = Array.isArray(usersArray) ? usersArray : (this.users || []);
     // Never overwrite real users with an empty array
     if (toSave.length === 0) return;
-    App.users = toSave;
+    this.users = toSave;
     localStorage.setItem(LS.USERS, JSON.stringify(toSave));
     // Defer the network call entirely — UI never waits for it
-    const url = (JSON.parse(localStorage.getItem(LS.SETTINGS) || '{}')).scriptUrl || App.settings.scriptUrl;
-    if (url) setTimeout(() => App._pushUsersToSheet(toSave, url), 0);
+    const url = (JSON.parse(localStorage.getItem(LS.SETTINGS) || '{}')).scriptUrl || this.settings.scriptUrl;
+    if (url) setTimeout(() => this._pushUsersToSheet(toSave, url), 0);
   },
 
   // Background push — fire-and-forget, no-cors avoids redirect/CORS issues
   _pushUsersToSheet(usersArray, scriptUrl) {
-    const url = scriptUrl || App.settings.scriptUrl;
+    const url = scriptUrl || this.settings.scriptUrl;
     if (!url) return;
-    App._xhrPost(url, { action: 'saveUsers', users: usersArray });
+    this._xhrPost(url, { action: 'saveUsers', users: usersArray });
   },
 
   // Manual trigger — called from the ☁️ Push Users to Sheet button
   async forcePushUsersToSheet() {
-    const url = App.settings.scriptUrl || JSON.parse(localStorage.getItem(LS.SETTINGS)||'{}').scriptUrl;
+    const url = this.settings.scriptUrl || JSON.parse(localStorage.getItem(LS.SETTINGS)||'{}').scriptUrl;
     if (!url) {
       Toast.show('No Script URL', 'Set the Apps Script URL in Settings → Google Sheets first.', 'error');
       return;
@@ -238,7 +238,7 @@ const App = {
 
     if (success) {
       Toast.show('Users Pushed ✅', `${users.length} account(s) sent to Google Sheets. Open the Users tab to confirm.`, 'success', 7000);
-      App.logAudit('SYNC_USERS', `Pushed ${users.length} users to Google Sheets`, App.currentUser?.username || 'admin');
+      this.logAudit('SYNC_USERS', `Pushed ${users.length} users to Google Sheets`, this.currentUser?.username || 'admin');
     } else {
       Toast.show('Push Failed', 'Request timed out or network error. Check your internet connection and Script URL, then try again.', 'error', 7000);
     }
@@ -251,9 +251,9 @@ const App = {
   //  - Password in Sheet only wins if it is non-empty AND different from local
   //  - Local admin record is ALWAYS preserved — it is never deleted by a Sheet fetch
   async _fetchUsersFromSheet() {
-    if (!App.isOnline || !App.settings.scriptUrl) return false;
+    if (!this.isOnline || !this.settings.scriptUrl) return false;
     try {
-      const res  = await fetch(App.settings.scriptUrl + '?action=getUsers&t=' + Date.now());
+      const res  = await fetch(this.settings.scriptUrl + '?action=getUsers&t=' + Date.now());
       const text = await res.text();
       let data;
       try { data = JSON.parse(text); } catch(_) { return false; }
@@ -292,7 +292,7 @@ const App = {
       // Safety net: ensure admin account is always present and has a password
       const hasAdmin = merged.some(u => u.role === 'admin' && u.password && u.active !== false);
       if (!hasAdmin) {
-        // Don't overwrite — abort App sync to protect login
+        // Don't overwrite — abort this sync to protect login
         return false;
       }
 
@@ -300,7 +300,7 @@ const App = {
       if (!merged.length) return false;
 
       localStorage.setItem(LS.USERS, JSON.stringify(merged));
-      App.users = merged;
+      this.users = merged;
       return true;
     } catch(_) {
       return false;
@@ -308,50 +308,50 @@ const App = {
   },
 
   applyAppName() {
-    const n = App.settings.appName || CONFIG.APP_NAME;
+    const n = this.settings.appName || CONFIG.APP_NAME;
     document.querySelectorAll('.app-title-text').forEach(el => el.textContent = n);
     document.title = n;
   },
 
   // ── NETWORK ───────────────────────────────────────────────
   setupNetworkListeners() {
-    window.addEventListener('online',  () => { App.isOnline = true;  App.updateOnlineStatus(); App.flushOfflineQueue(); });
-    window.addEventListener('offline', () => { App.isOnline = false; App.updateOnlineStatus(); });
-    App.updateOnlineStatus();
+    window.addEventListener('online',  () => { this.isOnline = true;  this.updateOnlineStatus(); this.flushOfflineQueue(); });
+    window.addEventListener('offline', () => { this.isOnline = false; this.updateOnlineStatus(); });
+    this.updateOnlineStatus();
   },
   updateOnlineStatus() {
-    document.getElementById('offline-banner')?.classList.toggle('show', !App.isOnline);
+    document.getElementById('offline-banner')?.classList.toggle('show', !this.isOnline);
     const dot = document.getElementById('conn-dot');
-    if (dot) dot.className = App.isOnline ? 'online-dot' : 'offline-dot';
+    if (dot) dot.className = this.isOnline ? 'online-dot' : 'offline-dot';
   },
 
   // ── SESSION / INACTIVITY ──────────────────────────────────
   checkSession() {
     const s = sessionStorage.getItem(LS.SESSION);
     if (s) {
-      try { App.currentUser = JSON.parse(s); App.showApp(); return; } catch(_) {}
+      try { this.currentUser = JSON.parse(s); this.showApp(); return; } catch(_) {}
     }
-    App.showLogin();
+    this.showLogin();
   },
 
   resetInactivityTimer() {
-    if (App._inactivityTimer) clearTimeout(App._inactivityTimer);
-    App._inactivityTimer = setTimeout(() => {
-      if (!App.currentUser) return;
-      App.logAudit('AUTO_LOGOUT','Session expired — 10 min inactivity', App.currentUser.username);
+    if (this._inactivityTimer) clearTimeout(this._inactivityTimer);
+    this._inactivityTimer = setTimeout(() => {
+      if (!this.currentUser) return;
+      this.logAudit('AUTO_LOGOUT','Session expired — 10 min inactivity', this.currentUser.username);
       Toast.show('Session Expired','Logged out after 10 minutes of inactivity.','warning', 5000);
-      setTimeout(() => App.logout(), 1800);
+      setTimeout(() => this.logout(), 1800);
     }, CONFIG.INACTIVITY_MS);
   },
   setupInactivityTracking() {
     ['mousemove','keydown','mousedown','touchstart','scroll','click'].forEach(e =>
-      document.addEventListener(e, () => App.resetInactivityTimer(), { passive:true })
+      document.addEventListener(e, () => this.resetInactivityTimer(), { passive:true })
     );
-    App.resetInactivityTimer();
+    this.resetInactivityTimer();
   },
   stopInactivityTracking() {
-    if (App._inactivityTimer) clearTimeout(App._inactivityTimer);
-    App._inactivityTimer = null;
+    if (this._inactivityTimer) clearTimeout(this._inactivityTimer);
+    this._inactivityTimer = null;
   },
 
   // ── AUTH ──────────────────────────────────────────────────
@@ -373,8 +373,8 @@ const App = {
 
     // Read users from localStorage; treat missing OR empty array as "use defaults"
     const storedUsers = JSON.parse(localStorage.getItem(LS.USERS) || 'null');
-    App.users = (storedUsers && storedUsers.length > 0) ? storedUsers : JSON.parse(JSON.stringify(SYSTEM_USERS));
-    const user = App.users.find(u => u.username === username && u.password === password && u.active);
+    this.users = (storedUsers && storedUsers.length > 0) ? storedUsers : JSON.parse(JSON.stringify(SYSTEM_USERS));
+    const user = this.users.find(u => u.username === username && u.password === password && u.active);
 
     if (!user) {
       const n = (parseInt(localStorage.getItem(LS.ATTEMPTS)||'0')) + 1;
@@ -382,7 +382,7 @@ const App = {
       if (n >= MAX) {
         localStorage.setItem(LS.LOCKOUT, JSON.stringify({ until: Date.now() + LOCK_MS }));
         localStorage.removeItem(LS.ATTEMPTS);
-        App.logAudit('LOCKOUT', `Locked after ${MAX} failed attempts for: ${username}`, 'system');
+        this.logAudit('LOCKOUT', `Locked after ${MAX} failed attempts for: ${username}`, 'system');
         return { locked:true, seconds: LOCK_MS/1000 };
       }
       return { failed:true, attemptsLeft: MAX - n };
@@ -390,9 +390,9 @@ const App = {
 
     localStorage.removeItem(LS.ATTEMPTS);
     localStorage.removeItem(LS.LOCKOUT);
-    App.currentUser = user;
+    this.currentUser = user;
     sessionStorage.setItem(LS.SESSION, JSON.stringify(user));
-    App.logAudit('LOGIN','Logged in successfully', user.username);
+    this.logAudit('LOGIN','Logged in successfully', user.username);
 
     // Force password change on first login
     if (user.mustChangePassword) return { success:true, mustChangePassword:true };
@@ -401,31 +401,31 @@ const App = {
 
   // ── DEMO DATA CLEAR (admin trigger) ───────────────────────
   clearDemoData() {
-    App.members = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]').filter(m => !m._demo);
-    App.saveMembers();
+    this.members = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]').filter(m => !m._demo);
+    this.saveMembers();
     localStorage.setItem(LS.DEMO_CLEARED, '1');
-    App.logAudit('CLEAR_DEMO','Administrator cleared all demo data', App.currentUser?.username || 'admin');
+    this.logAudit('CLEAR_DEMO','Administrator cleared all demo data', this.currentUser?.username || 'admin');
     Toast.show('Demo Data Cleared','All sample data has been removed. Only real records remain.','success', 5000);
     // Push the cleared flag to the Sheet so other devices skip demo data too
-    if (App.isOnline && App.settings.scriptUrl) {
-      App._pushSettingsToSheet().catch(() => {});
+    if (this.isOnline && this.settings.scriptUrl) {
+      this._pushSettingsToSheet().catch(() => {});
     }
   },
 
   // ── PASSWORD MANAGEMENT ───────────────────────────────────
   changePassword(userId, newPassword) {
     const stored = localStorage.getItem(LS.USERS);
-    App.users = (stored ? JSON.parse(stored) : null) || JSON.parse(JSON.stringify(SYSTEM_USERS));
-    const u = App.users.find(x => x.id === userId);
+    this.users = (stored ? JSON.parse(stored) : null) || JSON.parse(JSON.stringify(SYSTEM_USERS));
+    const u = this.users.find(x => x.id === userId);
     if (!u) return false;
     u.password = newPassword;
     u.mustChangePassword = false;
-    if (App.currentUser?.id === userId) {
-      App.currentUser = { ...App.currentUser, password:newPassword, mustChangePassword:false };
-      sessionStorage.setItem(LS.SESSION, JSON.stringify(App.currentUser));
+    if (this.currentUser?.id === userId) {
+      this.currentUser = { ...this.currentUser, password:newPassword, mustChangePassword:false };
+      sessionStorage.setItem(LS.SESSION, JSON.stringify(this.currentUser));
     }
-    App.saveUsers(App.users);
-    App.logAudit('PASSWORD_CHANGE', `Password changed for user: ${u.username}`, u.username);
+    this.saveUsers(this.users);
+    this.logAudit('PASSWORD_CHANGE', `Password changed for user: ${u.username}`, u.username);
     return true;
   },
 
@@ -443,24 +443,24 @@ const App = {
   },
 
   logout() {
-    App.logAudit('LOGOUT','User logged out', App.currentUser?.username);
-    App.stopInactivityTracking();
-    if (App._syncInterval) { clearInterval(App._syncInterval); App._syncInterval = null; }
-    App.currentUser = null;
+    this.logAudit('LOGOUT','User logged out', this.currentUser?.username);
+    this.stopInactivityTracking();
+    if (this._syncInterval) { clearInterval(this._syncInterval); this._syncInterval = null; }
+    this.currentUser = null;
     sessionStorage.removeItem(LS.SESSION);
-    App.showLogin();
+    this.showLogin();
   },
 
   showLogin() {
     document.getElementById('app-shell').style.display    = 'none';
     document.getElementById('login-screen').style.display = 'flex';
-    App.stopInactivityTracking();
+    this.stopInactivityTracking();
   },
 
   showApp() {
     // Check if admin needs to see demo-clear prompt
     const demoCleared = localStorage.getItem(LS.DEMO_CLEARED);
-    if (App.currentUser?.role === 'admin' && !demoCleared) {
+    if (this.currentUser?.role === 'admin' && !demoCleared) {
       const hasDemo = (JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]')).some(m => m._demo);
       if (hasDemo) {
         setTimeout(() => Modal.open('modal-demo-clear'), 800);
@@ -470,69 +470,69 @@ const App = {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app-shell').style.display    = 'flex';
     document.getElementById('app-shell').style.flexDirection = 'column';
-    App.renderNav();
-    App.renderUserHeader();
-    App.setupInactivityTracking();
-    App.navigate('dashboard');
+    this.renderNav();
+    this.renderUserHeader();
+    this.setupInactivityTracking();
+    this.navigate('dashboard');
 
-    if (App.isOnline && App.settings.scriptUrl) {
+    if (this.isOnline && this.settings.scriptUrl) {
       // Fetch settings AND users in parallel on every login
       Promise.all([
-        App._fetchAndApplyRemoteSettings(),
-        App._fetchUsersFromSheet(),
+        this._fetchAndApplyRemoteSettings(),
+        this._fetchUsersFromSheet(),
       ]).then(([settingsChanged]) => {
         if (settingsChanged) {
-          App.applyAppName();
-          App.renderUserHeader();
-          if (App.currentPage === 'settings') PageRenderers.settings();
+          this.applyAppName();
+          this.renderUserHeader();
+          if (this.currentPage === 'settings') PageRenderers.settings();
           Toast.show('Settings Synced','App settings updated from Google Sheets.','info',3000);
         }
         // Re-validate session against freshly fetched users
-        App._revalidateSession();
-        App._startSyncTimer();
+        this._revalidateSession();
+        this._startSyncTimer();
       });
     } else {
-      App._startSyncTimer();
+      this._startSyncTimer();
     }
   },
 
   // After fetching users from Sheet, check the current session is still valid.
   _revalidateSession() {
-    if (!App.currentUser) return;
-    const fresh = App.users.find(u => u.id === App.currentUser.id || u.username === App.currentUser.username);
+    if (!this.currentUser) return;
+    const fresh = this.users.find(u => u.id === this.currentUser.id || u.username === this.currentUser.username);
     if (!fresh) return; // user not in merged set — don't touch session
     // Only force logout if the account is explicitly marked inactive
     if (fresh.active === false) {
       Toast.show('Account Disabled','Your account has been deactivated. Contact your administrator.','error', 8000);
-      setTimeout(() => App.logout(), 2500);
+      setTimeout(() => this.logout(), 2500);
       return;
     }
     // Update session with latest non-sensitive fields (role, name, stations)
     // Never overwrite password in session from a Sheet fetch
-    App.currentUser = {
+    this.currentUser = {
       ...fresh,
-      password: App.currentUser.password, // keep session password (user's own device knows it)
+      password: this.currentUser.password, // keep session password (user's own device knows it)
     };
-    sessionStorage.setItem(LS.SESSION, JSON.stringify(App.currentUser));
+    sessionStorage.setItem(LS.SESSION, JSON.stringify(this.currentUser));
   },
 
   _startSyncTimer() {
-    if (App._syncInterval) clearInterval(App._syncInterval);
-    if (App.settings.scriptUrl) {
+    if (this._syncInterval) clearInterval(this._syncInterval);
+    if (this.settings.scriptUrl) {
       // Every 2 minutes: sync members AND users
-      App._syncInterval = setInterval(() => {
-        App.fetchFromSheets();
-        App._fetchUsersFromSheet();
+      this._syncInterval = setInterval(() => {
+        this.fetchFromSheets();
+        this._fetchUsersFromSheet();
       }, 2 * 60 * 1000);
-      App.fetchFromSheets(); // immediate member sync on login
+      this.fetchFromSheets(); // immediate member sync on login
     }
   },
 
   // ── FETCH FROM GOOGLE SHEETS (bidirectional sync) ─────────
   async fetchFromSheets() {
-    if (!App.isOnline || !App.settings.scriptUrl) return;
+    if (!this.isOnline || !this.settings.scriptUrl) return;
     try {
-      const url = App.settings.scriptUrl + '?action=getMembers&t=' + Date.now();
+      const url = this.settings.scriptUrl + '?action=getMembers&t=' + Date.now();
       const res = await fetch(url);
       const data = await res.json();
       if (!data?.members?.length) return;
@@ -547,7 +547,7 @@ const App = {
 
       data.members.forEach(sheetRow => {
         // Normalise sheet columns to app field names
-        const norm = App._normaliseSheetRow(sheetRow);
+        const norm = this._normaliseSheetRow(sheetRow);
         if (!norm.id) return;
         if (!localIds.has(norm.id)) {
           merged.unshift(norm);
@@ -561,20 +561,20 @@ const App = {
 
       if (added > 0) {
         merged.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
-        App.members = merged;
-        App.saveMembers();
+        this.members = merged;
+        this.saveMembers();
         Toast.show('Synced from Sheets', `${added} new record(s) pulled from Google Sheets.`, 'info', 3000);
         // Refresh current page
-        if (['dashboard','records','my-records','reports','analytics'].includes(App.currentPage)) {
-          PageRenderers[App.currentPage]?.();
+        if (['dashboard','records','my-records','reports','analytics'].includes(this.currentPage)) {
+          PageRenderers[this.currentPage]?.();
         }
       }
 
       // Also fetch polling stations from sheet — update existing + add new
-      const stationsRes = await fetch(App.settings.scriptUrl + '?action=getStations&t=' + Date.now());
+      const stationsRes = await fetch(this.settings.scriptUrl + '?action=getStations&t=' + Date.now());
       const stationsData = await stationsRes.json();
       if (stationsData?.stations?.length) {
-        const local = [...App.pollingStations];
+        const local = [...this.pollingStations];
         let changed = false;
         stationsData.stations.forEach(s => {
           if (!s.code) return;
@@ -590,9 +590,9 @@ const App = {
           }
         });
         if (changed) {
-          App.pollingStations = local;
-          App.settings.pollingStations = local;
-          App.saveSettings();
+          this.pollingStations = local;
+          this.settings.pollingStations = local;
+          this.saveSettings();
         }
       }
     } catch(e) {
@@ -638,11 +638,11 @@ const App = {
     exec:    ['dashboard','records','reports','analytics'],
     admin:   ['dashboard','entry','records','reports','analytics','audit','users','settings'],
   },
-  canAccess(page) { return (App.ROLE_PAGES[App.currentUser?.role]||[]).includes(page); },
+  canAccess(page) { return (this.ROLE_PAGES[this.currentUser?.role]||[]).includes(page); },
 
   navigate(page) {
-    if (!App.canAccess(page)) { Toast.show('Access Denied','You do not have permission.','error'); return; }
-    App.currentPage = page;
+    if (!this.canAccess(page)) { Toast.show('Access Denied','You do not have permission.','error'); return; }
+    this.currentPage = page;
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     const el = document.getElementById('page-' + page);
     if (el) { el.classList.add('active'); PageRenderers[page]?.(); }
@@ -652,7 +652,7 @@ const App = {
 
   renderNav() {
     const nav = document.getElementById('main-nav');
-    if (!nav || !App.currentUser) return;
+    if (!nav || !this.currentUser) return;
     const pages = [
       { id:'dashboard', icon:'📊', label:'Dashboard'  },
       { id:'entry',     icon:'✍️',  label:'Data Entry'  },
@@ -664,7 +664,7 @@ const App = {
       { id:'users',     icon:'👥', label:'User Mgmt'   },
       { id:'settings',  icon:'⚙️',  label:'Settings'    },
     ];
-    nav.innerHTML = pages.filter(p => App.canAccess(p.id)).map(p =>
+    nav.innerHTML = pages.filter(p => this.canAccess(p.id)).map(p =>
       `<a class="nav-link" data-page="${p.id}" onclick="App.navigate('${p.id}')">
          <span class="nav-icon">${p.icon}</span>${p.label}
        </a>`
@@ -672,7 +672,7 @@ const App = {
   },
 
   renderUserHeader() {
-    const u = App.currentUser;
+    const u = this.currentUser;
     if (!u) return;
     const initials = u.name.split(' ').map(n=>n[0]).slice(0,2).join('');
     const rl = {officer:'Data Entry Officer',ward:'Ward Coordinator',exec:'Constituency Executive',admin:'System Administrator'}[u.role]||u.role;
@@ -684,9 +684,9 @@ const App = {
   // ── MEMBER CRUD ───────────────────────────────────────────
   addMember(data) {
     // ── PRIMARY KEY CHECK: Party ID must be unique ──────────
-    App.members = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
+    this.members = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
     if (data.partyId && data.partyId.trim()) {
-      const existing = App.members.find(m =>
+      const existing = this.members.find(m =>
         m.partyId?.trim().toLowerCase() === data.partyId.trim().toLowerCase()
         && !m._demo
       );
@@ -696,26 +696,26 @@ const App = {
           `Member with Party ID "${data.partyId}" is already enrolled as ${existing.firstName} ${existing.lastName} (${existing.station}).`,
           'error', 7000
         );
-        App.logAudit('DUPLICATE_BLOCKED',
+        this.logAudit('DUPLICATE_BLOCKED',
           `Blocked duplicate Party ID: ${data.partyId} — existing: ${existing.firstName} ${existing.lastName}`,
-          App.currentUser.username
+          this.currentUser.username
         );
         return null; // signal to caller that save was rejected
       }
     }
 
-    const member = { id:'m'+Date.now(), ...data, officer:App.currentUser.username, officerName:App.currentUser.name, timestamp:new Date().toLocaleString('en-GH') };
-    App.members.unshift(member);
-    App.saveMembers();
-    App.logAudit('ADD_MEMBER',`Added: ${data.firstName} ${data.lastName} (${data.partyId}) — ${data.station}`, App.currentUser.username);
-    if (App.isOnline && App.settings.scriptUrl) App.syncToSheets(member);
-    else { App.offlineQueue.push({type:'add',data:member}); App.saveOfflineQ(); if(!App.isOnline) Toast.show('Saved Offline','Will sync when online.','warning'); }
+    const member = { id:'m'+Date.now(), ...data, officer:this.currentUser.username, officerName:this.currentUser.name, timestamp:new Date().toLocaleString('en-GH') };
+    this.members.unshift(member);
+    this.saveMembers();
+    this.logAudit('ADD_MEMBER',`Added: ${data.firstName} ${data.lastName} (${data.partyId}) — ${data.station}`, this.currentUser.username);
+    if (this.isOnline && this.settings.scriptUrl) this.syncToSheets(member);
+    else { this.offlineQueue.push({type:'add',data:member}); this.saveOfflineQ(); if(!this.isOnline) Toast.show('Saved Offline','Will sync when online.','warning'); }
     return member;
   },
 
-  // ── PERMISSION CHECK — can App user edit/delete App record? ──
+  // ── PERMISSION CHECK — can this user edit/delete this record? ──
   canModifyMember(m) {
-    const u = App.currentUser;
+    const u = this.currentUser;
     if (!u) return false;
     if (u.role === 'admin') return true;   // admin can do anything
     if (u.role === 'exec')  return false;  // exec view-only (no edit/delete)
@@ -732,51 +732,51 @@ const App = {
   },
 
   updateMember(id, updates, reason) {
-    App.members = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
-    const idx = App.members.findIndex(m=>m.id===id);
+    this.members = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
+    const idx = this.members.findIndex(m=>m.id===id);
     if (idx<0) return false;
     // Permission check
-    if (!App.canModifyMember(App.members[idx])) {
+    if (!this.canModifyMember(this.members[idx])) {
       Toast.show('Permission Denied','You can only edit records from your assigned stations.','error');
-      App.logAudit('EDIT_DENIED',`Blocked edit attempt on record ${id} by ${App.currentUser.username}`,App.currentUser.username);
+      this.logAudit('EDIT_DENIED',`Blocked edit attempt on record ${id} by ${this.currentUser.username}`,this.currentUser.username);
       return false;
     }
-    const before = {...App.members[idx]};
-    App.members[idx] = {...App.members[idx],...updates, lastModified:new Date().toLocaleString('en-GH'), modifiedBy:App.currentUser.username};
-    App.saveMembers();
-    App.logAudit('EDIT_MEMBER',`Edited: ${before.firstName} ${before.lastName}. Reason: ${reason}`, App.currentUser.username, {before, after:App.members[idx], reason});
-    if (App.isOnline && App.settings.scriptUrl) {
-      App.syncToSheets({...App.members[idx], action:'updateMember'});
+    const before = {...this.members[idx]};
+    this.members[idx] = {...this.members[idx],...updates, lastModified:new Date().toLocaleString('en-GH'), modifiedBy:this.currentUser.username};
+    this.saveMembers();
+    this.logAudit('EDIT_MEMBER',`Edited: ${before.firstName} ${before.lastName}. Reason: ${reason}`, this.currentUser.username, {before, after:this.members[idx], reason});
+    if (this.isOnline && this.settings.scriptUrl) {
+      this.syncToSheets({...this.members[idx], action:'updateMember'});
     }
     return true;
   },
 
   deleteMember(id, reason) {
-    App.members = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
-    const m = App.members.find(m=>m.id===id);
+    this.members = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
+    const m = this.members.find(m=>m.id===id);
     if (!m) return false;
     // Permission check
-    if (!App.canModifyMember(m)) {
+    if (!this.canModifyMember(m)) {
       Toast.show('Permission Denied','You can only delete records from your assigned stations.','error');
-      App.logAudit('DELETE_DENIED',`Blocked delete attempt on record ${id} by ${App.currentUser.username}`,App.currentUser.username);
+      this.logAudit('DELETE_DENIED',`Blocked delete attempt on record ${id} by ${this.currentUser.username}`,this.currentUser.username);
       return false;
     }
-    App.members = App.members.filter(mx=>mx.id!==id);
-    App.saveMembers();
-    App.logAudit('DELETE_MEMBER',`Deleted: ${m.firstName} ${m.lastName} (${m.partyId}). Reason: ${reason}`, App.currentUser.username);
-    if (App.isOnline && App.settings.scriptUrl) {
-      App.syncToSheets({id, action:'deleteMember', reason});
+    this.members = this.members.filter(mx=>mx.id!==id);
+    this.saveMembers();
+    this.logAudit('DELETE_MEMBER',`Deleted: ${m.firstName} ${m.lastName} (${m.partyId}). Reason: ${reason}`, this.currentUser.username);
+    if (this.isOnline && this.settings.scriptUrl) {
+      this.syncToSheets({id, action:'deleteMember', reason});
     }
     return true;
   },
 
   getMembersForUser() {
     const all = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
-    App.members = all;
-    const u = App.currentUser;
+    this.members = all;
+    const u = this.currentUser;
     if (!u) return [];
     if (u.role==='admin'||u.role==='exec') return all;
-    // Stations App user is authorised to view
+    // Stations this user is authorised to view
     const codes = (u.assignedStations||[]).length ? u.assignedStations : (u.station ? [u.station] : []);
     if (u.role==='ward') {
       // Ward coordinators see all records in their assigned stations OR matching ward
@@ -796,12 +796,12 @@ const App = {
     if (App.auditLog.length>10000) App.auditLog=App.auditLog.slice(0,10000);
     localStorage.setItem(LS.AUDIT, JSON.stringify(App.auditLog));
     // Defer audit sheet sync — never block UI
-    if (App.settings.scriptUrl) setTimeout(() => App._syncAuditEntry(entry), 0);
+    if (this.settings.scriptUrl) setTimeout(() => this._syncAuditEntry(entry), 0);
   },
 
   _syncAuditEntry(entry) {
-    if (!App.settings.scriptUrl) return;
-    App._xhrPost(App.settings.scriptUrl, {
+    if (!this.settings.scriptUrl) return;
+    this._xhrPost(this.settings.scriptUrl, {
       action:      'logAudit',
       auditAction: entry.action,
       timestamp:   entry.timestamp,
@@ -812,9 +812,9 @@ const App = {
   },
 
   syncToSheets(data) {
-    if (!App.settings.scriptUrl) return;
+    if (!this.settings.scriptUrl) return;
     const payload = data.action ? data : {...data, action:'addMember'};
-    setTimeout(() => App._xhrPost(App.settings.scriptUrl, payload), 0);
+    setTimeout(() => this._xhrPost(this.settings.scriptUrl, payload), 0);
   },
 
   // Reliable fire-and-forget POST using XHR — handles Apps Script redirects correctly
@@ -829,7 +829,7 @@ const App = {
   },
 
   getStats() {
-    const all   = App.getMembersForUser();
+    const all   = this.getMembersForUser();
     const today = new Date().toLocaleDateString('en-GH');
     const byStation={}, byDay={}, byGender={Male:0,Female:0,Other:0}, byZone={};
     all.forEach(m => {
@@ -847,13 +847,13 @@ const App = {
   },
 
   async flushOfflineQueue() {
-    if (!App.offlineQueue.length || !App.settings.scriptUrl) return;
-    Toast.show('Syncing', `Uploading ${App.offlineQueue.length} record(s)…`, 'info');
+    if (!this.offlineQueue.length || !this.settings.scriptUrl) return;
+    Toast.show('Syncing', `Uploading ${this.offlineQueue.length} record(s)…`, 'info');
     const failed = [];
-    for (const item of App.offlineQueue) {
+    for (const item of this.offlineQueue) {
       const ok = await new Promise(resolve => {
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', App.settings.scriptUrl, true);
+        xhr.open('POST', this.settings.scriptUrl, true);
         xhr.timeout  = 15000;
         xhr.onload   = () => resolve(true);
         xhr.onerror  = () => resolve(false);
@@ -862,15 +862,15 @@ const App = {
       });
       if (!ok) failed.push(item);
     }
-    App.offlineQueue = failed;
-    App.saveOfflineQ();
+    this.offlineQueue = failed;
+    this.saveOfflineQ();
     if (!failed.length) Toast.show('Sync Complete', 'All records uploaded.', 'success');
     else Toast.show('Partial Sync', `${failed.length} record(s) still pending.`, 'warning');
   },
 
   // Push ALL local members to Sheet (for records entered before Sheets was configured)
   async bulkPushToSheets() {
-    if (!App.settings.scriptUrl) {
+    if (!this.settings.scriptUrl) {
       Toast.show('No Script URL', 'Configure the Apps Script URL in Settings → Google Sheets.', 'error');
       return;
     }
@@ -881,7 +881,7 @@ const App = {
     for (const m of all) {
       const sent = await new Promise(resolve => {
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', App.settings.scriptUrl, true);
+        xhr.open('POST', this.settings.scriptUrl, true);
         xhr.timeout  = 15000;
         xhr.onload   = () => resolve(true);
         xhr.onerror  = () => resolve(false);
@@ -892,7 +892,7 @@ const App = {
     }
     if (fail === 0) Toast.show('Push Complete', `All ${ok} records uploaded to Google Sheets.`, 'success');
     else            Toast.show('Partial Upload', `${ok} uploaded, ${fail} failed. Try again.`, 'warning');
-    App.logAudit('BULK_PUSH', `Bulk pushed ${ok}/${all.length} records to Google Sheets`, App.currentUser?.username || 'admin');
+    this.logAudit('BULK_PUSH', `Bulk pushed ${ok}/${all.length} records to Google Sheets`, this.currentUser?.username || 'admin');
   },
 };
 
@@ -906,7 +906,7 @@ const Toast = {
     t.className=`toast ${type}`;
     t.innerHTML=`<span class="toast-icon">${icons[type]||'✅'}</span>
       <div class="toast-content"><div class="toast-title">${title}</div>${msg?`<div class="toast-msg">${msg}</div>`:''}</div>
-      <button class="toast-close" onclick="App.parentElement.remove()">✕</button>`;
+      <button class="toast-close" onclick="this.parentElement.remove()">✕</button>`;
     c.appendChild(t);
     setTimeout(()=>{t.classList.add('hiding');setTimeout(()=>t.remove(),300);},duration);
   }
