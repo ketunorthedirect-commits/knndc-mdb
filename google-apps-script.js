@@ -313,33 +313,43 @@ function _setupSummarySheet(ss) {
 function doGet(e) {
   const action = e?.parameter?.action || 'ping';
   try {
-    if (action==='getMembers')   return _json(_getMembers());
-    if (action==='getStations')  return _json(_getPollingStations());
-    if (action==='getSettings')  return _json(_getAppSettings());
-    if (action==='getUsers')     return _json(_getUsers());
-    if (action==='ping')         return _json({status:'ok',app:'KNNDCmdb',version:'1.9'});
-    return _json({error:'Unknown action'});
-  } catch(err) { return _json({error:err.message}); }
+    if (action==='getMembers')   return _jsonCors(_getMembers());
+    if (action==='getStations')  return _jsonCors(_getPollingStations());
+    if (action==='getSettings')  return _jsonCors(_getAppSettings());
+    if (action==='getUsers')     return _jsonCors(_getUsers());
+    if (action==='ping')         return _jsonCors({status:'ok',app:'KNNDCmdb',version:'1.9'});
+    return _jsonCors({error:'Unknown action'});
+  } catch(err) { return _jsonCors({error:err.message}); }
 }
 
 function doPost(e) {
   try {
+    // Guard: Apps Script sometimes receives a request with no body
+    if (!e || !e.postData || !e.postData.contents) {
+      return _jsonCors({success:false, error:'Empty request body'});
+    }
     const data=JSON.parse(e.postData.contents);
     const action=data.action||'addMember';
-    if (action==='addMember')    return _json(_addMember(data));
-    if (action==='updateMember') return _json(_updateMember(data));
-    if (action==='deleteMember') return _json(_deleteMember(data));
-    if (action==='logAudit')     return _json(_logAudit(data));
-    if (action==='saveSettings') return _json(_saveAppSettings(data));
-    if (action==='saveUsers')    return _json(_saveUsers(data));   // full users array replace
-    if (action==='syncSummary')  return _json(_refreshSummary(SpreadsheetApp.getActiveSpreadsheet()));
-    return _json(_addMember(data)); // default
-  } catch(err) { return _json({success:false,error:err.message}); }
+    if (action==='addMember')    return _jsonCors(_addMember(data));
+    if (action==='updateMember') return _jsonCors(_updateMember(data));
+    if (action==='deleteMember') return _jsonCors(_deleteMember(data));
+    if (action==='logAudit')     return _jsonCors(_logAudit(data));
+    if (action==='saveSettings') return _jsonCors(_saveAppSettings(data));
+    if (action==='saveUsers')    return _jsonCors(_saveUsers(data));
+    if (action==='syncSummary')  return _jsonCors(_refreshSummary(SpreadsheetApp.getActiveSpreadsheet()));
+    return _jsonCors(_addMember(data)); // default
+  } catch(err) { return _jsonCors({success:false,error:err.message}); }
 }
 
-function _json(data) {
-  return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
+// JSON response with permissive CORS headers
+function _jsonCors(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
 }
+
+// Keep _json as alias for backward compat
+function _json(data) { return _jsonCors(data); }
 
 
 // ════════════════════════════════════════════════════════════
