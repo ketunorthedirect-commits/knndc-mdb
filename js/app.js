@@ -90,29 +90,25 @@ const App = {
   },
   saveSettings() {
     localStorage.setItem(LS.SETTINGS, JSON.stringify(this.settings));
-    // Push to Google Sheet so all devices can pick them up
-    if (this.isOnline && this.settings.scriptUrl) {
-      this._pushSettingsToSheet().catch(() => {}); // fire and forget
-    }
+    // Defer settings push — never block UI
+    if (this.settings.scriptUrl) setTimeout(() => this._pushSettingsToSheet(), 0);
   },
 
   // Push settings to the Sheet's App Settings tab
-  async _pushSettingsToSheet() {
+  _pushSettingsToSheet() {
     if (!this.settings.scriptUrl) return;
-    try {
-      await fetch(this.settings.scriptUrl, {
-        method: 'POST',
-        body:   JSON.stringify({
-          action:       'saveSettings',
-          scriptUrl:    this.settings.scriptUrl,
-          appName:      this.settings.appName,
-          constituency: this.settings.constituency,
-          sheetId:      this.settings.sheetId,
-          demoCleared:  localStorage.getItem(LS.DEMO_CLEARED) || '',
-          updatedBy:    this.currentUser?.username || 'system',
-        }),
-      });
-    } catch(_) {}
+    fetch(this.settings.scriptUrl, {
+      method: 'POST',
+      body:   JSON.stringify({
+        action:       'saveSettings',
+        scriptUrl:    this.settings.scriptUrl,
+        appName:      this.settings.appName,
+        constituency: this.settings.constituency,
+        sheetId:      this.settings.sheetId,
+        demoCleared:  localStorage.getItem(LS.DEMO_CLEARED) || '',
+        updatedBy:    this.currentUser?.username || 'system',
+      }),
+    }).catch(() => {});
   },
 
   // Fetch remote settings from the Sheet and apply them to this device
@@ -190,35 +186,24 @@ const App = {
 
   saveMembers()  { localStorage.setItem(LS.MEMBERS,   JSON.stringify(this.members)); },
 
-  // saveUsers: write to localStorage then push to Sheet with the PASSED array
-  // Always call as App.saveUsers(usersArray) so we push the right data
+  // saveUsers: write to localStorage instantly, then push to Sheet in background
   saveUsers(usersArray) {
     const toSave = Array.isArray(usersArray) ? usersArray : (this.users || []);
     this.users = toSave;
     localStorage.setItem(LS.USERS, JSON.stringify(toSave));
-
-    // Re-read settings fresh — they may have been updated since app loaded
-    const settings = JSON.parse(localStorage.getItem(LS.SETTINGS) || '{}');
-    const scriptUrl = settings.scriptUrl || this.settings.scriptUrl;
-
-    if (scriptUrl) {
-      this._pushUsersToSheet(toSave, scriptUrl);
-    }
+    // Defer the network call entirely — UI never waits for it
+    const url = (JSON.parse(localStorage.getItem(LS.SETTINGS) || '{}')).scriptUrl || this.settings.scriptUrl;
+    if (url) setTimeout(() => this._pushUsersToSheet(toSave, url), 0);
   },
 
-  // Push users to Sheet — takes an explicit scriptUrl to avoid stale closure
-  async _pushUsersToSheet(usersArray, scriptUrl) {
-    const url = scriptUrl || this.settings.scriptUrl || JSON.parse(localStorage.getItem(LS.SETTINGS)||'{}').scriptUrl;
-    if (!url) return false;
-    try {
-      await fetch(url, {
-        method: 'POST',
-        body:   JSON.stringify({ action: 'saveUsers', users: usersArray }),
-      });
-      return true;
-    } catch(e) {
-      return false;
-    }
+  // Background push — fully async, never blocks UI
+  _pushUsersToSheet(usersArray, scriptUrl) {
+    const url = scriptUrl || this.settings.scriptUrl;
+    if (!url) return;
+    fetch(url, {
+      method: 'POST',
+      body:   JSON.stringify({ action: 'saveUsers', users: usersArray }),
+    }).catch(() => {}); // silent — background only
   },
 
   // Manual trigger — called from the Sync Users button in Settings
@@ -796,10 +781,40 @@ const App = {
     this.auditLog.unshift(entry);
     if (this.auditLog.length>10000) this.auditLog=this.auditLog.slice(0,10000);
     this.saveAudit();
-    // Also write to Google Sheet Audit Log
-    if (this.isOnline && this.settings.scriptUrl) {
-      this._syncAuditEntry(entry).catch(()=>{});
-    }
+    // Defer audit sheet sync — never block UI
+    if (this.settings.scriptUrl) setTimeout(() => this._syncAuditEntry(entry), 0);
+  },
+
+  _syncAuditEntry(entry) {
+    if (!this.settings.scriptUrl) return;
+    fetch(this.settings.scriptUrl, {
+      method: 'POST',
+      body:   JSON.stringify({
+        action:      'logAudit',
+        auditAction: entry.action,
+        timestamp:   entry.timestamp,
+        user:        entry.user,
+        details:     entry.details,
+        extra:       entry.reason || '',
+      }),
+    }).catch(() => {});
+  },
+
+  syncToSheets(data) {
+    if (!this.settings.scriptUrl) return;
+    const payload = data.action ? data : {...data, action:'addMember'};
+    // Defer entirely — never block the save button
+    setTimeout(() => {
+      fetch(this.settings.scriptUrl, {
+        method: 'POST',
+        body:   JSON.stringify(payload),
+      }).catch(() => {
+        if (payload.action !== 'deleteMember') {
+          this.offlineQueue.push({type:'add', data:payload});
+          this.saveOfflineQ();
+        }
+      });
+    }, 0);
   },
 
   // Push ALL local members to Sheet (for existing records not yet in Sheet)
@@ -844,45 +859,17 @@ const App = {
     return { total:all.length, today:all.filter(m=>m.timestamp?.includes(today)).length, byStation, byDay, stations:Object.keys(byStation).length, byGender, byZone };
   },
 
-  async syncToSheets(data) {
-    if (!this.settings.scriptUrl) return;
-    const payload = data.action ? data : {...data, action:'addMember'};
-    try {
-      await fetch(this.settings.scriptUrl, {
-        method: 'POST',
-        body:   JSON.stringify(payload),
-      });
-    } catch(e) {
-      if (payload.action !== 'deleteMember') {
-        this.offlineQueue.push({type:'add', data:payload});
-        this.saveOfflineQ();
-      }
-    }
-  },
-
-  async _syncAuditEntry(entry) {
-    if (!this.settings.scriptUrl) return;
-    try {
-      await fetch(this.settings.scriptUrl, {
-        method: 'POST',
-        body:   JSON.stringify({
-          action:      'logAudit',
-          auditAction: entry.action,
-          timestamp:   entry.timestamp,
-          user:        entry.user,
-          details:     entry.details,
-          extra:       entry.reason || '',
-        }),
-      });
-    } catch(_) {}
-  },
-
   async flushOfflineQueue() {
     if (!this.offlineQueue.length||!this.settings.scriptUrl) return;
     Toast.show('Syncing',`Uploading ${this.offlineQueue.length} record(s)…`,'info');
     const failed=[];
     for (const item of this.offlineQueue) {
-      try { await this.syncToSheets(item.data); } catch(e) { failed.push(item); }
+      try {
+        await fetch(this.settings.scriptUrl, {
+          method: 'POST',
+          body:   JSON.stringify(item.data),
+        });
+      } catch(e) { failed.push(item); }
     }
     this.offlineQueue=failed; this.saveOfflineQ();
     if (!failed.length) Toast.show('Sync Complete','All records uploaded.','success');
