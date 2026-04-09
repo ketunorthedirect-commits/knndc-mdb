@@ -297,7 +297,8 @@ const PageRenderers = {
   'my-records'() {
     const members = App.getMembersForUser();
     document.getElementById('my-records-count').textContent = `${members.length} record${members.length!==1?'s':''}`;
-    this._renderMembersTable('my-records-tbody', members, false);
+    // showActions=true so officers can edit their own records from this page
+    this._renderMembersTable('my-records-tbody', members, true);
   },
 
   // ══════════════════════════════════════════════════════════
@@ -349,12 +350,12 @@ const PageRenderers = {
 
   _renderMembersTable(tbodyId, members, showActions) {
     const tbody=document.getElementById(tbodyId); if(!tbody) return;
-    // exec is view-only; admin can do anything; ward/officer are checked per-record
-    const role = App.currentUser?.role;
+    // canEditMember: admin=yes, exec=yes, ward/officer=station-scoped (officer: own records only)
+    // canDeleteMember: same but exec=no (view+edit only, no delete)
     tbody.innerHTML = members.length
       ? members.map(m => {
-          const canEdit = showActions && role !== 'exec' && App.canModifyMember(m);
-          const canDel  = showActions && (role === 'admin' || (role !== 'exec' && App.canModifyMember(m)));
+          const canEdit = showActions && App.canEditMember(m);
+          const canDel  = showActions && App.canDeleteMember(m);
           return `<tr>
             <td><strong>${m.lastName||''},</strong> ${m.firstName||''} ${m.otherNames||''}</td>
             <td><span class="badge ${m.gender==='Male'?'badge-blue':'badge-red'}" style="font-size:11px">${m.gender||'—'}</span></td>
@@ -378,8 +379,8 @@ const PageRenderers = {
 
   openEdit(id) {
     const m = App.members.find(x=>x.id===id); if (!m) return;
-    // Permission guard — re-check even if button was somehow shown
-    if (!App.canModifyMember(m)) {
+    // Permission guard — use canEditMember (exec can edit; officer scoped to own records)
+    if (!App.canEditMember(m)) {
       Toast.show('Permission Denied','You can only edit records from your assigned stations.','error');
       return;
     }
@@ -501,7 +502,10 @@ const PageRenderers = {
     if (saved === false) return; // permission denied — toast already shown
     Modal.close('modal-edit');
     Toast.show('Record Updated','Changes saved and synced.','success');
-    PageRenderers.records();
+    // Refresh whichever records page the user was on
+    const page = App.currentPage;
+    if (page === 'my-records') PageRenderers['my-records']();
+    else PageRenderers.records();
   },
 
   confirmDelete(id) {

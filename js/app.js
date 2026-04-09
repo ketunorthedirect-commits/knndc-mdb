@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v2.4
+   KNNDCmdb – Core Application Logic  v2.5
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '2.4.0',
+  VERSION:       '2.5.0',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -839,29 +839,49 @@ const App = {
   },
 
   // ── PERMISSION CHECK — can App user edit/delete App record? ──
-  canModifyMember(m) {
+  // canEditMember — can this user EDIT this record?
+  // exec (Constituency Executive) can edit any record; ward/officer are station-scoped.
+  canEditMember(m) {
     const u = App.currentUser;
     if (!u) return false;
-    if (u.role === 'admin') return true;   // admin can do anything
-    if (u.role === 'exec')  return false;  // exec view-only (no edit/delete)
+    if (u.role === 'admin') return true;
+    if (u.role === 'exec')  return true;   // exec can edit (but not delete)
     const codes = (u.assignedStations||[]).length ? u.assignedStations : (u.station ? [u.station] : []);
     if (u.role === 'ward') {
-      // Ward coordinator can only modify records in their assigned stations/ward
       return codes.includes(m.stationCode) || m.ward === u.ward || m.branch === u.branch;
     }
     if (u.role === 'officer') {
-      // Officer can only modify records they personally entered AND in their assigned stations
       return m.officer === u.username && codes.includes(m.stationCode);
     }
     return false;
   },
 
+  // canDeleteMember — can this user DELETE this record?
+  // exec is explicitly blocked from deletion (view + edit only).
+  canDeleteMember(m) {
+    const u = App.currentUser;
+    if (!u) return false;
+    if (u.role === 'admin') return true;
+    if (u.role === 'exec')  return false;  // exec cannot delete
+    const codes = (u.assignedStations||[]).length ? u.assignedStations : (u.station ? [u.station] : []);
+    if (u.role === 'ward') {
+      return codes.includes(m.stationCode) || m.ward === u.ward || m.branch === u.branch;
+    }
+    if (u.role === 'officer') {
+      return m.officer === u.username && codes.includes(m.stationCode);
+    }
+    return false;
+  },
+
+  // canModifyMember — legacy alias used by deleteMember(); maps to canDeleteMember
+  canModifyMember(m) { return App.canDeleteMember(m); },
+
   updateMember(id, updates, reason) {
     App.members = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
     const idx = App.members.findIndex(m=>m.id===id);
     if (idx<0) return false;
-    // Permission check
-    if (!App.canModifyMember(App.members[idx])) {
+    // Permission check — use canEditMember (exec can edit; officer scoped to own records)
+    if (!App.canEditMember(App.members[idx])) {
       Toast.show('Permission Denied','You can only edit records from your assigned stations.','error');
       App.logAudit('EDIT_DENIED',`Blocked edit attempt on record ${id} by ${App.currentUser.username}`,App.currentUser.username);
       return false;
