@@ -97,19 +97,15 @@ const App = {
   // Push settings to the Sheet's App Settings tab
   _pushSettingsToSheet() {
     if (!this.settings.scriptUrl) return;
-    fetch(this.settings.scriptUrl, {
-      method: 'POST',
-      mode:   'no-cors',
-      body:   JSON.stringify({
-        action:       'saveSettings',
-        scriptUrl:    this.settings.scriptUrl,
-        appName:      this.settings.appName,
-        constituency: this.settings.constituency,
-        sheetId:      this.settings.sheetId,
-        demoCleared:  localStorage.getItem(LS.DEMO_CLEARED) || '',
-        updatedBy:    this.currentUser?.username || 'system',
-      }),
-    }).catch(() => {});
+    this._xhrPost(this.settings.scriptUrl, {
+      action:       'saveSettings',
+      scriptUrl:    this.settings.scriptUrl,
+      appName:      this.settings.appName,
+      constituency: this.settings.constituency,
+      sheetId:      this.settings.sheetId,
+      demoCleared:  localStorage.getItem(LS.DEMO_CLEARED) || '',
+      updatedBy:    this.currentUser?.username || 'system',
+    });
   },
 
   // Fetch remote settings from the Sheet and apply them to this device
@@ -208,18 +204,14 @@ const App = {
   _pushUsersToSheet(usersArray, scriptUrl) {
     const url = scriptUrl || this.settings.scriptUrl;
     if (!url) return;
-    fetch(url, {
-      method: 'POST',
-      mode:   'no-cors',
-      body:   JSON.stringify({ action: 'saveUsers', users: usersArray }),
-    }).catch(() => {});
+    this._xhrPost(url, { action: 'saveUsers', users: usersArray });
   },
 
   // Manual trigger — called from the ☁️ Push Users to Sheet button
   async forcePushUsersToSheet() {
     const url = this.settings.scriptUrl || JSON.parse(localStorage.getItem(LS.SETTINGS)||'{}').scriptUrl;
     if (!url) {
-      Toast.show('No Script URL', 'Configure the Apps Script URL in Settings → Google Sheets first.', 'error');
+      Toast.show('No Script URL', 'Set the Apps Script URL in Settings → Google Sheets first.', 'error');
       return;
     }
     const users = JSON.parse(localStorage.getItem(LS.USERS) || '[]');
@@ -228,35 +220,26 @@ const App = {
       return;
     }
 
-    Toast.show('Pushing Users…', `Uploading ${users.length} user account(s) to Google Sheets…`, 'info', 5000);
+    Toast.show('Pushing Users…', `Sending ${users.length} account(s) to Google Sheets…`, 'info', 8000);
 
-    // Use no-cors mode — Apps Script POSTs must not follow redirects as GET.
-    // no-cors sends the data without waiting for a readable response (opaque response).
-    // We verify the URL works first with a GET ping, then POST the data.
-    try {
-      // Step 1: ping to verify URL is reachable
-      const ping = await fetch(url + '?action=ping&t=' + Date.now());
-      const pingText = await ping.text();
-      if (!pingText.includes('KNNDCmdb') && !pingText.includes('ok')) {
-        Toast.show('Connection Error', 'Script URL responded but does not look like KNNDCmdb backend. Check the URL.', 'error', 7000);
-        return;
-      }
-    } catch(e) {
-      Toast.show('Cannot Reach Sheet', 'Could not connect to the Apps Script URL. Check the URL in Settings → Google Sheets and your internet connection.', 'error', 7000);
-      return;
-    }
+    // Use XMLHttpRequest — more reliable than fetch for cross-origin POST to Apps Script.
+    // XHR sends the request and ignores the opaque redirect response without throwing.
+    const body = JSON.stringify({ action: 'saveUsers', users });
+    const success = await new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+      xhr.timeout = 15000; // 15 second timeout
+      xhr.onload  = () => resolve(true);   // any response = data was received
+      xhr.onerror = () => resolve(false);
+      xhr.ontimeout = () => resolve(false);
+      xhr.send(body);
+    });
 
-    // Step 2: POST the users — use no-cors to avoid redirect issue
-    try {
-      await fetch(url, {
-        method:   'POST',
-        mode:     'no-cors',   // avoids CORS preflight AND redirect-to-GET problem
-        body:     JSON.stringify({ action: 'saveUsers', users }),
-      });
-      Toast.show('Users Pushed', `${users.length} user account(s) sent to Google Sheets. Check the Users tab to confirm.`, 'success', 6000);
-      this.logAudit('SYNC_USERS', `Manually pushed ${users.length} users to Google Sheets`, this.currentUser?.username || 'admin');
-    } catch(e) {
-      Toast.show('Push Failed', 'Data could not be sent. Check your internet connection and try again.', 'error');
+    if (success) {
+      Toast.show('Users Pushed ✅', `${users.length} account(s) sent to Google Sheets. Open the Users tab to confirm.`, 'success', 7000);
+      this.logAudit('SYNC_USERS', `Pushed ${users.length} users to Google Sheets`, this.currentUser?.username || 'admin');
+    } else {
+      Toast.show('Push Failed', 'Request timed out or network error. Check your internet connection and Script URL, then try again.', 'error', 7000);
     }
   },
 
@@ -816,60 +799,31 @@ const App = {
 
   _syncAuditEntry(entry) {
     if (!this.settings.scriptUrl) return;
-    fetch(this.settings.scriptUrl, {
-      method: 'POST',
-      mode:   'no-cors',
-      body:   JSON.stringify({
-        action:      'logAudit',
-        auditAction: entry.action,
-        timestamp:   entry.timestamp,
-        user:        entry.user,
-        details:     entry.details,
-        extra:       entry.reason || '',
-      }),
-    }).catch(() => {});
+    this._xhrPost(this.settings.scriptUrl, {
+      action:      'logAudit',
+      auditAction: entry.action,
+      timestamp:   entry.timestamp,
+      user:        entry.user,
+      details:     entry.details,
+      extra:       entry.reason || '',
+    });
   },
 
   syncToSheets(data) {
     if (!this.settings.scriptUrl) return;
     const payload = data.action ? data : {...data, action:'addMember'};
-    setTimeout(() => {
-      fetch(this.settings.scriptUrl, {
-        method: 'POST',
-        mode:   'no-cors',
-        body:   JSON.stringify(payload),
-      }).catch(() => {
-        if (payload.action !== 'deleteMember') {
-          this.offlineQueue.push({type:'add', data:payload});
-          this.saveOfflineQ();
-        }
-      });
-    }, 0);
+    setTimeout(() => this._xhrPost(this.settings.scriptUrl, payload), 0);
   },
 
-  // Push ALL local members to Sheet (for existing records not yet in Sheet)
-  async bulkPushToSheets() {
-    if (!this.settings.scriptUrl) {
-      Toast.show('No Script URL','Configure the Apps Script URL in Settings → Google Sheets.','error');
-      return;
-    }
-    const all = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]').filter(m=>!m._demo);
-    if (!all.length) { Toast.show('No Records','There are no real member records to push.','warning'); return; }
-    Toast.show('Uploading…',`Pushing ${all.length} record(s) to Google Sheets…`,'info', 6000);
-    let ok=0, fail=0;
-    for (const m of all) {
-      try {
-        await fetch(this.settings.scriptUrl, {
-          method: 'POST',
-          mode:   'no-cors',
-          body:   JSON.stringify({...m, action:'addMember'}),
-        });
-        ok++;
-      } catch(_) { fail++; }
-    }
-    if (fail===0) Toast.show('Push Complete',`All ${ok} records uploaded to Google Sheets.`,'success');
-    else          Toast.show('Partial Upload',`${ok} uploaded, ${fail} failed. Try again.`,'warning');
-    this.logAudit('BULK_PUSH',`Bulk pushed ${ok}/${all.length} local records to Google Sheets`, this.currentUser?.username||'admin');
+  // Reliable fire-and-forget POST using XHR — handles Apps Script redirects correctly
+  _xhrPost(url, data) {
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true); // async
+      xhr.timeout = 20000;
+      xhr.send(JSON.stringify(data));
+      // No response handling — fire and forget
+    } catch(_) {}
   },
 
   getStats() {
@@ -891,20 +845,52 @@ const App = {
   },
 
   async flushOfflineQueue() {
-    if (!this.offlineQueue.length||!this.settings.scriptUrl) return;
-    Toast.show('Syncing',`Uploading ${this.offlineQueue.length} record(s)…`,'info');
-    const failed=[];
+    if (!this.offlineQueue.length || !this.settings.scriptUrl) return;
+    Toast.show('Syncing', `Uploading ${this.offlineQueue.length} record(s)…`, 'info');
+    const failed = [];
     for (const item of this.offlineQueue) {
-      try {
-        await fetch(this.settings.scriptUrl, {
-          method: 'POST',
-          mode:   'no-cors',
-          body:   JSON.stringify(item.data),
-        });
-      } catch(e) { failed.push(item); }
+      const ok = await new Promise(resolve => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', this.settings.scriptUrl, true);
+        xhr.timeout  = 15000;
+        xhr.onload   = () => resolve(true);
+        xhr.onerror  = () => resolve(false);
+        xhr.ontimeout= () => resolve(false);
+        xhr.send(JSON.stringify(item.data));
+      });
+      if (!ok) failed.push(item);
     }
-    this.offlineQueue=failed; this.saveOfflineQ();
-    if (!failed.length) Toast.show('Sync Complete','All records uploaded.','success');
+    this.offlineQueue = failed;
+    this.saveOfflineQ();
+    if (!failed.length) Toast.show('Sync Complete', 'All records uploaded.', 'success');
+    else Toast.show('Partial Sync', `${failed.length} record(s) still pending.`, 'warning');
+  },
+
+  // Push ALL local members to Sheet (for records entered before Sheets was configured)
+  async bulkPushToSheets() {
+    if (!this.settings.scriptUrl) {
+      Toast.show('No Script URL', 'Configure the Apps Script URL in Settings → Google Sheets.', 'error');
+      return;
+    }
+    const all = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]').filter(m => !m._demo);
+    if (!all.length) { Toast.show('No Records', 'There are no real member records to push.', 'warning'); return; }
+    Toast.show('Uploading…', `Pushing ${all.length} record(s) to Google Sheets…`, 'info', 6000);
+    let ok = 0, fail = 0;
+    for (const m of all) {
+      const sent = await new Promise(resolve => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', this.settings.scriptUrl, true);
+        xhr.timeout  = 15000;
+        xhr.onload   = () => resolve(true);
+        xhr.onerror  = () => resolve(false);
+        xhr.ontimeout= () => resolve(false);
+        xhr.send(JSON.stringify({...m, action:'addMember'}));
+      });
+      if (sent) ok++; else fail++;
+    }
+    if (fail === 0) Toast.show('Push Complete', `All ${ok} records uploaded to Google Sheets.`, 'success');
+    else            Toast.show('Partial Upload', `${ok} uploaded, ${fail} failed. Try again.`, 'warning');
+    this.logAudit('BULK_PUSH', `Bulk pushed ${ok}/${all.length} records to Google Sheets`, this.currentUser?.username || 'admin');
   },
 };
 
