@@ -225,7 +225,7 @@ const PageRenderers = {
       ).slice(0,30);
       dropdown.innerHTML = hits.length
         ? hits.map(s=>`
-            <div class="dropdown-item" data-sidx="${App.pollingStations.indexOf(s)}">
+            <div class="dropdown-item" data-code="${s.code}">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
                 <div>
                   <strong style="color:var(--ndc-green-dk)">${s.branchCode}</strong>
@@ -240,9 +240,9 @@ const PageRenderers = {
             </div>`).join('')
         : '<div class="dropdown-item" style="color:var(--gray-400);text-align:center;padding:16px">No matching stations</div>';
       dropdown.classList.add('open');
-      dropdown.querySelectorAll('.dropdown-item[data-sidx]').forEach(item=>{
+      dropdown.querySelectorAll('.dropdown-item[data-code]').forEach(item=>{
         item.onclick=()=>{
-          const s=App.pollingStations[parseInt(item.dataset.sidx)];
+          const s = App.pollingStations.find(ps => ps.code === item.dataset.code);
           if(s){this._fillStationFields(s);Toast.show('Station Selected',`${s.name} · ${s.branchCode}`,'success');}
           dropdown.classList.remove('open');
         };
@@ -432,7 +432,7 @@ const PageRenderers = {
 
       dropdown.innerHTML = hits.length
         ? hits.map(s => `
-            <div class="dropdown-item" data-sidx="${App.pollingStations.indexOf(s)}">
+            <div class="dropdown-item" data-code="${s.code}">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
                 <div>
                   <strong style="color:var(--ndc-green-dk)">${s.branchCode}</strong>
@@ -450,9 +450,9 @@ const PageRenderers = {
 
       dropdown.classList.add('open');
 
-      dropdown.querySelectorAll('.dropdown-item[data-sidx]').forEach(item => {
+      dropdown.querySelectorAll('.dropdown-item[data-code]').forEach(item => {
         item.onclick = () => {
-          const s = App.pollingStations[parseInt(item.dataset.sidx)];
+          const s = App.pollingStations.find(ps => ps.code === item.dataset.code);
           if (s) {
             document.getElementById('edit-branch-code').value  = s.branchCode;
             document.getElementById('edit-zone').value         = s.zone;

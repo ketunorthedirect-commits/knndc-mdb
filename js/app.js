@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v2.1
+   KNNDCmdb – Core Application Logic  v2.2
    ============================================================ */
 'use strict';
 
@@ -9,7 +9,7 @@ const CONFIG = {
   SCRIPT_URL:    '',
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '2.1.0',
+  VERSION:       '2.2.0',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -134,6 +134,30 @@ const App = {
       apply('appName');
       apply('constituency');
       apply('sheetId');
+
+      // Sync pollingStations from remote settings if present and non-empty
+      if (Array.isArray(remote.pollingStations) && remote.pollingStations.length) {
+        const localStations  = App.settings.pollingStations || [];
+        const merged         = [...localStations];
+        let   stationsChanged = false;
+        remote.pollingStations.forEach(s => {
+          if (!s.code) return;
+          const idx = merged.findIndex(ps => ps.code === s.code);
+          if (idx >= 0) {
+            const before = JSON.stringify(merged[idx]);
+            merged[idx] = { ...merged[idx], ...s };
+            if (JSON.stringify(merged[idx]) !== before) stationsChanged = true;
+          } else {
+            merged.push(s);
+            stationsChanged = true;
+          }
+        });
+        if (stationsChanged || !localStations.length) {
+          App.settings.pollingStations = merged;
+          App.pollingStations = merged;
+          changed = true;
+        }
+      }
 
       // Sync demoCleared flag across devices
       if (remote.demoCleared === '1' && !localStorage.getItem(LS.DEMO_CLEARED)) {
