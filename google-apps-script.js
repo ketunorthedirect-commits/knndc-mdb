@@ -32,6 +32,7 @@ const SHEETS = {
   USERS:            'Users',
   AUDIT:            'Audit Log',
   SUMMARY:          'Summary',
+  SETTINGS:         'App Settings',   // ← new: stores shared settings
 };
 
 const NDC_GREEN  = '#1a6b3a';
@@ -52,17 +53,23 @@ function setupSpreadsheet() {
   _setupUsersSheet(ss);
   _setupAuditSheet(ss);
   _setupSummarySheet(ss);
-  // Reorder tabs: activate each sheet then call moveActiveSheet on the spreadsheet
-  const order = [SHEETS.MEMBERS, SHEETS.POLLING_STATIONS, SHEETS.USERS, SHEETS.AUDIT, SHEETS.SUMMARY];
+  _setupAppSettingsSheet(ss);   // ← new
+
+  const order = [SHEETS.MEMBERS, SHEETS.POLLING_STATIONS, SHEETS.USERS, SHEETS.AUDIT, SHEETS.SUMMARY, SHEETS.SETTINGS];
   order.forEach((name, i) => {
     const s = ss.getSheetByName(name);
-    if (s) {
-      ss.setActiveSheet(s);
-      ss.moveActiveSheet(i + 1);
-    }
+    if (s) { ss.setActiveSheet(s); ss.moveActiveSheet(i + 1); }
   });
   Logger.log('✅ Setup complete!');
-  SpreadsheetApp.getUi().alert('✅ KNNDCmdb v1.3 Setup Complete!\n\nTabs created:\n• Members Database (with Zone & Gender columns)\n• Polling Stations (with Zone column)\n• Users\n• Audit Log\n• Summary\n\nNext: Deploy as Web App.');
+  SpreadsheetApp.getUi().alert(
+    '✅ KNNDCmdb v1.9 Setup Complete!\n\n' +
+    'Tabs created:\n' +
+    '• Members Database\n• Polling Stations\n• Users\n• Audit Log\n• Summary\n• App Settings\n\n' +
+    'Next: Deploy as Web App.\n\n' +
+    'IMPORTANT: After deploying, paste the Web App URL into the App Settings tab (cell B2), ' +
+    'then save it from the web app Settings page — all future logins on any device will ' +
+    'automatically receive the correct settings.'
+  );
 }
 
 
@@ -136,6 +143,57 @@ function migrateAddZoneAndGender() {
   const summary = log.join('\n');
   Logger.log(summary);
   SpreadsheetApp.getUi().alert('Migration Complete!\n\n' + summary + '\n\nDone. Remember to re-deploy your Web App after this.');
+}
+
+
+// ════════════════════════════════════════════════════════════
+//  MIGRATION v1.9 — Add App Settings tab to existing sheets
+//  Run if upgrading from v1.8 or earlier
+// ════════════════════════════════════════════════════════════
+function migrateAddSettingsSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (ss.getSheetByName(SHEETS.SETTINGS)) {
+    SpreadsheetApp.getUi().alert('ℹ️  App Settings tab already exists — nothing to do.');
+    return;
+  }
+  _setupAppSettingsSheet(ss);
+  SpreadsheetApp.getUi().alert(
+    '✅ App Settings tab added!\n\n' +
+    'Next: create a New Deployment for this script (Deploy → New Deployment).\n\n' +
+    'Then log in as admin → Settings → Google Sheets → 💾 Save. ' +
+    'All future logins on any device will automatically receive the correct settings.'
+  );
+}
+
+
+// ─── App Settings Sheet ──────────────────────────────────────
+function _setupAppSettingsSheet(ss) {
+  let sheet = ss.getSheetByName(SHEETS.SETTINGS);
+  if (!sheet) sheet = ss.insertSheet(SHEETS.SETTINGS);
+  sheet.clear();
+
+  sheet.getRange('A1').setValue('KNNDCmdb — Shared App Settings')
+    .setFontWeight('bold').setFontSize(13).setBackground(NDC_GREEN).setFontColor(WHITE);
+  sheet.getRange('B1').setValue('').setBackground(NDC_GREEN);
+  sheet.getRange('A2').setValue('Last Updated By').setFontWeight('bold');
+  sheet.getRange('B2').setValue('').setBackground(LIGHT_GRN);
+
+  const rows = [
+    ['scriptUrl',    ''],
+    ['appName',      'Ketu North NDC Members Database'],
+    ['constituency', 'Ketu North'],
+    ['sheetId',      ss.getId()],
+    ['apiKey',       ''],
+    ['demoCleared',  ''],
+  ];
+  sheet.getRange(3, 1, rows.length, 2).setValues(rows);
+  sheet.getRange(3, 1, rows.length, 1).setFontWeight('bold').setBackground(LIGHT_GRN);
+  sheet.getRange(3, 2, rows.length, 1).setBackground(WHITE);
+  sheet.setColumnWidth(1, 180);
+  sheet.setColumnWidth(2, 420);
+  sheet.setFrozenRows(2);
+  sheet.setTabColor('#7c3aed');
+  Logger.log('✅ App Settings sheet created.');
 }
 
 
@@ -250,9 +308,10 @@ function _setupSummarySheet(ss) {
 function doGet(e) {
   const action = e?.parameter?.action || 'ping';
   try {
-    if (action==='getMembers')        return _json(_getMembers());
-    if (action==='getStations')       return _json(_getPollingStations());
-    if (action==='ping')              return _json({status:'ok',app:'KNNDCmdb',version:'1.3'});
+    if (action==='getMembers')   return _json(_getMembers());
+    if (action==='getStations')  return _json(_getPollingStations());
+    if (action==='getSettings')  return _json(_getAppSettings());
+    if (action==='ping')         return _json({status:'ok',app:'KNNDCmdb',version:'1.9'});
     return _json({error:'Unknown action'});
   } catch(err) { return _json({error:err.message}); }
 }
@@ -265,6 +324,7 @@ function doPost(e) {
     if (action==='updateMember') return _json(_updateMember(data));
     if (action==='deleteMember') return _json(_deleteMember(data));
     if (action==='logAudit')     return _json(_logAudit(data));
+    if (action==='saveSettings') return _json(_saveAppSettings(data));
     if (action==='syncSummary')  return _json(_refreshSummary(SpreadsheetApp.getActiveSpreadsheet()));
     return _json(_addMember(data)); // default
   } catch(err) { return _json({success:false,error:err.message}); }
@@ -486,6 +546,57 @@ function _getPollingStations() {
   }
   return{stations};
 }
+
+// ─── Read App Settings from Sheet ────────────────────────────
+function _getAppSettings() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet   = ss.getSheetByName(SHEETS.SETTINGS);
+  if (!sheet) {
+    // Settings sheet doesn't exist yet — return empty object so app falls back to defaults
+    return { settings: {}, exists: false };
+  }
+  const rows  = sheet.getDataRange().getValues();
+  const cfg   = {};
+  // Data rows start at row 3 (index 2): key in col A, value in col B
+  for (let i = 2; i < rows.length; i++) {
+    const key = String(rows[i][0]||'').trim();
+    const val = String(rows[i][1]||'').trim();
+    if (key) cfg[key] = val;
+  }
+  return { settings: cfg, exists: true };
+}
+
+// ─── Write App Settings to Sheet ─────────────────────────────
+function _saveAppSettings(data) {
+  const ss  = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEETS.SETTINGS);
+  if (!sheet) { _setupAppSettingsSheet(ss); sheet = ss.getSheetByName(SHEETS.SETTINGS); }
+
+  // Update "Last Updated By" row
+  sheet.getRange('B2').setValue((data.updatedBy || 'admin') + '  |  ' + new Date().toLocaleString());
+
+  // Keys we persist to the sheet (never store the apiKey server-side for security)
+  const keysToSave = ['scriptUrl','appName','constituency','sheetId','demoCleared'];
+
+  const rows = sheet.getDataRange().getValues();
+  keysToSave.forEach(key => {
+    if (data[key] === undefined) return;
+    // Find existing row with this key and update value, or append
+    let found = false;
+    for (let i = 2; i < rows.length; i++) {
+      if (String(rows[i][0]).trim() === key) {
+        sheet.getRange(i + 1, 2).setValue(String(data[key]||''));
+        found = true; break;
+      }
+    }
+    if (!found) {
+      sheet.appendRow([key, String(data[key]||'')]);
+    }
+  });
+
+  return { success: true };
+}
+
 
 function _refreshSummary(ss) {
   let sheet=ss.getSheetByName(SHEETS.SUMMARY);
