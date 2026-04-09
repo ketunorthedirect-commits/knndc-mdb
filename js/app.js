@@ -99,6 +99,7 @@ const App = {
     if (!this.settings.scriptUrl) return;
     fetch(this.settings.scriptUrl, {
       method: 'POST',
+      mode:   'no-cors',
       body:   JSON.stringify({
         action:       'saveSettings',
         scriptUrl:    this.settings.scriptUrl,
@@ -203,17 +204,18 @@ const App = {
     if (url) setTimeout(() => this._pushUsersToSheet(toSave, url), 0);
   },
 
-  // Background push — fully async, never blocks UI
+  // Background push — fire-and-forget, no-cors avoids redirect/CORS issues
   _pushUsersToSheet(usersArray, scriptUrl) {
     const url = scriptUrl || this.settings.scriptUrl;
     if (!url) return;
     fetch(url, {
       method: 'POST',
+      mode:   'no-cors',
       body:   JSON.stringify({ action: 'saveUsers', users: usersArray }),
-    }).catch(() => {}); // silent — background only
+    }).catch(() => {});
   },
 
-  // Manual trigger — called from the Sync Users button in Settings
+  // Manual trigger — called from the ☁️ Push Users to Sheet button
   async forcePushUsersToSheet() {
     const url = this.settings.scriptUrl || JSON.parse(localStorage.getItem(LS.SETTINGS)||'{}').scriptUrl;
     if (!url) {
@@ -225,16 +227,36 @@ const App = {
       Toast.show('No Users', 'No user accounts found in local storage.', 'warning');
       return;
     }
-    Toast.show('Pushing Users…', `Uploading ${users.length} user account(s) to Google Sheets…`, 'info', 4000);
+
+    Toast.show('Pushing Users…', `Uploading ${users.length} user account(s) to Google Sheets…`, 'info', 5000);
+
+    // Use no-cors mode — Apps Script POSTs must not follow redirects as GET.
+    // no-cors sends the data without waiting for a readable response (opaque response).
+    // We verify the URL works first with a GET ping, then POST the data.
+    try {
+      // Step 1: ping to verify URL is reachable
+      const ping = await fetch(url + '?action=ping&t=' + Date.now());
+      const pingText = await ping.text();
+      if (!pingText.includes('KNNDCmdb') && !pingText.includes('ok')) {
+        Toast.show('Connection Error', 'Script URL responded but does not look like KNNDCmdb backend. Check the URL.', 'error', 7000);
+        return;
+      }
+    } catch(e) {
+      Toast.show('Cannot Reach Sheet', 'Could not connect to the Apps Script URL. Check the URL in Settings → Google Sheets and your internet connection.', 'error', 7000);
+      return;
+    }
+
+    // Step 2: POST the users — use no-cors to avoid redirect issue
     try {
       await fetch(url, {
-        method: 'POST',
-        body:   JSON.stringify({ action: 'saveUsers', users }),
+        method:   'POST',
+        mode:     'no-cors',   // avoids CORS preflight AND redirect-to-GET problem
+        body:     JSON.stringify({ action: 'saveUsers', users }),
       });
-      Toast.show('Users Saved', `${users.length} user account(s) written to Google Sheets Users tab.`, 'success');
+      Toast.show('Users Pushed', `${users.length} user account(s) sent to Google Sheets. Check the Users tab to confirm.`, 'success', 6000);
       this.logAudit('SYNC_USERS', `Manually pushed ${users.length} users to Google Sheets`, this.currentUser?.username || 'admin');
     } catch(e) {
-      Toast.show('Push Failed', 'Could not reach Google Sheets. Check your Script URL and internet connection.', 'error');
+      Toast.show('Push Failed', 'Data could not be sent. Check your internet connection and try again.', 'error');
     }
   },
 
@@ -796,6 +818,7 @@ const App = {
     if (!this.settings.scriptUrl) return;
     fetch(this.settings.scriptUrl, {
       method: 'POST',
+      mode:   'no-cors',
       body:   JSON.stringify({
         action:      'logAudit',
         auditAction: entry.action,
@@ -810,10 +833,10 @@ const App = {
   syncToSheets(data) {
     if (!this.settings.scriptUrl) return;
     const payload = data.action ? data : {...data, action:'addMember'};
-    // Defer entirely — never block the save button
     setTimeout(() => {
       fetch(this.settings.scriptUrl, {
         method: 'POST',
+        mode:   'no-cors',
         body:   JSON.stringify(payload),
       }).catch(() => {
         if (payload.action !== 'deleteMember') {
@@ -838,6 +861,7 @@ const App = {
       try {
         await fetch(this.settings.scriptUrl, {
           method: 'POST',
+          mode:   'no-cors',
           body:   JSON.stringify({...m, action:'addMember'}),
         });
         ok++;
@@ -874,6 +898,7 @@ const App = {
       try {
         await fetch(this.settings.scriptUrl, {
           method: 'POST',
+          mode:   'no-cors',
           body:   JSON.stringify(item.data),
         });
       } catch(e) { failed.push(item); }
