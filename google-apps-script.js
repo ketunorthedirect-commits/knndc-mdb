@@ -336,6 +336,7 @@ function doPost(e) {
     if (action==='logAudit')     return _jsonCors(_logAudit(data));
     if (action==='saveSettings') return _jsonCors(_saveAppSettings(data));
     if (action==='saveUsers')    return _jsonCors(_saveUsers(data));
+    if (action==='saveStations') return _jsonCors(_savePollingStations(data));
     if (action==='syncSummary')  return _jsonCors(_refreshSummary(SpreadsheetApp.getActiveSpreadsheet()));
     return _jsonCors(_addMember(data)); // default
   } catch(err) { return _jsonCors({success:false,error:err.message}); }
@@ -563,6 +564,57 @@ function _getPollingStations() {
   }
   return{stations};
 }
+
+
+// ─── Save / Replace All Polling Stations ─────────────────────
+// Replaces all station rows from row 3 down with the submitted array.
+// Preserves the title row (row 1) and header row (row 2).
+function _savePollingStations(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEETS.POLLING_STATIONS);
+  if (!sheet) { _setupPollingStationsSheet(ss); sheet = ss.getSheetByName(SHEETS.POLLING_STATIONS); }
+
+  const stations = data.stations;
+  if (!Array.isArray(stations)) return { success: false, error: 'stations must be an array' };
+
+  // ── Ensure header row 2 is correct ──────────────────────────
+  const requiredHdrs = ['Zone', 'Ward Name', 'Polling Station Name', 'Branch Name', 'Station Code', 'Branch Code'];
+  if (sheet.getMaxColumns() < 6) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), 6 - sheet.getMaxColumns());
+  }
+  sheet.getRange(2, 1, 1, 6).setValues([requiredHdrs])
+    .setFontWeight('bold').setBackground(NDC_GREEN2).setFontColor(WHITE);
+
+  // ── Clear all existing data rows (keep rows 1–2) ─────────────
+  const lastRow = sheet.getLastRow();
+  if (lastRow >= 3) {
+    sheet.getRange(3, 1, lastRow - 2, 6).clearContent();
+  }
+
+  if (stations.length === 0) return { success: true, saved: 0 };
+
+  // ── Write new rows ───────────────────────────────────────────
+  const rows = stations.map(s => [
+    s.zone       || '',
+    s.ward       || '',
+    s.name       || '',
+    s.branch     || '',
+    s.code       || '',
+    s.branchCode || '',
+  ]);
+
+  sheet.getRange(3, 1, rows.length, 6).setValues(rows);
+
+  // Light alternating row shading for readability
+  for (let i = 0; i < rows.length; i++) {
+    const rowNum = i + 3;
+    const bg = i % 2 === 0 ? '#ffffff' : LIGHT_GRN;
+    sheet.getRange(rowNum, 1, 1, 6).setBackground(bg);
+  }
+
+  return { success: true, saved: stations.length };
+}
+
 
 // ─── Read App Settings from Sheet ────────────────────────────
 function _getAppSettings() {

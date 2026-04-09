@@ -526,7 +526,27 @@
             </div>
 
             <div class="card" style="margin-bottom:16px">
-              <div class="card-header"><div class="card-icon">➕</div><h3>Add Polling Station Manually</h3></div>
+              <div class="card-header"><div class="card-icon" style="background:var(--ndc-green-lt)">☁️</div><h3>Push Stations to Google Sheet</h3></div>
+              <div class="card-body">
+                <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+                  <div style="flex:1;min-width:200px">
+                    <div style="font-size:13px;color:var(--gray-600);margin-bottom:4px">
+                      Overwrites the <strong>Polling Stations</strong> tab in your Google Sheet with the
+                      <strong><span id="push-station-count">0</span> station(s)</strong> currently configured in this app.
+                    </div>
+                    <div style="font-size:12px;color:var(--gray-400)">
+                      Use this after adding or editing stations locally so all devices can pull the updated list.
+                      Requires Script URL to be set.
+                    </div>
+                  </div>
+                  <button class="btn btn-secondary" id="push-stations-btn"
+                    onclick="App.forcePushStationsToSheet()"
+                    title="Send all configured polling stations to the Google Sheets Polling Stations tab">
+                    ☁️ Push Stations to Sheet
+                  </button>
+                </div>
+              </div>
+            </div>
               <div class="card-body">
                 <div class="form-grid">
                   <div class="form-group"><label>Zone <span class="required">*</span></label><input type="text" id="st-zone" placeholder="e.g. Zone A"></div>
@@ -547,7 +567,7 @@
               <div class="card-header"><div class="card-icon blue">ℹ️</div><h3>About KNNDCmdb</h3></div>
               <div class="card-body" style="text-align:center;padding:40px">
                 <img src="assets/ndc-logo.png" style="width:80px;margin-bottom:16px">
-                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v2.2.0</div>
+                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v2.3.0</div>
                 <div style="color:var(--gray-500);margin-top:8px">Ketu North NDC Members Database</div>
                 <div style="color:var(--gray-400);font-size:13px;margin-top:4px">Elections & IT Directorate, 2026</div>
               </div>
@@ -559,7 +579,7 @@
 
   </main>
 
-  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v2.2.0</footer>
+  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v2.3.0</footer>
 </div>
 
 <div id="toast-container"></div>
