@@ -35,6 +35,23 @@
       🔄 Fetching user accounts from Google Sheets…
     </div>
 
+    <!-- Quick Connect — shown only on devices with no Script URL configured -->
+    <div id="quick-connect-panel" style="display:none;background:var(--ndc-green-pale);border:1px solid var(--ndc-green);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px">
+      <div style="font-weight:700;color:var(--ndc-green-dk);margin-bottom:4px;font-size:13px">🔗 First-time setup — Connect to Google Sheets</div>
+      <div style="font-size:12px;color:var(--gray-600);margin-bottom:10px">Paste the Apps Script Web App URL below. All settings, accounts and stations will be downloaded automatically.</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="text" id="qc-script-url"
+          placeholder="https://script.google.com/macros/s/…/exec"
+          style="flex:1;min-width:0;font-size:12px;padding:8px 10px;border:1px solid var(--ndc-green);border-radius:var(--radius);outline:none"
+          autocomplete="off">
+        <button id="qc-connect-btn" onclick="quickConnect()"
+          style="background:var(--ndc-green);color:#fff;border:none;border-radius:var(--radius);padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">
+          ✅ Connect
+        </button>
+      </div>
+      <div id="qc-status" style="font-size:11px;margin-top:6px;color:var(--ndc-green-dk);min-height:14px"></div>
+    </div>
+
     <div class="form-group" style="margin-bottom:14px">
       <label for="login-username">Username <span class="required">*</span></label>
       <input type="text" id="login-username" placeholder="Enter your username" autocomplete="username">
@@ -567,7 +584,7 @@
               <div class="card-header"><div class="card-icon blue">ℹ️</div><h3>About KNNDCmdb</h3></div>
               <div class="card-body" style="text-align:center;padding:40px">
                 <img src="assets/ndc-logo.png" style="width:80px;margin-bottom:16px">
-                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v2.3.0</div>
+                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v2.4.0</div>
                 <div style="color:var(--gray-500);margin-top:8px">Ketu North NDC Members Database</div>
                 <div style="color:var(--gray-400);font-size:13px;margin-top:4px">Elections & IT Directorate, 2026</div>
               </div>
@@ -579,7 +596,7 @@
 
   </main>
 
-  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v2.3.0</footer>
+  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v2.4.0</footer>
 </div>
 
 <div id="toast-container"></div>
@@ -885,6 +902,91 @@ function setTab(el,tabId) {
   el.classList.add('active'); document.getElementById(tabId).style.display='block';
 }
 
+// ── QUICK CONNECT ─────────────────────────────────────────────
+// Shown on the login screen when no Script URL is configured.
+// Lets a new device bootstrap fully from a single URL paste.
+async function quickConnect() {
+  const input  = document.getElementById('qc-script-url');
+  const btn    = document.getElementById('qc-connect-btn');
+  const status = document.getElementById('qc-status');
+  const url    = input?.value.trim();
+
+  if (!url || !url.startsWith('https://')) {
+    if (status) status.textContent = '⚠️ Please paste a valid Apps Script URL.';
+    return;
+  }
+
+  btn.disabled  = true;
+  btn.textContent = '⏳ Connecting…';
+  if (status) status.textContent = 'Fetching settings, accounts and stations…';
+
+  try {
+    const [settingsRes, usersRes, stationsRes] = await Promise.allSettled([
+      fetch(url + '?action=getSettings&t=' + Date.now()).then(r => r.json()),
+      fetch(url + '?action=getUsers&t='    + Date.now()).then(r => r.json()),
+      fetch(url + '?action=getStations&t=' + Date.now()).then(r => r.json()),
+    ]);
+
+    // Persist the Script URL immediately so all subsequent fetches work
+    const stored = JSON.parse(localStorage.getItem('knndc_settings') || '{}');
+    stored.scriptUrl = url;
+
+    // Apply remote settings
+    if (settingsRes.status === 'fulfilled' && settingsRes.value?.settings && settingsRes.value?.exists) {
+      const remote = settingsRes.value.settings;
+      ['appName','constituency','sheetId'].forEach(k => { if (remote[k]) stored[k] = remote[k]; });
+      if (Array.isArray(remote.pollingStations) && remote.pollingStations.length) {
+        stored.pollingStations = remote.pollingStations;
+      }
+    }
+
+    // Apply remote stations (getStations is more authoritative than settings blob)
+    if (stationsRes.status === 'fulfilled' && stationsRes.value?.stations?.length) {
+      const sheetStations = stationsRes.value.stations;
+      const base = stored.pollingStations || [];
+      const merged = [...base];
+      sheetStations.forEach(s => {
+        if (!s.code) return;
+        const idx = merged.findIndex(ps => ps.code === s.code);
+        if (idx >= 0) merged[idx] = { ...merged[idx], ...s }; else merged.push(s);
+      });
+      stored.pollingStations = merged;
+    }
+
+    localStorage.setItem('knndc_settings', JSON.stringify(stored));
+
+    // Apply to live App object
+    App.settings.scriptUrl       = url;
+    App.settings.sheetId         = stored.sheetId         || '';
+    App.settings.appName         = stored.appName         || CONFIG.APP_NAME;
+    App.settings.constituency    = stored.constituency    || CONFIG.CONSTITUENCY;
+    App.settings.pollingStations = stored.pollingStations || App.pollingStations;
+    App.pollingStations          = App.settings.pollingStations;
+    App.applyAppName();
+
+    // Apply remote users
+    if (usersRes.status === 'fulfilled' && usersRes.value?.users?.length) {
+      localStorage.setItem('knndc_users', JSON.stringify(usersRes.value.users));
+      App.users = usersRes.value.users;
+    }
+
+    // Hide panel, show success
+    document.getElementById('quick-connect-panel').style.display = 'none';
+    const parts = [];
+    if (usersRes.value?.users?.length)       parts.push(`${usersRes.value.users.length} account(s)`);
+    if (stored.pollingStations?.length)       parts.push(`${stored.pollingStations.length} station(s)`);
+    Toast.show('Device Connected ✅', `Configuration loaded — ${parts.join(', ')}. You can now sign in.`, 'success', 7000);
+    // Update subtitle
+    const subtitle = document.querySelector('.login-subtitle');
+    if (subtitle) subtitle.textContent = '✅ Connected — please sign in';
+
+  } catch(err) {
+    if (status) status.textContent = '❌ Connection failed. Check the URL and try again.';
+    btn.disabled   = false;
+    btn.textContent = '✅ Connect';
+  }
+}
+
 // ── INIT ─────────────────────────────────────────────────────
 document.getElementById('current-date').textContent=new Date().toLocaleDateString('en-GH',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 
@@ -893,12 +995,20 @@ document.getElementById('current-date').textContent=new Date().toLocaleDateStrin
 
 App.init();
 
+// Show Quick Connect panel if this device has no Script URL configured
+(()=>{
+  const hasUrl = (JSON.parse(localStorage.getItem('knndc_settings')||'{}').scriptUrl) || CONFIG.SCRIPT_URL;
+  const panel  = document.getElementById('quick-connect-panel');
+  if (!hasUrl && panel) panel.style.display = 'block';
+})();
+
 // ── PRE-LOGIN SYNC ────────────────────────────────────────────
-// On every device load, silently pull users AND polling stations
-// from the Sheet so credentials, assignments, and the station
-// lookup dropdown are fully current before the user signs in.
+// On every device load, silently pull settings, users, AND polling
+// stations from the Sheet so a brand-new device is fully configured
+// before the user even attempts to sign in.
 (async function prefetchOnLoad() {
-  const scriptUrl = JSON.parse(localStorage.getItem('knndc_settings')||'{}').scriptUrl;
+  const scriptUrl = JSON.parse(localStorage.getItem('knndc_settings')||'{}').scriptUrl
+                    || (typeof CONFIG !== 'undefined' ? CONFIG.SCRIPT_URL : '');
   if (!scriptUrl || !navigator.onLine) return;
 
   const banner = document.getElementById('user-sync-banner');
@@ -908,13 +1018,64 @@ App.init();
   // Show syncing indicator only on brand-new devices (no local users yet)
   if (!hasLocalUsers && banner) banner.style.display = 'block';
 
-  // ── Fetch users and stations in parallel ─────────────────
-  const [usersResult, stationsResult] = await Promise.allSettled([
+  // ── Fetch settings, users, and stations in parallel ───────
+  const [settingsResult, usersResult, stationsResult] = await Promise.allSettled([
+    fetch(scriptUrl + '?action=getSettings&t=' + Date.now()).then(r => r.json()),
     fetch(scriptUrl + '?action=getUsers&t='    + Date.now()).then(r => r.json()),
     fetch(scriptUrl + '?action=getStations&t=' + Date.now()).then(r => r.json()),
   ]);
 
   if (banner) banner.style.display = 'none';
+
+  // ── Apply remote settings (scriptUrl, sheetId, appName, etc.) ──
+  if (settingsResult.status === 'fulfilled' && settingsResult.value?.settings && settingsResult.value?.exists) {
+    const remote   = settingsResult.value.settings;
+    const stored   = JSON.parse(localStorage.getItem('knndc_settings') || '{}');
+    let   changed  = false;
+
+    const applyKey = (key) => {
+      const rv = remote[key];
+      if (rv && rv !== stored[key] && key !== 'pollingStations') {
+        stored[key] = rv;
+        changed = true;
+      }
+    };
+
+    ['scriptUrl','appName','constituency','sheetId'].forEach(applyKey);
+
+    // Merge pollingStations from settings if present
+    if (Array.isArray(remote.pollingStations) && remote.pollingStations.length) {
+      const local  = stored.pollingStations || [];
+      const merged = [...local];
+      let   stChanged = false;
+      remote.pollingStations.forEach(s => {
+        if (!s.code) return;
+        const idx = merged.findIndex(ps => ps.code === s.code);
+        if (idx >= 0) {
+          const before = JSON.stringify(merged[idx]);
+          merged[idx] = { ...merged[idx], ...s };
+          if (JSON.stringify(merged[idx]) !== before) stChanged = true;
+        } else { merged.push(s); stChanged = true; }
+      });
+      if (stChanged || !local.length) { stored.pollingStations = merged; changed = true; }
+    }
+
+    if (changed) {
+      localStorage.setItem('knndc_settings', JSON.stringify(stored));
+      // Sync live App object if already initialised
+      if (typeof App !== 'undefined' && App.settings) {
+        if (remote.scriptUrl)    App.settings.scriptUrl    = remote.scriptUrl;
+        if (remote.sheetId)      App.settings.sheetId      = remote.sheetId;
+        if (remote.appName)      App.settings.appName      = remote.appName;
+        if (remote.constituency) App.settings.constituency = remote.constituency;
+        if (stored.pollingStations?.length) {
+          App.settings.pollingStations = stored.pollingStations;
+          App.pollingStations          = stored.pollingStations;
+        }
+        App.applyAppName?.();
+      }
+    }
+  }
 
   // ── Merge users ──────────────────────────────────────────
   if (usersResult.status === 'fulfilled' && usersResult.value?.users?.length) {
@@ -944,7 +1105,8 @@ App.init();
     }
   }
 
-  // ── Merge polling stations ────────────────────────────────
+  // ── Merge polling stations (from dedicated getStations endpoint) ──
+  // This supplements what may already have come via settings above
   if (stationsResult.status === 'fulfilled' && stationsResult.value?.stations?.length) {
     const sheetStations = stationsResult.value.stations;
     const settings = JSON.parse(localStorage.getItem('knndc_settings') || '{}');
@@ -968,9 +1130,10 @@ App.init();
     if (changed || !local.length) {
       settings.pollingStations = merged;
       localStorage.setItem('knndc_settings', JSON.stringify(settings));
-      // Keep App.pollingStations in sync for the login page (used by entry page immediately after login)
-      App.pollingStations = merged;
-      App.settings.pollingStations = merged;
+      if (typeof App !== 'undefined' && App.settings) {
+        App.pollingStations          = merged;
+        App.settings.pollingStations = merged;
+      }
     }
   }
 })();

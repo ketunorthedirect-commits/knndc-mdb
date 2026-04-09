@@ -630,7 +630,13 @@ function _getAppSettings() {
   for (let i = 2; i < rows.length; i++) {
     const key = String(rows[i][0]||'').trim();
     const val = String(rows[i][1]||'').trim();
-    if (key) cfg[key] = val;
+    if (!key) continue;
+    // Parse pollingStations back from JSON string to array
+    if (key === 'pollingStations') {
+      try { cfg[key] = val ? JSON.parse(val) : []; } catch(_) { cfg[key] = []; }
+    } else {
+      cfg[key] = val;
+    }
   }
   return { settings: cfg, exists: true };
 }
@@ -645,7 +651,7 @@ function _saveAppSettings(data) {
   sheet.getRange('B2').setValue((data.updatedBy || 'admin') + '  |  ' + new Date().toLocaleString());
 
   // Keys we persist to the sheet (never store the apiKey server-side for security)
-  const keysToSave = ['scriptUrl','appName','constituency','sheetId','demoCleared'];
+  const keysToSave = ['scriptUrl','appName','constituency','sheetId','demoCleared','pollingStations'];
 
   const rows = sheet.getDataRange().getValues();
   keysToSave.forEach(key => {
