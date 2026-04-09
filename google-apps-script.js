@@ -266,12 +266,17 @@ function _setupUsersSheet(ss) {
   let sheet = ss.getSheetByName(SHEETS.USERS);
   if (!sheet) sheet = ss.insertSheet(SHEETS.USERS);
   sheet.clear();
-  sheet.getRange('A1:J1').merge().setValue('SYSTEM USERS')
+  sheet.getRange('A1:L1').merge().setValue('SYSTEM USERS')
     .setFontSize(14).setFontWeight('bold').setHorizontalAlignment('center').setBackground(NDC_RED).setFontColor(WHITE);
-  const hdrs=['User ID','Full Name','Username','Password','Role','Ward','Station Code','Branch','Assigned Stations','Status'];
-  sheet.getRange(2,1,1,hdrs.length).setValues([hdrs]).setFontWeight('bold').setBackground('#7f1d1d').setFontColor(WHITE);
+  const hdrs = [
+    'User ID','Full Name','Username','Password','Role',
+    'Ward','Station Code','Branch','Assigned Stations',
+    'Status','Must Change Password','Last Updated'
+  ];
+  sheet.getRange(2,1,1,hdrs.length).setValues([hdrs])
+    .setFontWeight('bold').setBackground('#7f1d1d').setFontColor(WHITE);
   sheet.setFrozenRows(2);
-  [80,180,120,120,80,120,100,130,150,80].forEach((w,i)=>sheet.setColumnWidth(i+1,w));
+  [90,180,130,130,90,130,110,140,200,80,140,160].forEach((w,i)=>sheet.setColumnWidth(i+1,w));
   sheet.setTabColor(NDC_RED);
 }
 
@@ -311,6 +316,7 @@ function doGet(e) {
     if (action==='getMembers')   return _json(_getMembers());
     if (action==='getStations')  return _json(_getPollingStations());
     if (action==='getSettings')  return _json(_getAppSettings());
+    if (action==='getUsers')     return _json(_getUsers());
     if (action==='ping')         return _json({status:'ok',app:'KNNDCmdb',version:'1.9'});
     return _json({error:'Unknown action'});
   } catch(err) { return _json({error:err.message}); }
@@ -325,6 +331,7 @@ function doPost(e) {
     if (action==='deleteMember') return _json(_deleteMember(data));
     if (action==='logAudit')     return _json(_logAudit(data));
     if (action==='saveSettings') return _json(_saveAppSettings(data));
+    if (action==='saveUsers')    return _json(_saveUsers(data));   // full users array replace
     if (action==='syncSummary')  return _json(_refreshSummary(SpreadsheetApp.getActiveSpreadsheet()));
     return _json(_addMember(data)); // default
   } catch(err) { return _json({success:false,error:err.message}); }
@@ -595,6 +602,104 @@ function _saveAppSettings(data) {
   });
 
   return { success: true };
+}
+
+
+// ─── Get All Users ────────────────────────────────────────────
+function _getUsers() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEETS.USERS);
+  if (!sheet) return { users: [] };
+  const all = sheet.getDataRange().getValues();
+  if (all.length < 3) return { users: [] };
+
+  // Headers on row 2 (index 1), data from row 3 (index 2)
+  const hdrs = all[1].map(h => String(h).trim().toLowerCase());
+  const col = (names) => {
+    for (const n of names) {
+      const i = hdrs.indexOf(n.toLowerCase());
+      if (i >= 0) return i;
+    }
+    return -1;
+  };
+
+  const iId       = col(['user id','id']);
+  const iName     = col(['full name','name']);
+  const iUsername = col(['username']);
+  const iPassword = col(['password']);
+  const iRole     = col(['role']);
+  const iWard     = col(['ward']);
+  const iStation  = col(['station code','station']);
+  const iBranch   = col(['branch']);
+  const iAssigned = col(['assigned stations','assignedstations']);
+  const iStatus   = col(['status']);
+  const iMustChg  = col(['must change password','mustchangepassword']);
+
+  const g = (row, i) => i >= 0 ? String(row[i] || '').trim() : '';
+
+  const users = [];
+  for (let i = 2; i < all.length; i++) {
+    const row = all[i];
+    const id  = g(row, iId);
+    const usr = g(row, iUsername);
+    if (!id && !usr) continue; // skip empty rows
+    const assignedRaw = g(row, iAssigned);
+    const assignedStations = assignedRaw
+      ? assignedRaw.split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+    users.push({
+      id:                 id,
+      name:               g(row, iName),
+      username:           usr,
+      password:           g(row, iPassword),
+      role:               g(row, iRole),
+      ward:               g(row, iWard),
+      station:            g(row, iStation),
+      branch:             g(row, iBranch),
+      assignedStations:   assignedStations,
+      active:             g(row, iStatus).toLowerCase() !== 'inactive',
+      mustChangePassword: g(row, iMustChg).toLowerCase() === 'true' || g(row, iMustChg) === '1',
+    });
+  }
+  return { users, total: users.length };
+}
+
+
+// ─── Save Full Users Array (replaces all rows from row 3 down) ──
+function _saveUsers(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEETS.USERS);
+  if (!sheet) { _setupUsersSheet(ss); sheet = ss.getSheetByName(SHEETS.USERS); }
+
+  const users = data.users;
+  if (!Array.isArray(users)) return { success: false, error: 'users must be an array' };
+
+  // Clear all existing data rows (keep title row 1 and header row 2)
+  const lastRow = sheet.getLastRow();
+  if (lastRow >= 3) {
+    sheet.getRange(3, 1, lastRow - 2, sheet.getLastColumn()).clearContent();
+  }
+
+  if (users.length === 0) return { success: true };
+
+  const now = new Date().toLocaleString();
+  const rows = users.map(u => [
+    u.id            || '',
+    u.name          || '',
+    u.username      || '',
+    u.password      || '',
+    u.role          || '',
+    u.ward          || '',
+    u.station       || '',
+    u.branch        || '',
+    Array.isArray(u.assignedStations) ? u.assignedStations.join(', ') : (u.assignedStations || ''),
+    u.active === false ? 'Inactive' : 'Active',
+    u.mustChangePassword ? 'true' : 'false',
+    now,
+  ]);
+
+  sheet.getRange(3, 1, rows.length, 12).setValues(rows);
+  return { success: true, saved: users.length };
 }
 
 

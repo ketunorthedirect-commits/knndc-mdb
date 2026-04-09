@@ -30,6 +30,10 @@
     <div id="attempt-warning" style="display:none;background:#fef3c7;border:1px solid #d97706;border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:13px;color:#92400e">
       ⚠️ Incorrect credentials. <strong id="attempts-left"></strong> attempt(s) remaining.
     </div>
+    <!-- User sync indicator — shown on new devices while fetching accounts from Sheet -->
+    <div id="user-sync-banner" style="display:none;background:var(--ndc-green-pale);border:1px solid var(--ndc-green-lt);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ndc-green-dk);text-align:center">
+      🔄 Fetching user accounts from Google Sheets…
+    </div>
 
     <div class="form-group" style="margin-bottom:14px">
       <label for="login-username">Username <span class="required">*</span></label>
@@ -496,7 +500,8 @@
                 </div>
                 <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
                   <button class="btn btn-primary" onclick="PageRenderers.saveGeneralSettings()">💾 Save & Sync to Sheet</button>
-                  <button class="btn btn-secondary" onclick="App.fetchFromSheets().then(()=>Toast.show('Synced','Data refreshed.','success'))">🔄 Pull from Sheet</button>
+                  <button class="btn btn-secondary" onclick="App.fetchFromSheets().then(()=>Toast.show('Synced','Members refreshed.','success'))">🔄 Pull Members from Sheet</button>
+                  <button class="btn btn-secondary" onclick="App._fetchUsersFromSheet().then(ok=>{ if(ok){if(App.currentPage==='users')PageRenderers.users();Toast.show('Users Synced','User accounts updated from Google Sheets.','success');}else{Toast.show('No Users Found','The Users sheet is empty or the Script URL is not configured.','warning');}})">👥 Sync Users from Sheet</button>
                   <button class="btn btn-secondary" onclick="App.flushOfflineQueue()">📤 Upload Offline Queue</button>
                   <button class="btn btn-outline" onclick="App.bulkPushToSheets()" title="Push all local records to Google Sheets">
                     ☁️ Push All Records to Sheet
@@ -843,6 +848,38 @@ document.getElementById('current-date').textContent=new Date().toLocaleDateStrin
 (()=>{const l=JSON.parse(localStorage.getItem('knndc_lockout')||'null');if(l){const r=Math.ceil((l.until-Date.now())/1000);if(r>0) startLockoutCountdown(r);}})();
 
 App.init();
+
+// ── PRE-LOGIN USER SYNC ───────────────────────────────────────
+// On a brand-new device, localStorage has no user accounts yet.
+// Silently pull users from the Sheet so credentials work on first attempt.
+(async function prefetchUsersOnLoad() {
+  // Only run if we're on the login screen (not already logged in),
+  // we have a Script URL configured, and we appear to have no real users yet
+  const storedUsers = localStorage.getItem('knndc_users');
+  const hasRealUsers = storedUsers && JSON.parse(storedUsers).length > 0;
+  const scriptUrl   = JSON.parse(localStorage.getItem('knndc_settings')||'{}').scriptUrl;
+  if (!scriptUrl || hasRealUsers) return; // nothing to do
+
+  const banner = document.getElementById('user-sync-banner');
+  if (banner) banner.style.display = 'block';
+
+  try {
+    const res  = await fetch(scriptUrl + '?action=getUsers&t=' + Date.now());
+    const data = await res.json();
+    if (data?.users?.length) {
+      localStorage.setItem('knndc_users', JSON.stringify(data.users));
+      if (banner) banner.style.display = 'none';
+      // Subtly notify the user that accounts are ready
+      const subtitle = document.querySelector('.login-subtitle');
+      if (subtitle) subtitle.textContent = '✅ Accounts loaded — please sign in';
+    } else {
+      if (banner) banner.style.display = 'none';
+    }
+  } catch(_) {
+    if (banner) banner.style.display = 'none';
+  }
+})();
+
 setInterval(()=>{ if(App.currentUser&&App.currentPage==='dashboard') PageRenderers.dashboard(); },30000);
 </script>
 </body>
