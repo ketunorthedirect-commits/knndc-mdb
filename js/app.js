@@ -190,9 +190,45 @@ const App = {
   },
 
   saveMembers()  { localStorage.setItem(LS.MEMBERS,   JSON.stringify(this.members)); },
-  saveUsers()    { localStorage.setItem(LS.USERS,     JSON.stringify(this.users)); },
+  saveUsers() {
+    localStorage.setItem(LS.USERS, JSON.stringify(this.users));
+    // Push the full users array to Google Sheet so all devices stay in sync
+    if (this.isOnline && this.settings.scriptUrl) {
+      this._pushUsersToSheet().catch(() => {});
+    }
+  },
   saveAudit()    { localStorage.setItem(LS.AUDIT,     JSON.stringify(this.auditLog)); },
   saveOfflineQ() { localStorage.setItem(LS.OFFLINE_Q, JSON.stringify(this.offlineQueue)); },
+
+  // Push the full users array to the Sheet (replaces all rows)
+  async _pushUsersToSheet() {
+    if (!this.settings.scriptUrl) return;
+    try {
+      const users = JSON.parse(localStorage.getItem(LS.USERS) || '[]');
+      await fetch(this.settings.scriptUrl, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'saveUsers', users })
+      });
+    } catch(_) { /* silent */ }
+  },
+
+  // Pull users from the Sheet and merge — Sheet wins (admin device is source of truth)
+  async _fetchUsersFromSheet() {
+    if (!this.isOnline || !this.settings.scriptUrl) return false;
+    try {
+      const res  = await fetch(this.settings.scriptUrl + '?action=getUsers&t=' + Date.now());
+      const data = await res.json();
+      if (!data?.users?.length) return false;
+
+      // Sheet is the authoritative user store — replace local fully
+      const sheetUsers = data.users;
+      localStorage.setItem(LS.USERS, JSON.stringify(sheetUsers));
+      this.users = sheetUsers;
+      return true;
+    } catch(_) {
+      return false;
+    }
+  },
 
   applyAppName() {
     const n = this.settings.appName || CONFIG.APP_NAME;
@@ -242,6 +278,12 @@ const App = {
   },
 
   // ── AUTH ──────────────────────────────────────────────────
+  // NOTE: login() is synchronous so the lockout check stays fast.
+  // Users are fetched from the Sheet inside showApp() (after a successful
+  // login) and also every 2 minutes via the sync timer. On the very first
+  // login on a new device, if the Sheet has no users yet the local SYSTEM_USERS
+  // seed is used; the admin then creates real accounts which push to the Sheet,
+  // and subsequent logins on all devices pick them up automatically.
   login(username, password) {
     const MAX = 5, LOCK_MS = 2 * 60 * 1000;
     const lockData = JSON.parse(localStorage.getItem(LS.LOCKOUT) || 'null');
@@ -252,6 +294,8 @@ const App = {
       localStorage.removeItem(LS.ATTEMPTS);
     }
 
+    // Always read freshest users from localStorage (which is kept in sync with
+    // the Sheet via _fetchUsersFromSheet called on every login and every 2 min)
     this.users = JSON.parse(localStorage.getItem(LS.USERS) || 'null') || JSON.parse(JSON.stringify(SYSTEM_USERS));
     const user = this.users.find(u => u.username === username && u.password === password && u.active);
 
@@ -354,18 +398,20 @@ const App = {
     this.setupInactivityTracking();
     this.navigate('dashboard');
 
-    // On login: fetch remote settings first (so this device gets the latest
-    // Script URL, App Name, constituency etc.), then start sync
     if (this.isOnline && this.settings.scriptUrl) {
-      this._fetchAndApplyRemoteSettings().then(changed => {
-        if (changed) {
-          // Re-render header in case app name changed
+      // Fetch settings AND users in parallel on every login
+      Promise.all([
+        this._fetchAndApplyRemoteSettings(),
+        this._fetchUsersFromSheet(),
+      ]).then(([settingsChanged]) => {
+        if (settingsChanged) {
           this.applyAppName();
           this.renderUserHeader();
-          // Update settings form if currently open
           if (this.currentPage === 'settings') PageRenderers.settings();
-          Toast.show('Settings Synced', 'App settings updated from Google Sheets.', 'info', 3000);
+          Toast.show('Settings Synced','App settings updated from Google Sheets.','info',3000);
         }
+        // Re-validate session against freshly fetched users
+        this._revalidateSession();
         this._startSyncTimer();
       });
     } else {
@@ -373,11 +419,31 @@ const App = {
     }
   },
 
+  // After fetching users from Sheet, check the current session is still valid.
+  // Handles: admin disabled this account on another device, or changed this user's password.
+  _revalidateSession() {
+    if (!this.currentUser) return;
+    const fresh = this.users.find(u => u.id === this.currentUser.id);
+    if (!fresh) return; // user not in sheet yet — let them continue
+    if (!fresh.active) {
+      Toast.show('Account Disabled','Your account has been deactivated. Contact your administrator.','error', 8000);
+      setTimeout(() => this.logout(), 2500);
+      return;
+    }
+    // Update session with latest user data (picks up new assignments, name changes etc.)
+    this.currentUser = { ...fresh };
+    sessionStorage.setItem(LS.SESSION, JSON.stringify(this.currentUser));
+  },
+
   _startSyncTimer() {
     if (this._syncInterval) clearInterval(this._syncInterval);
     if (this.settings.scriptUrl) {
-      this._syncInterval = setInterval(() => this.fetchFromSheets(), 2 * 60 * 1000);
-      this.fetchFromSheets(); // immediate fetch on login
+      // Every 2 minutes: sync members AND users
+      this._syncInterval = setInterval(() => {
+        this.fetchFromSheets();
+        this._fetchUsersFromSheet();
+      }, 2 * 60 * 1000);
+      this.fetchFromSheets(); // immediate member sync on login
     }
   },
 
