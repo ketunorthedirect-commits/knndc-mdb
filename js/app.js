@@ -164,15 +164,20 @@ const App = {
   // ── DATA LOADING ──────────────────────────────────────────
   loadData() {
     const su = localStorage.getItem(LS.USERS);
-    this.users = su ? JSON.parse(su) : JSON.parse(JSON.stringify(SYSTEM_USERS));
-    if (!su) this.saveUsers();
+    const parsedUsers = su ? JSON.parse(su) : null;
+    if (parsedUsers && parsedUsers.length > 0) {
+      this.users = parsedUsers;
+    } else {
+      // No users in storage — seed with SYSTEM_USERS defaults
+      this.users = JSON.parse(JSON.stringify(SYSTEM_USERS));
+      localStorage.setItem(LS.USERS, JSON.stringify(this.users)); // write directly, no push to Sheet
+    }
 
     const sm = localStorage.getItem(LS.MEMBERS);
     const demoCleared = localStorage.getItem(LS.DEMO_CLEARED);
     if (sm) {
       this.members = JSON.parse(sm);
     } else if (!demoCleared) {
-      // First ever load — seed demo data
       this.members = JSON.parse(JSON.stringify(DEMO_MEMBERS));
       this.saveMembers();
     } else {
@@ -189,6 +194,8 @@ const App = {
   // saveUsers: write to localStorage instantly, then push to Sheet in background
   saveUsers(usersArray) {
     const toSave = Array.isArray(usersArray) ? usersArray : (this.users || []);
+    // Never overwrite real users with an empty array
+    if (toSave.length === 0) return;
     this.users = toSave;
     localStorage.setItem(LS.USERS, JSON.stringify(toSave));
     // Defer the network call entirely — UI never waits for it
@@ -358,9 +365,9 @@ const App = {
       localStorage.removeItem(LS.ATTEMPTS);
     }
 
-    // Always read freshest users from localStorage (which is kept in sync with
-    // the Sheet via _fetchUsersFromSheet called on every login and every 2 min)
-    this.users = JSON.parse(localStorage.getItem(LS.USERS) || 'null') || JSON.parse(JSON.stringify(SYSTEM_USERS));
+    // Read users from localStorage; treat missing OR empty array as "use defaults"
+    const storedUsers = JSON.parse(localStorage.getItem(LS.USERS) || 'null');
+    this.users = (storedUsers && storedUsers.length > 0) ? storedUsers : JSON.parse(JSON.stringify(SYSTEM_USERS));
     const user = this.users.find(u => u.username === username && u.password === password && u.active);
 
     if (!user) {
