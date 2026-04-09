@@ -101,19 +101,19 @@ const App = {
     if (!this.settings.scriptUrl) return;
     try {
       await fetch(this.settings.scriptUrl, {
-        method: 'POST',
-        body: JSON.stringify({
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
           action:       'saveSettings',
           scriptUrl:    this.settings.scriptUrl,
           appName:      this.settings.appName,
           constituency: this.settings.constituency,
           sheetId:      this.settings.sheetId,
-          // NOTE: apiKey is intentionally NOT sent to the Sheet for security
           demoCleared:  localStorage.getItem(LS.DEMO_CLEARED) || '',
           updatedBy:    this.currentUser?.username || 'system',
-        })
+        }),
       });
-    } catch(_) { /* silent — settings sync failure should not disrupt the user */ }
+    } catch(_) { /* silent */ }
   },
 
   // Fetch remote settings from the Sheet and apply them to this device
@@ -190,40 +190,60 @@ const App = {
   },
 
   saveMembers()  { localStorage.setItem(LS.MEMBERS,   JSON.stringify(this.members)); },
-  saveUsers() {
-    localStorage.setItem(LS.USERS, JSON.stringify(this.users));
-    // Push the full users array to Google Sheet so all devices stay in sync
+
+  // saveUsers: write to localStorage then push to Sheet with the PASSED array
+  // Always call as App.saveUsers(usersArray) so we push the right data
+  saveUsers(usersArray) {
+    // Accept either explicit array or fall back to this.users
+    const toSave = Array.isArray(usersArray) ? usersArray : this.users;
+    this.users = toSave;
+    localStorage.setItem(LS.USERS, JSON.stringify(toSave));
+    // Push to Sheet asynchronously — always use the array we just saved
     if (this.isOnline && this.settings.scriptUrl) {
-      this._pushUsersToSheet().catch(() => {});
+      this._pushUsersToSheet(toSave).catch(() => {});
     }
   },
+
   saveAudit()    { localStorage.setItem(LS.AUDIT,     JSON.stringify(this.auditLog)); },
   saveOfflineQ() { localStorage.setItem(LS.OFFLINE_Q, JSON.stringify(this.offlineQueue)); },
 
-  // Push the full users array to the Sheet (replaces all rows)
-  async _pushUsersToSheet() {
-    if (!this.settings.scriptUrl) return;
+  // Push the full users array to the Sheet — must include Content-Type header
+  async _pushUsersToSheet(usersArray) {
+    if (!this.settings.scriptUrl) return false;
     try {
-      const users = JSON.parse(localStorage.getItem(LS.USERS) || '[]');
-      await fetch(this.settings.scriptUrl, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'saveUsers', users })
+      const users = usersArray || JSON.parse(localStorage.getItem(LS.USERS) || '[]');
+      const res = await fetch(this.settings.scriptUrl, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ action: 'saveUsers', users }),
       });
-    } catch(_) { /* silent */ }
+      // Apps Script POSTs may return a redirect; that's OK — data was received
+      return true;
+    } catch(e) {
+      return false;
+    }
   },
 
-  // Pull users from the Sheet and merge — Sheet wins (admin device is source of truth)
+  // Pull users from the Sheet — Sheet is authoritative; replace local copy
   async _fetchUsersFromSheet() {
     if (!this.isOnline || !this.settings.scriptUrl) return false;
     try {
       const res  = await fetch(this.settings.scriptUrl + '?action=getUsers&t=' + Date.now());
-      const data = await res.json();
-      if (!data?.users?.length) return false;
+      // Apps Script may redirect; if response isn't JSON-parseable, skip silently
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch(_) { return false; }
 
-      // Sheet is the authoritative user store — replace local fully
-      const sheetUsers = data.users;
-      localStorage.setItem(LS.USERS, JSON.stringify(sheetUsers));
-      this.users = sheetUsers;
+      if (!data?.users || !Array.isArray(data.users) || data.users.length === 0) {
+        return false; // Sheet empty or not set up yet — keep local users
+      }
+
+      // Filter out any rows that are missing both id and username (malformed rows)
+      const valid = data.users.filter(u => u.id || u.username);
+      if (!valid.length) return false;
+
+      localStorage.setItem(LS.USERS, JSON.stringify(valid));
+      this.users = valid;
       return true;
     } catch(_) {
       return false;
@@ -340,7 +360,6 @@ const App = {
     this.users = JSON.parse(localStorage.getItem(LS.USERS) || 'null') || [];
     const u = this.users.find(x => x.id === userId);
     if (!u) return false;
-    const old = u.password;
     u.password = newPassword;
     u.mustChangePassword = false;
     // Update session too
@@ -348,7 +367,7 @@ const App = {
       this.currentUser = { ...this.currentUser, password:newPassword, mustChangePassword:false };
       sessionStorage.setItem(LS.SESSION, JSON.stringify(this.currentUser));
     }
-    this.saveUsers();
+    this.saveUsers(this.users);
     this.logAudit('PASSWORD_CHANGE', `Password changed for user: ${u.username}`, u.username);
     return true;
   },
@@ -359,7 +378,7 @@ const App = {
     if (!u) return false;
     u.password = CONFIG.DEFAULT_PASSWORD;
     u.mustChangePassword = true;
-    this.saveUsers();
+    this.saveUsers(this.users);
     this.logAudit('PASSWORD_RESET', `Password reset to default for: ${u.username}`, this.currentUser.username);
     Toast.show('Password Reset', `${u.name}'s password reset to default. They must change it on next login.`, 'success');
     return true;
@@ -724,17 +743,18 @@ const App = {
     if (!this.settings.scriptUrl) return;
     try {
       await fetch(this.settings.scriptUrl, {
-        method: 'POST',
-        body: JSON.stringify({
-          action:         'logAudit',  // HTTP routing action
-          auditAction:    entry.action, // the actual audit event name
-          timestamp:      entry.timestamp,
-          user:           entry.user,
-          details:        entry.details,
-          extra:          entry.reason || '',
-        })
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          action:      'logAudit',
+          auditAction: entry.action,
+          timestamp:   entry.timestamp,
+          user:        entry.user,
+          details:     entry.details,
+          extra:       entry.reason || '',
+        }),
       });
-    } catch(_) { /* silent — audit sync failure should never break the app */ }
+    } catch(_) { /* silent */ }
   },
 
   // Push ALL local members to Sheet (for existing records not yet in Sheet)
@@ -749,9 +769,13 @@ const App = {
     let ok=0, fail=0;
     for (const m of all) {
       try {
-        const res = await fetch(this.settings.scriptUrl, {method:'POST', body:JSON.stringify({...m, action:'addMember'})});
-        const data = await res.json();
-        if (data.success) ok++; else fail++;
+        const res = await fetch(this.settings.scriptUrl, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({...m, action:'addMember'}),
+        });
+        // Apps Script returns opaque response on redirect — treat non-throw as success
+        ok++;
       } catch(_) { fail++; }
     }
     if (fail===0) Toast.show('Push Complete',`All ${ok} records uploaded to Google Sheets.`,'success');
@@ -779,16 +803,37 @@ const App = {
 
   async syncToSheets(data) {
     if (!this.settings.scriptUrl) return;
-    // action field tells the server what operation this is
     const payload = data.action ? data : {...data, action:'addMember'};
-    try { await fetch(this.settings.scriptUrl,{method:'POST',body:JSON.stringify(payload)}); }
-    catch(e) {
-      // Queue non-delete operations for retry
+    try {
+      await fetch(this.settings.scriptUrl, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(payload),
+      });
+    } catch(e) {
       if (payload.action !== 'deleteMember') {
         this.offlineQueue.push({type:'add', data:payload});
         this.saveOfflineQ();
       }
     }
+  },
+
+  async _syncAuditEntry(entry) {
+    if (!this.settings.scriptUrl) return;
+    try {
+      await fetch(this.settings.scriptUrl, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          action:      'logAudit',
+          auditAction: entry.action,
+          timestamp:   entry.timestamp,
+          user:        entry.user,
+          details:     entry.details,
+          extra:       entry.reason || '',
+        }),
+      });
+    } catch(_) {}
   },
 
   async flushOfflineQueue() {

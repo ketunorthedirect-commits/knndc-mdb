@@ -804,13 +804,13 @@ const PageRenderers = {
       App.logAudit('ADD_USER',`Created: ${data.username} (${data.role})`,App.currentUser.username);
       Toast.show('User Created','New user added. They must change password on first login.','success');
     }
-    App.saveUsers();Modal.close('modal-user');PageRenderers.users();
+    App.saveUsers(App.users);Modal.close('modal-user');PageRenderers.users();
   },
 
   toggleUser(id) {
     App.users=JSON.parse(localStorage.getItem('knndc_users')||'null')||[];
     const u=App.users.find(x=>x.id===id); if(!u) return;
-    u.active=!u.active;App.saveUsers();
+    u.active=!u.active;App.saveUsers(App.users);
     App.logAudit(u.active?'ENABLE_USER':'DISABLE_USER',`${u.active?'Enabled':'Disabled'}: ${u.username}`,App.currentUser.username);
     Toast.show('Status Updated',`${u.name} is now ${u.active?'active':'inactive'}.`,u.active?'success':'warning');
     PageRenderers.users();
@@ -860,7 +860,7 @@ const PageRenderers = {
     const prev=u.assignedStations||[];
     u.assignedStations=selected;
     if(selected.length>0){const p=App.pollingStations.find(s=>s.code===selected[0]);if(p){u.station=p.code;u.ward=p.ward;u.branch=p.branch;}}
-    App.saveUsers();
+    App.saveUsers(App.users);
     App.logAudit('ASSIGN_STATIONS',`Assigned ${selected.length} station(s) to ${u.username}: [${selected.join(', ')}]. Prev: [${prev.join(', ')}]`,App.currentUser.username);
     Modal.close('modal-assign');
     Toast.show('Assignment Saved',`${u.name} assigned to ${selected.length} station${selected.length!==1?'s':''}.`,'success');
