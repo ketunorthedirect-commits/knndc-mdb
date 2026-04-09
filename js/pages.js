@@ -957,6 +957,9 @@ const PageRenderers = {
     const c=document.getElementById('stations-list'); if(!c) return;
     const sc=document.getElementById('station-count');
     if(sc) sc.textContent=App.pollingStations.length;
+    // Also keep the push-stations card count in sync
+    const pc=document.getElementById('push-station-count');
+    if(pc) pc.textContent=App.pollingStations.length;
     if(!App.pollingStations.length){c.innerHTML='<div class="empty-state"><div class="empty-icon">🏢</div><div class="empty-title">No stations configured</div><div class="empty-text">Add manually or use "Import from Sheet" above.</div></div>';return;}
     c.innerHTML=`<div class="table-wrap"><table>
       <thead><tr><th>#</th><th>Zone</th><th>Ward</th><th>Polling Station</th><th>Branch</th><th>Stn Code</th><th>Branch Code</th><th>Action</th></tr></thead>

@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v2.2
+   KNNDCmdb – Core Application Logic  v2.3
    ============================================================ */
 'use strict';
 
@@ -9,7 +9,7 @@ const CONFIG = {
   SCRIPT_URL:    '',
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '2.2.0',
+  VERSION:       '2.3.0',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -264,6 +264,40 @@ const App = {
     if (success) {
       Toast.show('Users Pushed ✅', `${users.length} account(s) sent to Google Sheets. Open the Users tab to confirm.`, 'success', 7000);
       App.logAudit('SYNC_USERS', `Pushed ${users.length} users to Google Sheets`, App.currentUser?.username || 'admin');
+    } else {
+      Toast.show('Push Failed', 'Request timed out or network error. Check your internet connection and Script URL, then try again.', 'error', 7000);
+    }
+  },
+
+  // Manual trigger — called from the ☁️ Push Stations to Sheet button in Settings
+  async forcePushStationsToSheet() {
+    const url = App.settings.scriptUrl || JSON.parse(localStorage.getItem(LS.SETTINGS)||'{}').scriptUrl;
+    if (!url) {
+      Toast.show('No Script URL', 'Set the Apps Script URL in Settings → Google Sheets first.', 'error');
+      return;
+    }
+    const stations = App.pollingStations || JSON.parse(localStorage.getItem(LS.SETTINGS)||'{}').pollingStations || [];
+    if (!stations.length) {
+      Toast.show('No Stations', 'No polling stations are configured locally. Add stations in Settings → Polling Stations first.', 'warning');
+      return;
+    }
+
+    Toast.show('Pushing Stations…', `Sending ${stations.length} station(s) to Google Sheets…`, 'info', 8000);
+
+    const body = JSON.stringify({ action: 'saveStations', stations });
+    const success = await new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+      xhr.timeout   = 20000;
+      xhr.onload    = () => resolve(true);
+      xhr.onerror   = () => resolve(false);
+      xhr.ontimeout = () => resolve(false);
+      xhr.send(body);
+    });
+
+    if (success) {
+      Toast.show('Stations Pushed ✅', `${stations.length} station(s) sent to Google Sheets. Open the Polling Stations tab to confirm.`, 'success', 7000);
+      App.logAudit('PUSH_STATIONS', `Pushed ${stations.length} configured stations to Google Sheets`, App.currentUser?.username || 'admin');
     } else {
       Toast.show('Push Failed', 'Request timed out or network error. Check your internet connection and Script URL, then try again.', 'error', 7000);
     }
