@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v1.3
+   KNNDCmdb – Core Application Logic  v2.0
    ============================================================ */
 'use strict';
 
@@ -9,9 +9,10 @@ const CONFIG = {
   SCRIPT_URL:    '',
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '1.3.0',
+  VERSION:       '2.0.0',
   INACTIVITY_MS: 10 * 60 * 1000,
-  DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default
+  DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
+  ADMIN_PASSWORD:   'admin123',    // default admin password
 };
 
 const LS = {
@@ -28,7 +29,7 @@ const LS = {
 
 // ─── SYSTEM USERS (non-deletable admin + demo accounts) ──────
 const SYSTEM_USERS = [
-  { id:'u001', username:'admin',    password:CONFIG.DEFAULT_PASSWORD, name:'System Administrator',    role:'admin',   ward:'', station:'', branch:'', assignedStations:[], active:true, mustChangePassword:false, isSystem:true },
+  { id:'u001', username:'admin',    password:CONFIG.ADMIN_PASSWORD,   name:'System Administrator',    role:'admin',   ward:'', station:'', branch:'', assignedStations:[], active:true, mustChangePassword:false, isSystem:true },
   { id:'u002', username:'exec',     password:CONFIG.DEFAULT_PASSWORD, name:'Constituency Executive',  role:'exec',    ward:'', station:'', branch:'', assignedStations:[], active:true, mustChangePassword:true,  isSystem:true },
   { id:'u003', username:'ward1',    password:CONFIG.DEFAULT_PASSWORD, name:'Ward Coordinator (Aflao)',role:'ward',    ward:'Aflao Ward', station:'PS-001', branch:'Aflao Branch', assignedStations:['PS-001','PS-002'], active:true, mustChangePassword:true, isSystem:false },
   { id:'u004', username:'officer1', password:CONFIG.DEFAULT_PASSWORD, name:'Data Entry Officer 1',    role:'officer', ward:'Aflao Ward', station:'PS-001', branch:'Aflao Branch', assignedStations:['PS-001'], active:true, mustChangePassword:true, isSystem:false },
@@ -272,14 +273,16 @@ const App = {
           u.id === sheetUser.id || u.username === sheetUser.username
         );
         if (idx >= 0) {
-          // Update existing user — but preserve local password if Sheet has empty/same
-          const localPwd = merged[idx].password;
-          const sheetPwd = sheetUser.password?.trim();
+          // For the currently-logged-in user: keep local password (they know their own password)
+          // For all other users: sheet password wins (propagates password changes across devices)
+          const isCurrentUser = App.currentUser &&
+            (merged[idx].id === App.currentUser.id || merged[idx].username === App.currentUser.username);
+          const localPwd  = merged[idx].password;
+          const sheetPwd  = sheetUser.password?.trim();
           merged[idx] = {
             ...merged[idx],
             ...sheetUser,
-            // Keep local password if sheet password is missing or blank
-            password: sheetPwd || localPwd,
+            password: isCurrentUser ? (localPwd || sheetPwd) : (sheetPwd || localPwd),
           };
         } else {
           // New user from Sheet — add only if they have a password
@@ -429,12 +432,13 @@ const App = {
     return true;
   },
 
+  // resetPasswordToDefault: admin account resets to ADMIN_PASSWORD; others reset to DEFAULT_PASSWORD
   resetPasswordToDefault(userId) {
     const stored = localStorage.getItem(LS.USERS);
     App.users = (stored ? JSON.parse(stored) : null) || JSON.parse(JSON.stringify(SYSTEM_USERS));
     const u = App.users.find(x => x.id === userId);
     if (!u) return false;
-    u.password = CONFIG.DEFAULT_PASSWORD;
+    u.password = (u.role === 'admin') ? CONFIG.ADMIN_PASSWORD : CONFIG.DEFAULT_PASSWORD;
     u.mustChangePassword = true;
     App.saveUsers(App.users);
     App.logAudit('PASSWORD_RESET', `Password reset to default for: ${u.username}`, App.currentUser.username);
@@ -507,6 +511,7 @@ const App = {
       setTimeout(() => App.logout(), 2500);
       return;
     }
+    const prevStations = JSON.stringify(App.currentUser.assignedStations || []);
     // Update session with latest non-sensitive fields (role, name, stations)
     // Never overwrite password in session from a Sheet fetch
     App.currentUser = {
@@ -514,6 +519,18 @@ const App = {
       password: App.currentUser.password, // keep session password (user's own device knows it)
     };
     sessionStorage.setItem(LS.SESSION, JSON.stringify(App.currentUser));
+
+    // If assigned stations changed, refresh nav and entry page so new stations are usable
+    const newStations = JSON.stringify(App.currentUser.assignedStations || []);
+    if (prevStations !== newStations) {
+      App.renderNav();
+      if (['entry','my-records'].includes(App.currentPage)) {
+        PageRenderers[App.currentPage]?.();
+      }
+      if (App.currentUser.assignedStations?.length) {
+        Toast.show('Stations Updated', `Your assigned polling stations have been synced (${App.currentUser.assignedStations.length} station${App.currentUser.assignedStations.length!==1?'s':''}).`, 'info', 4000);
+      }
+    }
   },
 
   _startSyncTimer() {

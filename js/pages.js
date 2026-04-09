@@ -753,7 +753,7 @@ const PageRenderers = {
           <div class="btn-group" style="flex-wrap:nowrap;gap:4px">
             <button class="btn btn-sm btn-secondary" onclick="PageRenderers.openEditUser('${u.id}')" title="Edit user">✏️</button>
             <button class="btn btn-sm btn-outline"   onclick="PageRenderers.resetPassword('${u.id}')" title="Reset password to default">🔑</button>
-            ${u.role==='officer'?`<button class="btn btn-sm btn-secondary" style="border-color:var(--ndc-green);color:var(--ndc-green)" onclick="PageRenderers.openAssignModal('${u.id}')" title="Assign stations">📍</button>`:''}
+            ${(u.role==='officer'||u.role==='ward')?`<button class="btn btn-sm btn-secondary" style="border-color:var(--ndc-green);color:var(--ndc-green)" onclick="PageRenderers.openAssignModal('${u.id}')" title="${u.role==='ward'?'Assign ward & stations':'Assign stations'}">📍</button>`:''}
             <button class="btn btn-sm btn-danger"    onclick="PageRenderers.toggleUser('${u.id}')" title="${u.active?'Disable':'Enable'}">${u.active?'🚫':'✅'}</button>
           </div>
         </td>
@@ -844,7 +844,11 @@ const PageRenderers = {
     const u = App.users.find(x => x.id === userId); if (!u) return;
     document.getElementById('assign-user-id').value=userId;
     document.getElementById('assign-user-name').textContent=u.name;
-    document.getElementById('assign-user-role').textContent='Data Entry Officer';
+    const roleLabel = u.role==='ward' ? 'Ward Coordinator' : 'Data Entry Officer';
+    document.getElementById('assign-user-role').textContent=roleLabel;
+    // Update modal title to reflect role
+    const modalTitle = document.querySelector('#modal-assign .modal-header h3');
+    if (modalTitle) modalTitle.textContent = u.role==='ward' ? 'Assign Ward & Polling Stations' : 'Assign Polling Stations';
     const assigned=u.assignedStations||[];
     const byWard={};
     App.pollingStations.forEach(s=>{if(!byWard[s.ward])byWard[s.ward]=[];byWard[s.ward].push(s);});
@@ -885,10 +889,16 @@ const PageRenderers = {
     u.assignedStations = selected;
     if (selected.length > 0) {
       const p = App.pollingStations.find(s => s.code === selected[0]);
-      if (p) { u.station = p.code; u.ward = p.ward; u.branch = p.branch; }
+      if (p) {
+        u.station = p.code;
+        u.branch  = p.branch;
+        // For ward coordinators, derive their ward from the first assigned station
+        // For officers, also set the ward
+        u.ward = p.ward;
+      }
     }
     App.saveUsers(App.users);
-    App.logAudit('ASSIGN_STATIONS', `Assigned ${selected.length} station(s) to ${u.username}: [${selected.join(', ')}]. Prev: [${prev.join(', ')}]`, App.currentUser.username);
+    App.logAudit('ASSIGN_STATIONS', `Assigned ${selected.length} station(s) to ${u.username} (${u.role}): [${selected.join(', ')}]. Prev: [${prev.join(', ')}]`, App.currentUser.username);
     Modal.close('modal-assign');
     Toast.show('Assignment Saved', `${u.name} assigned to ${selected.length} station${selected.length!==1?'s':''}.`, 'success');
     PageRenderers.users();
