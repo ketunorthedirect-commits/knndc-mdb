@@ -581,9 +581,10 @@ const PageRenderers = {
       : `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--gray-400)">No data</td></tr>`;
 
     document.getElementById('report-total').textContent=members.length.toLocaleString();
-    const today=new Date().toLocaleDateString('en-GH');
-    document.getElementById('daily-count').textContent=members.filter(m=>m.timestamp?.includes(today)).length;
-    document.getElementById('daily-date').textContent=today;
+    const todayISO = App._todayISO();
+    const dailyCount = members.filter(m => (m.isoDate || App._isoDate(m.timestamp)) === todayISO).length;
+    document.getElementById('daily-count').textContent = dailyCount;
+    document.getElementById('daily-date').textContent  = new Date().toLocaleDateString('en-GH');
 
     const male=members.filter(m=>m.gender==='Male').length;
     const female=members.filter(m=>m.gender==='Female').length;
@@ -667,8 +668,13 @@ const PageRenderers = {
 
     const male=members.filter(m=>m.gender==='Male').length;
     const female=members.filter(m=>m.gender==='Female').length;
-    const today=new Date().toLocaleDateString('en-GH');
-    const todayCount=members.filter(m=>m.timestamp?.includes(today)).length;
+
+    // Use ISO date keys — locale-independent, works on all devices
+    const todayISO = App._todayISO();
+    const yesterdayISO = App._daysAgoISO(1);
+    const isoOf = m => m.isoDate || App._isoDate(m.timestamp);
+
+    const todayCount = members.filter(m => isoOf(m) === todayISO).length;
     const byStation={}, byZone={};
     members.forEach(m=>{
       byStation[m.station]=(byStation[m.station]||0)+1;
@@ -688,14 +694,17 @@ const PageRenderers = {
     const anaZones = document.getElementById('ana-zones');
     if (anaZones) anaZones.textContent = zoneCount;
 
-    const yest=new Date();yest.setDate(yest.getDate()-1);
-    const yKey=yest.toLocaleDateString('en-GH');
-    const yCount=members.filter(m=>m.timestamp?.includes(yKey)).length;
-    const growth=yCount?((todayCount-yCount)/yCount*100).toFixed(0):(todayCount>0?'∞':0);
+    // Day-over-day growth — locale-independent
+    const yCount = members.filter(m => isoOf(m) === yesterdayISO).length;
+    const growth = yCount ? ((todayCount-yCount)/yCount*100).toFixed(0) : (todayCount>0?'∞':0);
     document.getElementById('ana-growth').textContent=(typeof growth==='number'&&growth>0?'+':'')+growth+(growth!=='∞'?'%':'');
 
+    // 7-day trend — ISO date keys
     const byDay={};
-    for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const k=d.toLocaleDateString('en-GH');byDay[k]=members.filter(m=>m.timestamp?.includes(k)).length;}
+    for(let i=6;i>=0;i--){
+      const k = App._daysAgoISO(i);
+      byDay[k] = members.filter(m => isoOf(m) === k).length;
+    }
 
     // Render zone list
     this._renderZoneList('ana-zone-list', byZone, members.length);

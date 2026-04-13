@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v2.5
+   KNNDCmdb – Core Application Logic  v2.6
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '2.5.0',
+  VERSION:       '2.6.0',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -117,7 +117,7 @@ const App = {
   async _fetchAndApplyRemoteSettings() {
     if (!App.isOnline || !App.settings.scriptUrl) return false;
     try {
-      const res  = await fetch(App.settings.scriptUrl + '?action=getSettings&t=' + Date.now());
+      const res  = await fetch(App.settings.scriptUrl + '?action=getSettings&t=' + Date.now(), { cache: 'no-store' });
       const data = await res.json();
       if (!data?.settings || !data.exists) return false;
 
@@ -214,8 +214,9 @@ const App = {
     App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q)|| '[]');
   },
 
-  saveMembers()  { localStorage.setItem(LS.MEMBERS,   JSON.stringify(App.members)); },
-  saveAudit()    { localStorage.setItem(LS.AUDIT,     JSON.stringify(App.auditLog)); },
+  saveMembers()   { localStorage.setItem(LS.MEMBERS,   JSON.stringify(App.members)); },
+  saveAudit()     { localStorage.setItem(LS.AUDIT,     JSON.stringify(App.auditLog)); },
+  saveOfflineQ()  { localStorage.setItem(LS.OFFLINE_Q, JSON.stringify(App.offlineQueue)); },
 
   // saveUsers: write to localStorage instantly, then push to Sheet in background
   saveUsers(usersArray) {
@@ -315,7 +316,7 @@ const App = {
   async _fetchUsersFromSheet() {
     if (!App.isOnline || !App.settings.scriptUrl) return false;
     try {
-      const res  = await fetch(App.settings.scriptUrl + '?action=getUsers&t=' + Date.now());
+      const res  = await fetch(App.settings.scriptUrl + '?action=getUsers&t=' + Date.now(), { cache: 'no-store' });
       const text = await res.text();
       let data;
       try { data = JSON.parse(text); } catch(_) { return false; }
@@ -658,7 +659,7 @@ const App = {
     if (!App.isOnline || !App.settings.scriptUrl) return;
     try {
       const url = App.settings.scriptUrl + '?action=getMembers&t=' + Date.now();
-      const res = await fetch(url);
+      const res = await fetch(url, { cache: 'no-store' });
       const data = await res.json();
       if (!data?.members?.length) return;
 
@@ -696,7 +697,7 @@ const App = {
       }
 
       // Also fetch polling stations from sheet — update existing + add new
-      const stationsRes = await fetch(App.settings.scriptUrl + '?action=getStations&t=' + Date.now());
+      const stationsRes = await fetch(App.settings.scriptUrl + '?action=getStations&t=' + Date.now(), { cache: 'no-store' });
       const stationsData = await stationsRes.json();
       if (stationsData?.stations?.length) {
         const local = [...App.pollingStations];
@@ -758,7 +759,7 @@ const App = {
 
   // ── ROLE ACCESS ───────────────────────────────────────────
   ROLE_PAGES: {
-    officer: ['dashboard','entry','my-records'],
+    officer: ['dashboard','entry','my-records','records'],
     ward:    ['dashboard','records','reports'],
     exec:    ['dashboard','records','reports','analytics'],
     admin:   ['dashboard','entry','records','reports','analytics','audit','users','settings'],
@@ -829,7 +830,7 @@ const App = {
       }
     }
 
-    const member = { id:'m'+Date.now(), ...data, officer:App.currentUser.username, officerName:App.currentUser.name, timestamp:new Date().toLocaleString('en-GH') };
+    const member = { id:'m'+Date.now(), ...data, officer:App.currentUser.username, officerName:App.currentUser.name, timestamp:new Date().toLocaleString('en-GH'), isoDate:App._todayISO() };
     App.members.unshift(member);
     App.saveMembers();
     App.logAudit('ADD_MEMBER',`Added: ${data.firstName} ${data.lastName} (${data.partyId}) — ${data.station}`, App.currentUser.username);
@@ -968,14 +969,54 @@ const App = {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', url, true); // async
       xhr.timeout = 20000;
+      xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.send(JSON.stringify(data));
       // No response handling — fire and forget
     } catch(_) {}
   },
 
+  // ── DATE HELPERS ─────────────────────────────────────────────
+  // Returns 'YYYY-MM-DD' from any stored timestamp string, locale-independent.
+  // Handles en-GH 'D/M/YYYY, ...' and en-US 'M/D/YYYY, ...' fallback formats.
+  _isoDate(timestamp) {
+    if (!timestamp) return '';
+    // If already ISO format
+    if (/^\d{4}-\d{2}-\d{2}/.test(timestamp)) return timestamp.slice(0, 10);
+    // Try native Date parse first (works for M/D/YYYY = en-US)
+    const d = new Date(timestamp);
+    if (!isNaN(d)) return d.toISOString().slice(0, 10);
+    // Manual parse for D/M/YYYY (en-GH): extract day, month, year
+    const m = timestamp.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (m) {
+      const [, day, month, year] = m;
+      const forced = new Date(`${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}`);
+      if (!isNaN(forced)) return forced.toISOString().slice(0, 10);
+    }
+    return '';
+  },
+
+  // Returns today's date as 'YYYY-MM-DD' in local time (immune to locale and timezone drift)
+  _todayISO() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  },
+
+  // Returns 'YYYY-MM-DD' for a date N days ago
+  _daysAgoISO(n) {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  },
+
   getStats() {
     const all   = App.getMembersForUser();
-    const today = new Date().toLocaleDateString('en-GH');
+    const todayISO = App._todayISO();
     const byStation={}, byDay={}, byGender={Male:0,Female:0,Other:0}, byZone={};
     all.forEach(m => {
       byStation[m.station] = (byStation[m.station]||0)+1;
@@ -983,12 +1024,13 @@ const App = {
       byGender[g]++;
       if (m.zone) byZone[m.zone] = (byZone[m.zone]||0)+1;
     });
+    // Build 7-day trend using ISO date keys — locale-independent
     for (let i=6;i>=0;i--) {
-      const d=new Date(); d.setDate(d.getDate()-i);
-      const key=d.toLocaleDateString('en-GH');
-      byDay[key]=all.filter(m=>m.timestamp?.includes(key)).length;
+      const key = App._daysAgoISO(i);
+      byDay[key] = all.filter(m => (m.isoDate || App._isoDate(m.timestamp)) === key).length;
     }
-    return { total:all.length, today:all.filter(m=>m.timestamp?.includes(today)).length, byStation, byDay, stations:Object.keys(byStation).length, byGender, byZone };
+    const todayCount = all.filter(m => (m.isoDate || App._isoDate(m.timestamp)) === todayISO).length;
+    return { total:all.length, today:todayCount, byStation, byDay, stations:Object.keys(byStation).length, byGender, byZone };
   },
 
   async flushOfflineQueue() {
