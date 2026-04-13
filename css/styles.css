@@ -749,6 +749,7 @@ tbody td { padding: 12px 16px; color: var(--gray-700); vertical-align: middle; }
 .offline-dot { background: var(--ndc-red); box-shadow: 0 0 0 2px rgba(200,16,46,.25); animation: none; }
 
 @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.5 } }
+@keyframes spin   { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
 
 /* Two col grid */
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
