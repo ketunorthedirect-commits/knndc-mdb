@@ -729,20 +729,47 @@ const PageRenderers = {
   // AUDIT LOG
   // ══════════════════════════════════════════════════════════
   audit() {
+    // Admin: pull latest entries from Sheet first (non-blocking)
+    // so the log shows activity from ALL devices, not just this one.
+    if (App.currentUser?.role === 'admin' && App.isOnline && App.settings.scriptUrl) {
+      const banner = document.getElementById('audit-sync-banner');
+      if (banner) banner.style.display = 'flex';
+      App._fetchAuditFromSheet().then(hasNew => {
+        if (banner) banner.style.display = 'none';
+        if (hasNew) PageRenderers._renderAuditEntries(); // re-render with fresh data
+      });
+    }
+    PageRenderers._renderAuditEntries();
+  },
+
+  _renderAuditEntries() {
     const q=document.getElementById('audit-search')?.value?.toLowerCase()||'';
     const filter=document.getElementById('audit-filter')?.value||'';
+    const userFilter=document.getElementById('audit-user-filter')?.value||'';
     App.auditLog=JSON.parse(localStorage.getItem('knndc_audit')||'[]');
     let log=App.auditLog;
-    if(q)      log=log.filter(e=>e.action?.toLowerCase().includes(q)||e.details?.toLowerCase().includes(q)||e.user?.toLowerCase().includes(q));
-    if(filter) log=log.filter(e=>e.action===filter);
+    if(q)          log=log.filter(e=>e.action?.toLowerCase().includes(q)||e.details?.toLowerCase().includes(q)||e.user?.toLowerCase().includes(q));
+    if(filter)     log=log.filter(e=>e.action===filter);
+    if(userFilter) log=log.filter(e=>e.user===userFilter);
     const c=document.getElementById('audit-entries'); if(!c) return;
-    c.innerHTML=log.slice(0,300).map(e=>{
-      const isDanger=['DELETE_MEMBER','LOCKOUT','DISABLE_USER','CLEAR_DEMO'].includes(e.action);
-      const isWarn=['EDIT_MEMBER','EXPORT_EXCEL','EXPORT_PDF','AUTO_LOGOUT','PASSWORD_RESET'].includes(e.action);
+
+    // Populate user filter dropdown from all known users in the log
+    const userSelect = document.getElementById('audit-user-filter');
+    if (userSelect && !userSelect.dataset.populated) {
+      const allUsers = [...new Set(App.auditLog.map(e=>e.user).filter(Boolean))].sort();
+      userSelect.innerHTML = '<option value="">All Users</option>' +
+        allUsers.map(u=>`<option value="${u}"${u===userFilter?' selected':''}>${u}</option>`).join('');
+      userSelect.dataset.populated = '1';
+    }
+
+    c.innerHTML=log.slice(0,500).map(e=>{
+      const isDanger=['DELETE_MEMBER','LOCKOUT','DISABLE_USER','CLEAR_DEMO','EDIT_DENIED','DELETE_DENIED'].includes(e.action);
+      const isWarn=['EDIT_MEMBER','EXPORT_EXCEL','EXPORT_PDF','AUTO_LOGOUT','PASSWORD_RESET','PASSWORD_CHANGE','ASSIGN_STATIONS'].includes(e.action);
+      const fromSheet = e._fromSheet ? '<span style="font-size:10px;color:var(--gray-400);margin-left:4px">☁️</span>' : '';
       return `<div class="log-entry ${isDanger?'danger':isWarn?'warning':''}">
         <div class="log-entry-header">
           <span class="badge ${isDanger?'badge-red':isWarn?'badge-amber':'badge-green'}">${e.action}</span>
-          <span class="log-user">👤 ${e.user}</span>
+          <span class="log-user">👤 ${e.user}${fromSheet}</span>
           <span class="log-time">${e.timestamp}</span>
         </div>
         <div class="log-details">${e.details||''}</div>

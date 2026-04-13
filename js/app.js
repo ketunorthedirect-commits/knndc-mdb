@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v2.6
+   KNNDCmdb – Core Application Logic  v2.7
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '2.6.0',
+  VERSION:       '2.7.0',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -955,6 +955,57 @@ const App = {
       details:     entry.details,
       extra:       entry.reason || '',
     });
+  },
+
+  // Pull audit entries from the Sheet and merge with local log.
+  // Called when admin navigates to the Audit Log page and Sheet is configured.
+  // Returns true if new entries were found, false otherwise.
+  async _fetchAuditFromSheet() {
+    if (!App.isOnline || !App.settings.scriptUrl) return false;
+    try {
+      const res  = await fetch(App.settings.scriptUrl + '?action=getAudit&t=' + Date.now(), { cache: 'no-store' });
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch(_) { return false; }
+      if (!data?.entries?.length) return false;
+
+      // Build a dedup key: timestamp + action + user (Sheet has no id field)
+      const local  = JSON.parse(localStorage.getItem(LS.AUDIT) || '[]');
+      const seenKeys = new Set(local.map(e => `${e.timestamp}|${e.action}|${e.user}`));
+
+      const newEntries = data.entries
+        .filter(e => {
+          const k = `${e.timestamp}|${e.action}|${e.user}`;
+          return !seenKeys.has(k);
+        })
+        .map(e => ({
+          id:        'a_sheet_' + Math.random().toString(36).slice(2),
+          action:    e.action,
+          details:   e.details,
+          user:      e.user,
+          timestamp: e.timestamp,
+          reason:    e.extra || '',
+          _fromSheet: true,
+        }));
+
+      if (!newEntries.length) return false;
+
+      // Merge: combine local + sheet entries, sort newest-first, cap at 10 000
+      const merged = [...local, ...newEntries]
+        .sort((a, b) => {
+          // Sort by id timestamp where available, else lexicographic on timestamp string
+          const ta = a.id?.startsWith('a') && !a._fromSheet ? parseInt(a.id.slice(1)) : 0;
+          const tb = b.id?.startsWith('a') && !b._fromSheet ? parseInt(b.id.slice(1)) : 0;
+          return tb - ta || b.timestamp.localeCompare(a.timestamp);
+        })
+        .slice(0, 10000);
+
+      App.auditLog = merged;
+      localStorage.setItem(LS.AUDIT, JSON.stringify(merged));
+      return true;
+    } catch(_) {
+      return false;
+    }
   },
 
   syncToSheets(data) {
