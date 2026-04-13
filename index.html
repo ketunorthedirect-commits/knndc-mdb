@@ -409,10 +409,17 @@
 
     <!-- ════ AUDIT LOG ════ -->
     <div id="page-audit" class="page">
-      <div class="section-header"><div class="section-title">Audit Log</div><div class="section-subtitle">All system activities</div></div>
-      <div class="search-bar">
-        <div class="search-input-wrap"><span class="search-ico">🔍</span><input type="text" id="audit-search" placeholder="Search…" oninput="PageRenderers.audit()"></div>
-        <select id="audit-filter" onchange="PageRenderers.audit()" style="width:auto">
+      <div class="section-header"><div class="section-title">Audit Log</div><div class="section-subtitle">All system activities — all users, all devices</div></div>
+
+      <!-- Sync banner — shown briefly while fetching from Sheet -->
+      <div id="audit-sync-banner" style="display:none;align-items:center;gap:10px;background:var(--ndc-green-pale);border:1px solid var(--ndc-green-lt);border-radius:var(--radius);padding:10px 16px;margin-bottom:12px;font-size:13px;color:var(--ndc-green-dk)">
+        <span style="animation:spin 1s linear infinite;display:inline-block">🔄</span>
+        Fetching latest activity from Google Sheets…
+      </div>
+
+      <div class="search-bar" style="flex-wrap:wrap;gap:8px">
+        <div class="search-input-wrap"><span class="search-ico">🔍</span><input type="text" id="audit-search" placeholder="Search action, user, details…" oninput="PageRenderers._renderAuditEntries()"></div>
+        <select id="audit-filter" onchange="PageRenderers._renderAuditEntries()" style="width:auto">
           <option value="">All Actions</option>
           <option>LOGIN</option><option>LOGOUT</option><option>AUTO_LOGOUT</option><option>LOCKOUT</option>
           <option>ADD_MEMBER</option><option>EDIT_MEMBER</option><option>DELETE_MEMBER</option><option>DUPLICATE_BLOCKED</option><option>EDIT_DENIED</option><option>DELETE_DENIED</option>
@@ -420,9 +427,14 @@
           <option>ADD_USER</option><option>EDIT_USER</option><option>ENABLE_USER</option><option>DISABLE_USER</option>
           <option>PASSWORD_CHANGE</option><option>PASSWORD_RESET</option><option>ASSIGN_STATIONS</option>
           <option>SETTINGS_CHANGE</option><option>ADD_STATION</option><option>REMOVE_STATION</option>
+          <option>PUSH_STATIONS</option><option>SYNC_USERS</option><option>BULK_PUSH</option>
           <option>CLEAR_DEMO</option>
         </select>
-        <button class="btn btn-danger btn-sm" onclick="if(confirm('Clear ALL audit logs?')){App.auditLog=[];App.saveAudit();PageRenderers.audit();Toast.show('Log Cleared','','warning');}">🗑️ Clear</button>
+        <select id="audit-user-filter" onchange="PageRenderers._renderAuditEntries()" style="width:auto">
+          <option value="">All Users</option>
+        </select>
+        <button class="btn btn-outline btn-sm" onclick="PageRenderers.audit()" title="Refresh from Google Sheets">🔄 Refresh</button>
+        <button class="btn btn-danger btn-sm" onclick="if(confirm('Clear ALL local audit logs on this device?')){App.auditLog=[];App.saveAudit();PageRenderers.audit();Toast.show('Log Cleared','','warning');}">🗑️ Clear</button>
       </div>
       <div id="audit-entries"></div>
     </div>
@@ -584,7 +596,7 @@
               <div class="card-header"><div class="card-icon blue">ℹ️</div><h3>About KNNDCmdb</h3></div>
               <div class="card-body" style="text-align:center;padding:40px">
                 <img src="assets/ndc-logo.png" style="width:80px;margin-bottom:16px">
-                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v2.6.0</div>
+                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v2.7.0</div>
                 <div style="color:var(--gray-500);margin-top:8px">Ketu North NDC Members Database</div>
                 <div style="color:var(--gray-400);font-size:13px;margin-top:4px">Elections & IT Directorate, 2026</div>
               </div>
@@ -596,7 +608,7 @@
 
   </main>
 
-  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v2.6.0</footer>
+  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v2.7.0</footer>
 </div>
 
 <div id="toast-container"></div>

@@ -317,6 +317,7 @@ function doGet(e) {
     if (action==='getStations')  return _jsonCors(_getPollingStations());
     if (action==='getSettings')  return _jsonCors(_getAppSettings());
     if (action==='getUsers')     return _jsonCors(_getUsers());
+    if (action==='getAudit')     return _jsonCors(_getAuditLog());
     if (action==='ping')         return _jsonCors({status:'ok',app:'KNNDCmdb',version:'1.9'});
     return _jsonCors({error:'Unknown action'});
   } catch(err) { return _jsonCors({error:err.message}); }
@@ -453,6 +454,38 @@ function _logAudit(data) {
     data.extra   || '',
   ]);
   return{success:true};
+}
+
+// ─── Read Audit Log from Sheet (admin-only pull) ──────────────
+// Returns up to 2000 most recent entries, newest first.
+// Columns: Timestamp(A), Action(B), User(C), Details(D), Extra(E)
+function _getAuditLog() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEETS.AUDIT);
+  if (!sheet) return { entries: [] };
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return { entries: [] };
+
+  // Read all data rows (skip title row 1 and header row 2)
+  const maxRows  = Math.min(lastRow - 2, 2000);
+  const startRow = Math.max(3, lastRow - maxRows + 1);
+  const numRows  = lastRow - startRow + 1;
+  const rows     = sheet.getRange(startRow, 1, numRows, 5).getValues();
+
+  // Return newest first (sheet is append-only so last rows = newest)
+  const entries = rows
+    .reverse()
+    .filter(r => r[0] || r[1] || r[2]) // skip completely empty rows
+    .map(r => ({
+      timestamp: String(r[0] || ''),
+      action:    String(r[1] || ''),
+      user:      String(r[2] || ''),
+      details:   String(r[3] || ''),
+      extra:     String(r[4] || ''),
+    }));
+
+  return { entries, total: entries.length };
 }
 
 function _getMembers() {
