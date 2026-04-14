@@ -178,6 +178,19 @@ const PageRenderers = {
       if (s) this._fillStationFields(s);
     }
 
+    // Show/hide Push Records button based on whether Sheet sync is configured
+    const pushBtn = document.getElementById('entry-push-btn');
+    if (pushBtn) {
+      if (App.settings.scriptUrl) {
+        const myCount = App.getMembersForUser().filter(m => !m._demo).length;
+        pushBtn.style.display = '';
+        pushBtn.title = `Force-upload your ${myCount} record(s) to Google Sheets`;
+        pushBtn.innerHTML = `☁️ Push Records to Sheet <span style="font-size:11px;opacity:.8">(${myCount})</span>`;
+      } else {
+        pushBtn.style.display = 'none';
+      }
+    }
+
     // Clear gender selection
     const gEl = document.getElementById('f-gender');
     if (gEl) gEl.value = '';

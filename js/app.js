@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v2.9.4.1
+   KNNDCmdb – Core Application Logic  v2.9.5.1
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '2.9.4',
+  VERSION:       '2.9.5',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -1198,6 +1198,51 @@ const App = {
     if (fail === 0) Toast.show('Push Complete ✅', `All ${ok} record(s) uploaded to Google Sheets.`, 'success', 6000);
     else            Toast.show('Partial Upload', `${ok} uploaded, ${fail} failed. Try again.`, 'warning', 6000);
     App.logAudit('BULK_PUSH', `Bulk pushed ${ok}/${all.length} records to Google Sheets`, App.currentUser?.username || 'admin');
+  },
+
+  // Push records visible to the current user to Google Sheet.
+  // Used from the Data Entry page — scoped by role and assigned stations.
+  // Officers push only their station's records; admin/ward push all they can see.
+  async pushMyRecordsToSheet() {
+    if (!App.settings.scriptUrl) {
+      Toast.show('No Script URL', 'Configure the Apps Script URL in Settings → Google Sheets first.', 'error');
+      return;
+    }
+    const records = App.getMembersForUser().filter(m => !m._demo);
+    if (!records.length) {
+      Toast.show('No Records', 'No records found for your assigned station(s).', 'warning');
+      return;
+    }
+
+    // Lock all entry-page push buttons during the operation
+    const btns = document.querySelectorAll('[onclick*="pushMyRecordsToSheet"]');
+    btns.forEach(b => { b.disabled = true; b.dataset._orig = b.textContent; b.textContent = '⏳ Pushing…'; });
+
+    Toast.show('Pushing…', `Sending ${records.length} record(s) to Google Sheets…`, 'info', 10000);
+    let ok = 0, fail = 0;
+    for (const m of records) {
+      const sent = await new Promise(resolve => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', App.settings.scriptUrl, true);
+        xhr.timeout  = 20000;
+        xhr.onload   = () => resolve(true);
+        xhr.onerror  = () => resolve(false);
+        xhr.ontimeout= () => resolve(false);
+        xhr.send(JSON.stringify({ action: 'upsertMember', ...m }));
+      });
+      if (sent) ok++; else fail++;
+    }
+
+    btns.forEach(b => { b.disabled = false; b.textContent = b.dataset._orig || '☁️ Push Records to Sheet'; });
+
+    if (fail === 0) {
+      Toast.show('Push Complete ✅', `All ${ok} record(s) uploaded to Google Sheets.`, 'success', 6000);
+      App.logAudit('PUSH_MY_RECORDS', `Pushed ${ok} record(s) to Google Sheets from Data Entry page`, App.currentUser?.username);
+    } else {
+      Toast.show('Partial Upload', `${ok} uploaded, ${fail} failed. Check your connection and try again.`, 'warning', 6000);
+    }
+    // Refresh entry page so count badge updates
+    if (App.currentPage === 'entry') PageRenderers.entry();
   },
 };
 
