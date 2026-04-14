@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v2.9.1.1
+   KNNDCmdb – Core Application Logic  v2.9.2.1
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '2.9.1',
+  VERSION:       '2.9.2',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -238,18 +238,6 @@ const App = {
   },
 
   // Manual trigger — called from the ☁️ Push Users to Sheet button
-  async forcePushUsersToSheet() {
-    const url = App.settings.scriptUrl || JSON.parse(localStorage.getItem(LS.SETTINGS)||'{}').scriptUrl;
-    if (!url) {
-      Toast.show('No Script URL', 'Set the Apps Script URL in Settings → Google Sheets first.', 'error');
-      return;
-    }
-    const users = JSON.parse(localStorage.getItem(LS.USERS) || '[]');
-    if (!users.length) {
-      Toast.show('No Users', 'No user accounts found in local storage.', 'warning');
-      return;
-    }
-
   async forcePushUsersToSheet() {
     const url = App.settings.scriptUrl || JSON.parse(localStorage.getItem(LS.SETTINGS)||'{}').scriptUrl;
     if (!url) {
