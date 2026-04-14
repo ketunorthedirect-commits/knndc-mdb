@@ -332,6 +332,7 @@ function doPost(e) {
     const data=JSON.parse(e.postData.contents);
     const action=data.action||'addMember';
     if (action==='addMember')    return _jsonCors(_addMember(data));
+    if (action==='upsertMember') return _jsonCors(_upsertMember(data));
     if (action==='updateMember') return _jsonCors(_updateMember(data));
     if (action==='deleteMember') return _jsonCors(_deleteMember(data));
     if (action==='logAudit')     return _jsonCors(_logAudit(data));
@@ -387,6 +388,96 @@ function _addMember(data) {
   ]);
   _refreshSummary(ss);
   return { success:true };
+}
+
+// ─── Upsert Member (insert OR update by Record ID) ───────────
+// Used by bulk push — prevents duplicate rows if called more than once for the same record.
+// Locates the Record ID column (row 4 headers), searches all data rows;
+// if found: updates all editable fields in-place; if not found: appends a new row.
+function _upsertMember(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEETS.MEMBERS);
+  if (!sheet) { setupSpreadsheet(); sheet = ss.getSheetByName(SHEETS.MEMBERS); }
+
+  const all = sheet.getDataRange().getValues();
+  if (all.length < 5) {
+    // Sheet is empty or has only headers — just append
+    return _addMember(data);
+  }
+
+  // Locate columns by header row (row 4 = index 3)
+  const hdrs = all[3].map(h => String(h).trim().toLowerCase());
+  const col  = (names) => { for (const n of names) { const i = hdrs.indexOf(n.toLowerCase()); if (i >= 0) return i; } return -1; };
+
+  const iId      = col(['record id', 'id']);
+  const iFirst   = col(['first name', 'firstname']);
+  const iLast    = col(['surname', 'last name', 'lastname']);
+  const iParty   = col(['party id number', 'party id', 'partyid']);
+  const iVoter   = col(['voter id number', 'voter id', 'voterid']);
+  const iPhone   = col(['telephone number', 'phone', 'telephone']);
+  const iGender  = col(['gender']);
+  const iZone    = col(['zone']);
+  const iWard    = col(['ward name', 'ward']);
+  const iStation = col(['polling station', 'station']);
+  const iStCode  = col(['station code', 'stationcode']);
+  const iBranch  = col(['branch name', 'branch']);
+  const iBrCode  = col(['branch code', 'branchcode']);
+  const iOther   = col(['other names', 'othernames']);
+  const iOfficer = col(['officer id', 'officer']);
+  const iOffName = col(['officer name', 'officername']);
+  const iTime    = col(['date/time added', 'timestamp', 'date added']);
+
+  // Search for existing row by Record ID (data rows start at row 5 = index 4)
+  if (iId >= 0 && data.id) {
+    for (let i = 4; i < all.length; i++) {
+      if (String(all[i][iId] || '').trim() === String(data.id).trim()) {
+        // Row found — update all fields in-place (single setValues call for performance)
+        const r = i + 1; // 1-based sheet row
+        const set = (ci, val) => { if (ci >= 0 && val !== undefined && val !== '') sheet.getRange(r, ci + 1).setValue(val); };
+        set(iFirst,   data.firstName);
+        set(iLast,    data.lastName);
+        set(iOther,   data.otherNames);
+        set(iParty,   data.partyId);
+        set(iVoter,   data.voterId);
+        set(iPhone,   data.phone);
+        set(iGender,  data.gender);
+        set(iZone,    data.zone);
+        set(iWard,    data.ward);
+        set(iStation, data.station);
+        set(iStCode,  data.stationCode);
+        set(iBranch,  data.branch);
+        set(iBrCode,  data.branchCode);
+        set(iOfficer, data.officer);
+        set(iOffName, data.officerName);
+        set(iTime,    data.timestamp);
+        _refreshSummary(ss);
+        return { success: true, action: 'updated' };
+      }
+    }
+  }
+
+  // Not found — append as new row
+  sheet.appendRow([
+    data.firstName   || '',
+    data.lastName    || '',
+    data.partyId     || '',
+    data.voterId     || '',
+    data.phone       || '',
+    data.gender      || '',
+    data.zone        || '',
+    data.ward        || '',
+    data.station     || '',
+    data.stationCode || '',
+    data.branch      || '',
+    data.branchCode  || '',
+    data.otherNames  || '',
+    data.officer     || '',
+    data.officerName || '',
+    data.timestamp   || new Date().toLocaleString(),
+    data.id          || 'm' + Date.now(),
+  ]);
+  _refreshSummary(ss);
+  return { success: true, action: 'inserted' };
 }
 
 function _updateMember(data) {
