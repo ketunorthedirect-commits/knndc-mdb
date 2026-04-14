@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v2.8
+   KNNDCmdb – Core Application Logic  v2.9
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '2.8.0',
+  VERSION:       '2.9.0',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -382,7 +382,13 @@ const App = {
 
   // ── NETWORK ───────────────────────────────────────────────
   setupNetworkListeners() {
-    window.addEventListener('online',  () => { App.isOnline = true;  App.updateOnlineStatus(); App.flushOfflineQueue(); });
+    window.addEventListener('online', () => {
+      App.isOnline = true;
+      App.updateOnlineStatus();
+      // Reload queue from localStorage — in-memory array may be stale after page reload
+      App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q) || '[]');
+      if (App.offlineQueue.length) App.flushOfflineQueue();
+    });
     window.addEventListener('offline', () => { App.isOnline = false; App.updateOnlineStatus(); });
     App.updateOnlineStatus();
   },
@@ -542,6 +548,13 @@ const App = {
     App.renderUserHeader();
     App.setupInactivityTracking();
     App.navigate('dashboard');
+
+    // Flush any queued offline records now that the user is logged in
+    // Reload from localStorage first — in-memory array may be stale after a page reload
+    App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q) || '[]');
+    if (App.isOnline && App.settings.scriptUrl && App.offlineQueue.length) {
+      setTimeout(() => App.flushOfflineQueue(), 1500); // slight delay so UI settles first
+    }
 
     if (App.isOnline && App.settings.scriptUrl) {
       // Fetch settings AND users in parallel on every login
@@ -895,6 +908,11 @@ const App = {
     App.logAudit('EDIT_MEMBER',`Edited: ${before.firstName} ${before.lastName}. Reason: ${reason}`, App.currentUser.username, {before, after:App.members[idx], reason});
     if (App.isOnline && App.settings.scriptUrl) {
       App.syncToSheets({...App.members[idx], action:'updateMember'});
+    } else if (App.settings.scriptUrl) {
+      // Queue for sync when back online
+      App.offlineQueue.push({ type:'update', data:{...App.members[idx], action:'updateMember', reason} });
+      App.saveOfflineQ();
+      if (!App.isOnline) Toast.show('Edit Queued','Changes saved locally and will sync when online.','warning');
     }
     return true;
   },
@@ -914,6 +932,11 @@ const App = {
     App.logAudit('DELETE_MEMBER',`Deleted: ${m.firstName} ${m.lastName} (${m.partyId}). Reason: ${reason}`, App.currentUser.username);
     if (App.isOnline && App.settings.scriptUrl) {
       App.syncToSheets({id, action:'deleteMember', reason});
+    } else if (App.settings.scriptUrl) {
+      // Queue for sync when back online
+      App.offlineQueue.push({ type:'delete', data:{id, action:'deleteMember', reason} });
+      App.saveOfflineQ();
+      if (!App.isOnline) Toast.show('Delete Queued','Record removed locally and will sync when online.','warning');
     }
     return true;
   },
@@ -1089,28 +1112,51 @@ const App = {
   },
 
   async flushOfflineQueue() {
+    // Always reload from localStorage — in-memory array may be stale after a page reload
+    App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q) || '[]');
     if (!App.offlineQueue.length || !App.settings.scriptUrl) return;
-    Toast.show('Syncing', `Uploading ${App.offlineQueue.length} record(s)…`, 'info');
+
+    Toast.show('Syncing', `Uploading ${App.offlineQueue.length} queued operation(s)…`, 'info', 6000);
     const failed = [];
+    let uploaded = 0;
+
     for (const item of App.offlineQueue) {
+      // Route each item to the correct GAS action based on its type
+      let payload;
+      if (item.type === 'delete') {
+        payload = { action: 'deleteMember', ...item.data };
+      } else if (item.type === 'update') {
+        payload = { action: 'updateMember', ...item.data };
+      } else {
+        // 'add' or legacy items without type — use upsert (idempotent, safe to retry)
+        payload = { action: 'upsertMember', ...item.data };
+      }
+
       const ok = await new Promise(resolve => {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', App.settings.scriptUrl, true);
-        xhr.timeout  = 15000;
+        xhr.timeout  = 20000;
         xhr.setRequestHeader('Content-Type', 'application/json');
         xhr.onload   = () => resolve(true);
         xhr.onerror  = () => resolve(false);
         xhr.ontimeout= () => resolve(false);
-        // Ensure action field is always explicit; use upsert to avoid duplicates
-        const payload = { action: 'upsertMember', ...item.data };
         xhr.send(JSON.stringify(payload));
       });
-      if (!ok) failed.push(item);
+
+      if (ok) { uploaded++; } else { failed.push(item); }
     }
+
     App.offlineQueue = failed;
     App.saveOfflineQ();
-    if (!failed.length) Toast.show('Sync Complete', 'All records uploaded.', 'success');
-    else Toast.show('Partial Sync', `${failed.length} record(s) still pending.`, 'warning');
+
+    if (!failed.length) {
+      Toast.show('Sync Complete ✅', `${uploaded} queued operation(s) uploaded to Google Sheets.`, 'success', 5000);
+    } else {
+      Toast.show('Partial Sync', `${uploaded} uploaded, ${failed.length} still pending. Will retry when online.`, 'warning', 6000);
+    }
+
+    // Refresh dashboard so the Offline Queue counter updates to 0
+    if (App.currentUser && App.currentPage === 'dashboard') PageRenderers.dashboard();
   },
 
   // Push ALL local members to Sheet (for records entered before Sheets was configured)
