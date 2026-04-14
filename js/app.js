@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v2.9
+   KNNDCmdb – Core Application Logic  v2.9.1.1
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '2.9.0',
+  VERSION:       '2.9.1',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -250,27 +250,42 @@ const App = {
       return;
     }
 
-    Toast.show('Pushing Users…', `Sending ${users.length} account(s) to Google Sheets…`, 'info', 8000);
+  async forcePushUsersToSheet() {
+    const url = App.settings.scriptUrl || JSON.parse(localStorage.getItem(LS.SETTINGS)||'{}').scriptUrl;
+    if (!url) {
+      Toast.show('No Script URL', 'Set the Apps Script URL in Settings → Google Sheets first.', 'error');
+      return;
+    }
+    const users = JSON.parse(localStorage.getItem(LS.USERS) || '[]');
+    if (!users.length) {
+      Toast.show('No Users', 'No user accounts found in local storage.', 'warning');
+      return;
+    }
 
-    // Use XMLHttpRequest — more reliable than fetch for cross-origin POST to Apps Script.
-    // XHR sends the request and ignores the opaque redirect response without throwing.
+    const btns = document.querySelectorAll('[onclick*="forcePushUsersToSheet"]');
+    btns.forEach(b => { b.disabled = true; b.dataset._orig = b.textContent; b.textContent = '⏳ Pushing…'; });
+
+    Toast.show('Pushing Users…', `Sending ${users.length} account(s) to Google Sheets…`, 'info', 10000);
+
     const body = JSON.stringify({ action: 'saveUsers', users });
     const success = await new Promise((resolve) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', url, true);
-      xhr.timeout = 15000;
+      xhr.timeout = 30000;
       xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.onload  = () => resolve(true);
-      xhr.onerror = () => resolve(false);
+      xhr.onload    = () => resolve(true);
+      xhr.onerror   = () => resolve(false);
       xhr.ontimeout = () => resolve(false);
       xhr.send(body);
     });
+
+    btns.forEach(b => { b.disabled = false; b.textContent = b.dataset._orig || '☁️ Push Users to Sheet'; });
 
     if (success) {
       Toast.show('Users Pushed ✅', `${users.length} account(s) sent to Google Sheets. Open the Users tab to confirm.`, 'success', 7000);
       App.logAudit('SYNC_USERS', `Pushed ${users.length} users to Google Sheets`, App.currentUser?.username || 'admin');
     } else {
-      Toast.show('Push Failed', 'Request timed out or network error. Check your internet connection and Script URL, then try again.', 'error', 7000);
+      Toast.show('Push Failed', 'Apps Script did not respond. Verify the Script URL is correct and the Web App deployment is active, then try again.', 'error', 9000);
     }
   },
 
@@ -287,13 +302,16 @@ const App = {
       return;
     }
 
-    Toast.show('Pushing Stations…', `Sending ${stations.length} station(s) to Google Sheets…`, 'info', 8000);
+    const btns = document.querySelectorAll('[onclick*="forcePushStationsToSheet"]');
+    btns.forEach(b => { b.disabled = true; b.dataset._orig = b.textContent; b.textContent = '⏳ Pushing…'; });
+
+    Toast.show('Pushing Stations…', `Sending ${stations.length} station(s) to Google Sheets…`, 'info', 10000);
 
     const body = JSON.stringify({ action: 'saveStations', stations });
     const success = await new Promise((resolve) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', url, true);
-      xhr.timeout   = 20000;
+      xhr.timeout   = 30000;
       xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.onload    = () => resolve(true);
       xhr.onerror   = () => resolve(false);
@@ -301,11 +319,13 @@ const App = {
       xhr.send(body);
     });
 
+    btns.forEach(b => { b.disabled = false; b.textContent = b.dataset._orig || '☁️ Push Stations to Sheet'; });
+
     if (success) {
       Toast.show('Stations Pushed ✅', `${stations.length} station(s) sent to Google Sheets. Open the Polling Stations tab to confirm.`, 'success', 7000);
       App.logAudit('PUSH_STATIONS', `Pushed ${stations.length} configured stations to Google Sheets`, App.currentUser?.username || 'admin');
     } else {
-      Toast.show('Push Failed', 'Request timed out or network error. Check your internet connection and Script URL, then try again.', 'error', 7000);
+      Toast.show('Push Failed', 'Apps Script did not respond. Verify the Script URL is correct and the Web App deployment is active, then try again.', 'error', 9000);
     }
   },
 
