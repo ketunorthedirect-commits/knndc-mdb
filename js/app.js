@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v2.9.3.1
+   KNNDCmdb – Core Application Logic  v2.9.4.1
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '2.9.3',
+  VERSION:       '2.9.4',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -260,7 +260,6 @@ const App = {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', url, true);
       xhr.timeout = 30000;
-      xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.onload    = () => resolve(true);
       xhr.onerror   = () => resolve(false);
       xhr.ontimeout = () => resolve(false);
@@ -300,7 +299,6 @@ const App = {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', url, true);
       xhr.timeout   = 30000;
-      xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.onload    = () => resolve(true);
       xhr.onerror   = () => resolve(false);
       xhr.ontimeout = () => resolve(false);
@@ -1055,7 +1053,6 @@ const App = {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', url, true); // async
       xhr.timeout = 20000;
-      xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.send(JSON.stringify(data));
       // No response handling — fire and forget
     } catch(_) {}
@@ -1144,7 +1141,6 @@ const App = {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', App.settings.scriptUrl, true);
         xhr.timeout  = 20000;
-        xhr.setRequestHeader('Content-Type', 'application/json');
         xhr.onload   = () => resolve(true);
         xhr.onerror  = () => resolve(false);
         xhr.ontimeout= () => resolve(false);
@@ -1188,7 +1184,6 @@ const App = {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', App.settings.scriptUrl, true);
         xhr.timeout  = 20000;
-        xhr.setRequestHeader('Content-Type', 'application/json');
         xhr.onload   = () => resolve(true);
         xhr.onerror  = () => resolve(false);
         xhr.ontimeout= () => resolve(false);
