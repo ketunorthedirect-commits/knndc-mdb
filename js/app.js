@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v2.7
+   KNNDCmdb – Core Application Logic  v2.8
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '2.7.0',
+  VERSION:       '2.8.0',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -258,8 +258,9 @@ const App = {
     const success = await new Promise((resolve) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', url, true);
-      xhr.timeout = 15000; // 15 second timeout
-      xhr.onload  = () => resolve(true);   // any response = data was received
+      xhr.timeout = 15000;
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.onload  = () => resolve(true);
       xhr.onerror = () => resolve(false);
       xhr.ontimeout = () => resolve(false);
       xhr.send(body);
@@ -293,6 +294,7 @@ const App = {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', url, true);
       xhr.timeout   = 20000;
+      xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.onload    = () => resolve(true);
       xhr.onerror   = () => resolve(false);
       xhr.ontimeout = () => resolve(false);
@@ -1010,7 +1012,9 @@ const App = {
 
   syncToSheets(data) {
     if (!App.settings.scriptUrl) return;
-    const payload = data.action ? data : {...data, action:'addMember'};
+    // Use upsertMember as default: if record already exists in Sheet it updates in-place,
+    // preventing duplicate rows when records sync more than once (e.g. after offline/online cycle).
+    const payload = data.action ? data : {...data, action:'upsertMember'};
     setTimeout(() => App._xhrPost(App.settings.scriptUrl, payload), 0);
   },
 
@@ -1093,10 +1097,13 @@ const App = {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', App.settings.scriptUrl, true);
         xhr.timeout  = 15000;
+        xhr.setRequestHeader('Content-Type', 'application/json');
         xhr.onload   = () => resolve(true);
         xhr.onerror  = () => resolve(false);
         xhr.ontimeout= () => resolve(false);
-        xhr.send(JSON.stringify(item.data));
+        // Ensure action field is always explicit; use upsert to avoid duplicates
+        const payload = { action: 'upsertMember', ...item.data };
+        xhr.send(JSON.stringify(payload));
       });
       if (!ok) failed.push(item);
     }
@@ -1107,6 +1114,7 @@ const App = {
   },
 
   // Push ALL local members to Sheet (for records entered before Sheets was configured)
+  // Uses upsertMember — safe to run multiple times: existing rows are updated, new rows appended.
   async bulkPushToSheets() {
     if (!App.settings.scriptUrl) {
       Toast.show('No Script URL', 'Configure the Apps Script URL in Settings → Google Sheets.', 'error');
@@ -1114,22 +1122,32 @@ const App = {
     }
     const all = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]').filter(m => !m._demo);
     if (!all.length) { Toast.show('No Records', 'There are no real member records to push.', 'warning'); return; }
-    Toast.show('Uploading…', `Pushing ${all.length} record(s) to Google Sheets…`, 'info', 6000);
+
+    // Lock button to prevent double-push
+    const btn = document.querySelector('[onclick*="bulkPushToSheets"]');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Pushing…'; }
+
+    Toast.show('Uploading…', `Pushing ${all.length} record(s) to Google Sheets…`, 'info', 10000);
     let ok = 0, fail = 0;
     for (const m of all) {
       const sent = await new Promise(resolve => {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', App.settings.scriptUrl, true);
-        xhr.timeout  = 15000;
+        xhr.timeout  = 20000;
+        xhr.setRequestHeader('Content-Type', 'application/json');
         xhr.onload   = () => resolve(true);
         xhr.onerror  = () => resolve(false);
         xhr.ontimeout= () => resolve(false);
-        xhr.send(JSON.stringify({...m, action:'addMember'}));
+        xhr.send(JSON.stringify({ action: 'upsertMember', ...m }));
       });
       if (sent) ok++; else fail++;
     }
-    if (fail === 0) Toast.show('Push Complete', `All ${ok} records uploaded to Google Sheets.`, 'success');
-    else            Toast.show('Partial Upload', `${ok} uploaded, ${fail} failed. Try again.`, 'warning');
+
+    // Restore button
+    if (btn) { btn.disabled = false; btn.textContent = '☁️ Push All Records to Sheet'; }
+
+    if (fail === 0) Toast.show('Push Complete ✅', `All ${ok} record(s) uploaded to Google Sheets.`, 'success', 6000);
+    else            Toast.show('Partial Upload', `${ok} uploaded, ${fail} failed. Try again.`, 'warning', 6000);
     App.logAudit('BULK_PUSH', `Bulk pushed ${ok}/${all.length} records to Google Sheets`, App.currentUser?.username || 'admin');
   },
 };
