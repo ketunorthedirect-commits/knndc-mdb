@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v2.9.6.1
+   KNNDCmdb – Core Application Logic  v2.9.7.1
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '2.9.6',
+  VERSION:       '2.9.7',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -748,11 +748,15 @@ const App = {
         }
       });
 
-      if (added > 0) {
+      const localCount = local.filter(m => !m._demo || !demoCleared).length;
+
+      if (added > 0 || merged.length > localCount) {
         merged.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
         App.members = merged;
         App.saveMembers();
-        Toast.show('Synced from Sheets', `${added} new record(s) pulled from Google Sheets.`, 'info', 3000);
+        if (added > 0) {
+          Toast.show('Synced from Sheets', `${added} new record(s) pulled from Google Sheets.`, 'info', 3000);
+        }
         // Refresh current page
         if (['dashboard','records','my-records','reports','analytics'].includes(App.currentPage)) {
           PageRenderers[App.currentPage]?.();
@@ -1106,17 +1110,72 @@ const App = {
     } catch(_) {}
   },
 
-  // ── AUTO-TRIM: keep localStorage healthy ─────────────────────
+  // Force a complete re-pull from Sheet for admin/exec.
+  // Clears the local member cache first so fetchFromSheets re-downloads everything,
+  // not just the delta. Used when admin notices local count < Sheet count.
+  async _pullAllFromSheet() {
+    if (!App.settings.scriptUrl) {
+      Toast.show('No Script URL', 'Configure the Apps Script URL in Settings → Google Sheets.', 'error');
+      return;
+    }
+    const btn = document.getElementById('records-pull-btn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Pulling…'; }
+    Toast.show('Pulling from Sheet', 'Downloading all records from Google Sheets…', 'info', 8000);
+
+    try {
+      const url  = App.settings.scriptUrl + '?action=getMembers&t=' + Date.now();
+      const res  = await fetch(url, { cache: 'no-store' });
+      const data = await res.json();
+
+      if (!data?.members?.length) {
+        Toast.show('No Records', 'The Google Sheet returned no records. Check the Sheet has data.', 'warning');
+        if (btn) { btn.disabled = false; btn.textContent = '🔄 Pull All from Sheet'; }
+        return;
+      }
+
+      // Keep any locally-entered records that haven't been pushed to Sheet yet
+      const local       = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+      const sheetIds    = new Set(data.members.map(m => m.id).filter(Boolean));
+      const localOnly   = local.filter(m => m.id && !sheetIds.has(m.id) && !m._demo);
+
+      // Build fresh set: all Sheet records + any local-only unsynced records
+      const sheetNormed = data.members.map(r => ({ ...App._normaliseSheetRow(r), _fromSheet: true }));
+      const merged      = [...localOnly, ...sheetNormed]
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      App.members = merged;
+      localStorage.setItem(LS.MEMBERS, JSON.stringify(merged));
+
+      Toast.show('Pull Complete ✅',
+        `${data.members.length} record(s) loaded from Google Sheets${localOnly.length ? ` + ${localOnly.length} local unsynced` : ''}.`,
+        'success', 6000);
+      App.logAudit('PULL_ALL_SHEET', `Admin force-pulled ${data.members.length} records from Google Sheets`, App.currentUser?.username);
+
+      // Refresh all relevant pages
+      if (['records','dashboard','reports','analytics'].includes(App.currentPage)) {
+        PageRenderers[App.currentPage]?.();
+      }
+    } catch(e) {
+      Toast.show('Pull Failed', 'Could not reach Google Sheets. Check your connection and Script URL.', 'error');
+    }
+
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Pull All from Sheet'; }
+  },
   // Called after every Sheet sync. Marks records confirmed in the Sheet as
-  // _fromSheet:true, then checks storage usage. If the members key is large,
-  // drops the oldest Sheet-sourced records (already safe server-side) to make
-  // room for new entries. Locally-entered unsynced records are NEVER dropped.
+  // _fromSheet:true, then checks storage usage on officer/ward devices only.
+  // Admin and exec devices are NEVER trimmed — they need the full dataset visible.
+  // Only locally-entered unsynced records are always preserved.
   _autoTrimMembers(sheetMembers) {
     if (!sheetMembers?.length) return;
+
+    // Never trim admin or exec — they need full visibility
+    const role = App.currentUser?.role;
+    const isFullViewRole = role === 'admin' || role === 'exec';
+
     const sheetIds = new Set(sheetMembers.map(m => m.id).filter(Boolean));
     const local    = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
 
-    // Mark confirmed records
+    // Mark confirmed records as _fromSheet
     let changed = false;
     local.forEach(m => {
       if (sheetIds.has(m.id) && !m._fromSheet) {
@@ -1129,18 +1188,19 @@ const App = {
       try { localStorage.setItem(LS.MEMBERS, JSON.stringify(local)); } catch(_) {}
     }
 
-    // Check approximate storage size for the members key
+    // Admin and exec: stop here — no trimming ever
+    if (isFullViewRole) return;
+
+    // Officer/ward: check storage and trim oldest synced records if needed
     const raw = localStorage.getItem(LS.MEMBERS) || '[]';
-    const sizeKB = (raw.length * 2) / 1024; // UTF-16 estimate in KB
-    const THRESHOLD_KB = 3500; // start trimming above 3.5 MB (well before 5 MB limit)
+    const sizeKB = (raw.length * 2) / 1024;
+    const THRESHOLD_KB = 3500;
 
-    if (sizeKB < THRESHOLD_KB) return; // plenty of space, nothing to do
+    if (sizeKB < THRESHOLD_KB) return;
 
-    // Drop oldest Sheet-sourced records until under threshold
-    const unsynced = local.filter(m => !m._fromSheet);  // keep all
-    const synced   = local.filter(m =>  m._fromSheet);  // candidates for trimming
+    const unsynced = local.filter(m => !m._fromSheet);
+    const synced   = local.filter(m =>  m._fromSheet);
 
-    // Sort synced oldest-first so we drop the most stale ones
     synced.sort((a, b) => {
       const da = a.isoDate || App._isoDate(a.timestamp) || '0000';
       const db = b.isoDate || App._isoDate(b.timestamp) || '0000';
@@ -1149,7 +1209,7 @@ const App = {
 
     let trimmed = [...unsynced, ...synced];
     while (trimmed.length > unsynced.length) {
-      trimmed.shift(); // remove oldest synced record
+      trimmed.shift();
       const testSize = (JSON.stringify(trimmed).length * 2) / 1024;
       if (testSize < THRESHOLD_KB) break;
     }
@@ -1159,7 +1219,6 @@ const App = {
       App.members = trimmed;
       try {
         localStorage.setItem(LS.MEMBERS, JSON.stringify(trimmed));
-        // Silently log — no toast, this is background maintenance
         App.logAudit('STORAGE_TRIM', `Auto-trimmed ${freed} synced record(s) from local storage to free space. All records remain in Google Sheets.`, 'system');
       } catch(_) {}
     }

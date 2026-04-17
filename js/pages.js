@@ -319,6 +319,19 @@ const PageRenderers = {
   // ══════════════════════════════════════════════════════════
   records() {
     PageRenderers._allState = PageRenderers._allState || { q:'', page:1, zone:'', ward:'', station:'', branch:'', gender:'' };
+
+    // Show Pull All from Sheet button for admin only
+    const pullBtn = document.getElementById('records-pull-btn');
+    if (pullBtn) {
+      pullBtn.style.display = (App.currentUser?.role === 'admin' && App.settings.scriptUrl) ? '' : 'none';
+    }
+
+    // Admin: trigger a background Sheet sync every time they visit this page
+    // so the count stays current without manual intervention
+    if (App.currentUser?.role === 'admin' && App.isOnline && App.settings.scriptUrl) {
+      App.fetchFromSheets();
+    }
+
     this._populateRecordFilters();
     this._renderAllRecords();
   },
