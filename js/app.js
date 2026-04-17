@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v2.9.7.1
+   KNNDCmdb – Core Application Logic  v2.9.8.1
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '2.9.7',
+  VERSION:       '2.9.8',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -218,42 +218,55 @@ const App = {
     try {
       localStorage.setItem(LS.MEMBERS, JSON.stringify(App.members));
     } catch(e) {
-      if (e.name === 'QuotaExceededError' || e.code === 22) {
-        // localStorage is full. Strategy:
-        // 1. Keep all records that were entered on this device (have officer = current user)
-        //    and all records without _fromSheet flag (locally entered, may not be in Sheet yet)
-        // 2. Drop the oldest Sheet-sourced records first (already safely stored server-side)
-        // 3. Retry — if still too large, hard-trim to 1000 most recent
-        const synced   = App.members.filter(m => m._fromSheet);
-        const unsynced = App.members.filter(m => !m._fromSheet);
-        // Drop oldest synced records in batches of 200 until it fits
-        let trimmed = [...unsynced, ...synced];
-        let saved = false;
-        while (trimmed.length > 100 && !saved) {
-          trimmed = trimmed.slice(0, Math.floor(trimmed.length * 0.8)); // drop 20% oldest each pass
-          try {
-            localStorage.setItem(LS.MEMBERS, JSON.stringify(trimmed));
-            saved = true;
-          } catch(_) {}
-        }
-        if (!saved) {
-          // Last resort: keep only the 500 most recent records
-          try {
-            const emergency = App.members.slice(0, 500);
-            localStorage.setItem(LS.MEMBERS, JSON.stringify(emergency));
-            saved = true;
-          } catch(_) {}
-        }
-        App.members = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+      if (e.name !== 'QuotaExceededError' && e.code !== 22) return; // unexpected error, ignore
+
+      const role = App.currentUser?.role;
+      const isFullViewRole = role === 'admin' || role === 'exec';
+
+      if (isFullViewRole) {
+        // Admin/exec: NEVER trim member records.
+        // Instead, free space by clearing non-critical keys that can be rebuilt.
+        try { localStorage.removeItem(LS.AUDIT);   } catch(_) {}
+        try { localStorage.removeItem(LS.OFFLINE_Q);} catch(_) {}
+        // Try again after freeing audit/queue space
+        try {
+          localStorage.setItem(LS.MEMBERS, JSON.stringify(App.members));
+          return; // success — no toast needed
+        } catch(_) {}
+        // Still failing: the members data itself is too large for this device's quota.
+        // Tell admin to use Pull All from Sheet on the next load instead of trimming.
         Toast.show(
           '⚠️ Storage Full',
-          'This device is running low on storage. Push your records to Google Sheets now, then the oldest synced records will be cleared automatically.',
-          'warning', 10000
+          'This device\'s storage is full. Use 🔄 Pull All from Sheet on the Records page to reload data directly from Google Sheets.',
+          'warning', 12000
         );
-        // Auto-trigger a push if online and Script URL is configured
-        if (App.isOnline && App.settings.scriptUrl && App.currentUser) {
-          setTimeout(() => App.pushMyRecordsToSheet(), 1000);
-        }
+        return;
+      }
+
+      // Officer / ward coordinator: trim oldest Sheet-confirmed records
+      const synced   = App.members.filter(m => m._fromSheet);
+      const unsynced = App.members.filter(m => !m._fromSheet);
+      let trimmed = [...unsynced, ...synced];
+      let saved = false;
+      while (trimmed.length > 100 && !saved) {
+        trimmed = trimmed.slice(0, Math.floor(trimmed.length * 0.8));
+        try { localStorage.setItem(LS.MEMBERS, JSON.stringify(trimmed)); saved = true; } catch(_) {}
+      }
+      if (!saved) {
+        try {
+          const emergency = App.members.slice(0, 500);
+          localStorage.setItem(LS.MEMBERS, JSON.stringify(emergency));
+          saved = true;
+        } catch(_) {}
+      }
+      App.members = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+      Toast.show(
+        '⚠️ Storage Full',
+        'This device is running low on storage. Push your records to Google Sheets now, then the oldest synced records will be cleared automatically.',
+        'warning', 10000
+      );
+      if (App.isOnline && App.settings.scriptUrl && App.currentUser) {
+        setTimeout(() => App.pushMyRecordsToSheet(), 1000);
       }
     }
   },
@@ -1143,8 +1156,12 @@ const App = {
       const merged      = [...localOnly, ...sheetNormed]
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
+      // Free up space from non-critical keys before writing the full member set
+      try { localStorage.removeItem(LS.AUDIT);    } catch(_) {}
+      try { localStorage.removeItem(LS.OFFLINE_Q); } catch(_) {}
+
       App.members = merged;
-      localStorage.setItem(LS.MEMBERS, JSON.stringify(merged));
+      App.saveMembers(); // uses quota-aware handler
 
       Toast.show('Pull Complete ✅',
         `${data.members.length} record(s) loaded from Google Sheets${localOnly.length ? ` + ${localOnly.length} local unsynced` : ''}.`,
