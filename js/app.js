@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v2.9.8.1
+   KNNDCmdb – Core Application Logic  v2.9.9.1
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '2.9.8',
+  VERSION:       '2.9.9',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -1303,32 +1303,37 @@ const App = {
     if (!App.offlineQueue.length || !App.settings.scriptUrl) return;
 
     Toast.show('Syncing', `Uploading ${App.offlineQueue.length} queued operation(s)…`, 'info', 6000);
-    const failed = [];
-    let uploaded = 0;
 
-    for (const item of App.offlineQueue) {
-      // Route each item to the correct GAS action based on its type
-      let payload;
-      if (item.type === 'delete') {
-        payload = { action: 'deleteMember', ...item.data };
-      } else if (item.type === 'update') {
-        payload = { action: 'updateMember', ...item.data };
-      } else {
-        // 'add' or legacy items without type — use upsert (idempotent, safe to retry)
-        payload = { action: 'upsertMember', ...item.data };
-      }
+    const sendOne = (payload) => new Promise(resolve => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', App.settings.scriptUrl, true);
+      xhr.timeout   = 25000;
+      xhr.onload    = () => resolve(true);
+      xhr.onerror   = () => resolve(false);
+      xhr.ontimeout = () => resolve(false);
+      xhr.send(JSON.stringify(payload));
+    });
 
-      const ok = await new Promise(resolve => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', App.settings.scriptUrl, true);
-        xhr.timeout  = 20000;
-        xhr.onload   = () => resolve(true);
-        xhr.onerror  = () => resolve(false);
-        xhr.ontimeout= () => resolve(false);
-        xhr.send(JSON.stringify(payload));
+    const failed   = [];
+    let uploaded   = 0;
+    const BATCH    = 5;
+    const queue    = App.offlineQueue;
+
+    for (let i = 0; i < queue.length; i += BATCH) {
+      const batch = queue.slice(i, i + BATCH);
+
+      // Build payloads for this batch
+      const payloads = batch.map(item => {
+        if (item.type === 'delete') return { action: 'deleteMember', ...item.data };
+        if (item.type === 'update') return { action: 'updateMember', ...item.data };
+        return { action: 'upsertMember', ...item.data };
       });
 
-      if (ok) { uploaded++; } else { failed.push(item); }
+      const results = await Promise.all(payloads.map(sendOne));
+      results.forEach((ok, j) => ok ? uploaded++ : failed.push(batch[j]));
+
+      // Yield to browser between batches
+      await new Promise(r => setTimeout(r, 0));
     }
 
     App.offlineQueue = failed;
@@ -1340,12 +1345,12 @@ const App = {
       Toast.show('Partial Sync', `${uploaded} uploaded, ${failed.length} still pending. Will retry when online.`, 'warning', 6000);
     }
 
-    // Refresh dashboard so the Offline Queue counter updates to 0
     if (App.currentUser && App.currentPage === 'dashboard') PageRenderers.dashboard();
   },
 
   // Push ALL local members to Sheet (for records entered before Sheets was configured)
   // Uses upsertMember — safe to run multiple times: existing rows are updated, new rows appended.
+  // Sends in parallel batches of 5 to avoid hanging the browser.
   async bulkPushToSheets() {
     if (!App.settings.scriptUrl) {
       Toast.show('No Script URL', 'Configure the Apps Script URL in Settings → Google Sheets.', 'error');
@@ -1354,36 +1359,44 @@ const App = {
     const all = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]').filter(m => !m._demo);
     if (!all.length) { Toast.show('No Records', 'There are no real member records to push.', 'warning'); return; }
 
-    // Lock button to prevent double-push
     const btn = document.querySelector('[onclick*="bulkPushToSheets"]');
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Pushing…'; }
 
-    Toast.show('Uploading…', `Pushing ${all.length} record(s) to Google Sheets…`, 'info', 10000);
+    const BATCH = 5;
     let ok = 0, fail = 0;
-    for (const m of all) {
-      const sent = await new Promise(resolve => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', App.settings.scriptUrl, true);
-        xhr.timeout  = 20000;
-        xhr.onload   = () => resolve(true);
-        xhr.onerror  = () => resolve(false);
-        xhr.ontimeout= () => resolve(false);
-        xhr.send(JSON.stringify({ action: 'upsertMember', ...m }));
-      });
-      if (sent) ok++; else fail++;
+    const total = all.length;
+
+    const sendOne = (m) => new Promise(resolve => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', App.settings.scriptUrl, true);
+      xhr.timeout   = 25000;
+      xhr.onload    = () => resolve(true);
+      xhr.onerror   = () => resolve(false);
+      xhr.ontimeout = () => resolve(false);
+      xhr.send(JSON.stringify({ action: 'upsertMember', ...m }));
+    });
+
+    for (let i = 0; i < total; i += BATCH) {
+      const batch   = all.slice(i, i + BATCH);
+      const results = await Promise.all(batch.map(sendOne));
+      results.forEach(sent => sent ? ok++ : fail++);
+
+      const pct = Math.round(((i + batch.length) / total) * 100);
+      if (btn) btn.textContent = `⏳ ${pct}% (${ok}/${total})`;
+
+      await new Promise(r => setTimeout(r, 0));
     }
 
-    // Restore button
     if (btn) { btn.disabled = false; btn.textContent = '☁️ Push All Records to Sheet'; }
 
     if (fail === 0) Toast.show('Push Complete ✅', `All ${ok} record(s) uploaded to Google Sheets.`, 'success', 6000);
     else            Toast.show('Partial Upload', `${ok} uploaded, ${fail} failed. Try again.`, 'warning', 6000);
-    App.logAudit('BULK_PUSH', `Bulk pushed ${ok}/${all.length} records to Google Sheets`, App.currentUser?.username || 'admin');
+    App.logAudit('BULK_PUSH', `Bulk pushed ${ok}/${total} records to Google Sheets`, App.currentUser?.username || 'admin');
   },
 
   // Push records visible to the current user to Google Sheet.
   // Used from the Data Entry page — scoped by role and assigned stations.
-  // Officers push only their station's records; admin/ward push all they can see.
+  // Sends in parallel batches of 5 to avoid hanging the browser.
   async pushMyRecordsToSheet() {
     if (!App.settings.scriptUrl) {
       Toast.show('No Script URL', 'Configure the Apps Script URL in Settings → Google Sheets first.', 'error');
@@ -1395,34 +1408,46 @@ const App = {
       return;
     }
 
-    // Lock all entry-page push buttons during the operation
     const btns = document.querySelectorAll('[onclick*="pushMyRecordsToSheet"]');
     btns.forEach(b => { b.disabled = true; b.dataset._orig = b.textContent; b.textContent = '⏳ Pushing…'; });
 
-    Toast.show('Pushing…', `Sending ${records.length} record(s) to Google Sheets…`, 'info', 10000);
+    const BATCH = 5;
     let ok = 0, fail = 0;
-    for (const m of records) {
-      const sent = await new Promise(resolve => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', App.settings.scriptUrl, true);
-        xhr.timeout  = 20000;
-        xhr.onload   = () => resolve(true);
-        xhr.onerror  = () => resolve(false);
-        xhr.ontimeout= () => resolve(false);
-        xhr.send(JSON.stringify({ action: 'upsertMember', ...m }));
-      });
-      if (sent) ok++; else fail++;
+    const total = records.length;
+
+    // Helper: send one record, returns true/false
+    const sendOne = (m) => new Promise(resolve => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', App.settings.scriptUrl, true);
+      xhr.timeout   = 25000;
+      xhr.onload    = () => resolve(true);
+      xhr.onerror   = () => resolve(false);
+      xhr.ontimeout = () => resolve(false);
+      xhr.send(JSON.stringify({ action: 'upsertMember', ...m }));
+    });
+
+    // Process in batches — each batch runs in parallel, batches run in sequence
+    for (let i = 0; i < total; i += BATCH) {
+      const batch   = records.slice(i, i + BATCH);
+      const results = await Promise.all(batch.map(sendOne));
+      results.forEach(sent => sent ? ok++ : fail++);
+
+      // Update button with live progress — keeps user informed, doesn't block UI
+      const pct = Math.round(((i + batch.length) / total) * 100);
+      btns.forEach(b => { b.textContent = `⏳ ${pct}% (${ok}/${total})`; });
+
+      // Yield to the browser between batches so the UI stays responsive
+      await new Promise(r => setTimeout(r, 0));
     }
 
     btns.forEach(b => { b.disabled = false; b.textContent = b.dataset._orig || '☁️ Push Records to Sheet'; });
 
     if (fail === 0) {
       Toast.show('Push Complete ✅', `All ${ok} record(s) uploaded to Google Sheets.`, 'success', 6000);
-      App.logAudit('PUSH_MY_RECORDS', `Pushed ${ok} record(s) to Google Sheets from Data Entry page`, App.currentUser?.username);
+      App.logAudit('PUSH_MY_RECORDS', `Pushed ${ok}/${total} records to Google Sheets`, App.currentUser?.username);
     } else {
-      Toast.show('Partial Upload', `${ok} uploaded, ${fail} failed. Check your connection and try again.`, 'warning', 6000);
+      Toast.show('Partial Upload', `${ok} uploaded, ${fail} failed. Try again to retry the failed ones.`, 'warning', 7000);
     }
-    // Refresh entry page so count badge updates
     if (App.currentPage === 'entry') PageRenderers.entry();
   },
 };
