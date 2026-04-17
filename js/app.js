@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v2.9.9.1
+   KNNDCmdb – Core Application Logic  v3.0.0.1
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '2.9.9',
+  VERSION:       '3.0.0',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -117,8 +117,7 @@ const App = {
   async _fetchAndApplyRemoteSettings() {
     if (!App.isOnline || !App.settings.scriptUrl) return false;
     try {
-      const res  = await fetch(App.settings.scriptUrl + '?action=getSettings&t=' + Date.now(), { cache: 'no-store' });
-      const data = await res.json();
+      const data = await App._xhrGet(App.settings.scriptUrl + '?action=getSettings&t=' + Date.now());
       if (!data?.settings || !data.exists) return false;
 
       const remote = data.settings;
@@ -379,10 +378,8 @@ const App = {
   async _fetchUsersFromSheet() {
     if (!App.isOnline || !App.settings.scriptUrl) return false;
     try {
-      const res  = await fetch(App.settings.scriptUrl + '?action=getUsers&t=' + Date.now(), { cache: 'no-store' });
-      const text = await res.text();
-      let data;
-      try { data = JSON.parse(text); } catch(_) { return false; }
+      const data = await App._xhrGet(App.settings.scriptUrl + '?action=getUsers&t=' + Date.now());
+      if (!data) return false;
 
       if (!data?.users || !Array.isArray(data.users) || data.users.length === 0) {
         return false; // Sheet empty — keep local users as-is
@@ -735,8 +732,7 @@ const App = {
     if (!App.isOnline || !App.settings.scriptUrl) return;
     try {
       const url = App.settings.scriptUrl + '?action=getMembers&t=' + Date.now();
-      const res = await fetch(url, { cache: 'no-store' });
-      const data = await res.json();
+      const data = await App._xhrGet(url);
       if (!data?.members?.length) return;
 
       // Merge sheet records with local records — sheet is source of truth
@@ -783,8 +779,7 @@ const App = {
       App._autoTrimMembers(data.members);
 
       // Also fetch polling stations from sheet — update existing + add new
-      const stationsRes = await fetch(App.settings.scriptUrl + '?action=getStations&t=' + Date.now(), { cache: 'no-store' });
-      const stationsData = await stationsRes.json();
+      const stationsData = await App._xhrGet(App.settings.scriptUrl + '?action=getStations&t=' + Date.now());
       if (stationsData?.stations?.length) {
         const local = [...App.pollingStations];
         let changed = false;
@@ -1059,10 +1054,8 @@ const App = {
   async _fetchAuditFromSheet() {
     if (!App.isOnline || !App.settings.scriptUrl) return false;
     try {
-      const res  = await fetch(App.settings.scriptUrl + '?action=getAudit&t=' + Date.now(), { cache: 'no-store' });
-      const text = await res.text();
-      let data;
-      try { data = JSON.parse(text); } catch(_) { return false; }
+      const data = await App._xhrGet(App.settings.scriptUrl + '?action=getAudit&t=' + Date.now());
+      if (!data?.entries) return false;
       if (!data?.entries?.length) return false;
 
       // Build a dedup key: timestamp + action + user (Sheet has no id field)
@@ -1123,6 +1116,27 @@ const App = {
     } catch(_) {}
   },
 
+  // Reliable GET using XHR — returns a Promise that resolves to parsed JSON or null.
+  // Uses XHR instead of fetch() because fetch() triggers a CORS preflight on Apps Script
+  // GET responses from GitHub Pages and other cross-origin hosts, which Apps Script
+  // does not handle. XHR treats the response as opaque and does not preflight.
+  _xhrGet(url) {
+    return new Promise(resolve => {
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.timeout = 20000;
+        xhr.onload = () => {
+          try { resolve(JSON.parse(xhr.responseText)); }
+          catch(_) { resolve(null); }
+        };
+        xhr.onerror   = () => resolve(null);
+        xhr.ontimeout = () => resolve(null);
+        xhr.send();
+      } catch(_) { resolve(null); }
+    });
+  },
+
   // Force a complete re-pull from Sheet for admin/exec.
   // Clears the local member cache first so fetchFromSheets re-downloads everything,
   // not just the delta. Used when admin notices local count < Sheet count.
@@ -1137,8 +1151,7 @@ const App = {
 
     try {
       const url  = App.settings.scriptUrl + '?action=getMembers&t=' + Date.now();
-      const res  = await fetch(url, { cache: 'no-store' });
-      const data = await res.json();
+      const data = await App._xhrGet(url);
 
       if (!data?.members?.length) {
         Toast.show('No Records', 'The Google Sheet returned no records. Check the Sheet has data.', 'warning');
