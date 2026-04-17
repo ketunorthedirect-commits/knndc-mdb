@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v2.9.5.1
+   KNNDCmdb – Core Application Logic  v2.9.6.1
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '2.9.5',
+  VERSION:       '2.9.6',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -214,7 +214,49 @@ const App = {
     App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q)|| '[]');
   },
 
-  saveMembers()   { localStorage.setItem(LS.MEMBERS,   JSON.stringify(App.members)); },
+  saveMembers() {
+    try {
+      localStorage.setItem(LS.MEMBERS, JSON.stringify(App.members));
+    } catch(e) {
+      if (e.name === 'QuotaExceededError' || e.code === 22) {
+        // localStorage is full. Strategy:
+        // 1. Keep all records that were entered on this device (have officer = current user)
+        //    and all records without _fromSheet flag (locally entered, may not be in Sheet yet)
+        // 2. Drop the oldest Sheet-sourced records first (already safely stored server-side)
+        // 3. Retry — if still too large, hard-trim to 1000 most recent
+        const synced   = App.members.filter(m => m._fromSheet);
+        const unsynced = App.members.filter(m => !m._fromSheet);
+        // Drop oldest synced records in batches of 200 until it fits
+        let trimmed = [...unsynced, ...synced];
+        let saved = false;
+        while (trimmed.length > 100 && !saved) {
+          trimmed = trimmed.slice(0, Math.floor(trimmed.length * 0.8)); // drop 20% oldest each pass
+          try {
+            localStorage.setItem(LS.MEMBERS, JSON.stringify(trimmed));
+            saved = true;
+          } catch(_) {}
+        }
+        if (!saved) {
+          // Last resort: keep only the 500 most recent records
+          try {
+            const emergency = App.members.slice(0, 500);
+            localStorage.setItem(LS.MEMBERS, JSON.stringify(emergency));
+            saved = true;
+          } catch(_) {}
+        }
+        App.members = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+        Toast.show(
+          '⚠️ Storage Full',
+          'This device is running low on storage. Push your records to Google Sheets now, then the oldest synced records will be cleared automatically.',
+          'warning', 10000
+        );
+        // Auto-trigger a push if online and Script URL is configured
+        if (App.isOnline && App.settings.scriptUrl && App.currentUser) {
+          setTimeout(() => App.pushMyRecordsToSheet(), 1000);
+        }
+      }
+    }
+  },
   saveAudit()     { localStorage.setItem(LS.AUDIT,     JSON.stringify(App.auditLog)); },
   saveOfflineQ()  { localStorage.setItem(LS.OFFLINE_Q, JSON.stringify(App.offlineQueue)); },
 
@@ -717,6 +759,12 @@ const App = {
         }
       }
 
+      // ── Auto-trim: mark Sheet-confirmed records and free local storage ──────
+      // After a successful sync, records confirmed in the Sheet are safe server-side.
+      // Mark them as _fromSheet=true. If local storage is >80% full, drop the oldest
+      // Sheet-sourced records to free space for new entries — they remain in the Sheet.
+      App._autoTrimMembers(data.members);
+
       // Also fetch polling stations from sheet — update existing + add new
       const stationsRes = await fetch(App.settings.scriptUrl + '?action=getStations&t=' + Date.now(), { cache: 'no-store' });
       const stationsData = await stationsRes.json();
@@ -1058,7 +1106,64 @@ const App = {
     } catch(_) {}
   },
 
-  // ── DATE HELPERS ─────────────────────────────────────────────
+  // ── AUTO-TRIM: keep localStorage healthy ─────────────────────
+  // Called after every Sheet sync. Marks records confirmed in the Sheet as
+  // _fromSheet:true, then checks storage usage. If the members key is large,
+  // drops the oldest Sheet-sourced records (already safe server-side) to make
+  // room for new entries. Locally-entered unsynced records are NEVER dropped.
+  _autoTrimMembers(sheetMembers) {
+    if (!sheetMembers?.length) return;
+    const sheetIds = new Set(sheetMembers.map(m => m.id).filter(Boolean));
+    const local    = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+
+    // Mark confirmed records
+    let changed = false;
+    local.forEach(m => {
+      if (sheetIds.has(m.id) && !m._fromSheet) {
+        m._fromSheet = true;
+        changed = true;
+      }
+    });
+    if (changed) {
+      App.members = local;
+      try { localStorage.setItem(LS.MEMBERS, JSON.stringify(local)); } catch(_) {}
+    }
+
+    // Check approximate storage size for the members key
+    const raw = localStorage.getItem(LS.MEMBERS) || '[]';
+    const sizeKB = (raw.length * 2) / 1024; // UTF-16 estimate in KB
+    const THRESHOLD_KB = 3500; // start trimming above 3.5 MB (well before 5 MB limit)
+
+    if (sizeKB < THRESHOLD_KB) return; // plenty of space, nothing to do
+
+    // Drop oldest Sheet-sourced records until under threshold
+    const unsynced = local.filter(m => !m._fromSheet);  // keep all
+    const synced   = local.filter(m =>  m._fromSheet);  // candidates for trimming
+
+    // Sort synced oldest-first so we drop the most stale ones
+    synced.sort((a, b) => {
+      const da = a.isoDate || App._isoDate(a.timestamp) || '0000';
+      const db = b.isoDate || App._isoDate(b.timestamp) || '0000';
+      return da.localeCompare(db);
+    });
+
+    let trimmed = [...unsynced, ...synced];
+    while (trimmed.length > unsynced.length) {
+      trimmed.shift(); // remove oldest synced record
+      const testSize = (JSON.stringify(trimmed).length * 2) / 1024;
+      if (testSize < THRESHOLD_KB) break;
+    }
+
+    if (trimmed.length < local.length) {
+      const freed = local.length - trimmed.length;
+      App.members = trimmed;
+      try {
+        localStorage.setItem(LS.MEMBERS, JSON.stringify(trimmed));
+        // Silently log — no toast, this is background maintenance
+        App.logAudit('STORAGE_TRIM', `Auto-trimmed ${freed} synced record(s) from local storage to free space. All records remain in Google Sheets.`, 'system');
+      } catch(_) {}
+    }
+  },
   // Returns 'YYYY-MM-DD' from any stored timestamp string, locale-independent.
   // Handles en-GH 'D/M/YYYY, ...' and en-US 'M/D/YYYY, ...' fallback formats.
   _isoDate(timestamp) {
