@@ -7,10 +7,25 @@
   <link rel="stylesheet" href="css/styles.css">
   <link rel="icon" type="image/png" href="assets/ndc-logo.png">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- EMERGENCY: If settings page is unreachable, open browser console and run:
+     App.settings.scriptUrl = 'YOUR_SCRIPT_URL_HERE';
+     App.saveSettings();
+     location.reload();
+-->
 </head>
 <body>
 
 <div id="offline-banner">⚡ You are offline — records are queued and will sync automatically.</div>
+
+  <!-- No-Script-URL banner — shown whenever the app has no Sheet connection -->
+  <div id="no-script-banner" style="display:none;background:#1a6b3a;color:#fff;padding:12px 20px;font-size:13px;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="font-weight:600">⚠️ Not connected to Google Sheets.</span>
+    <span style="opacity:.85">Paste your Apps Script Web App URL to unlock data sync:</span>
+    <input id="quick-script-url" type="text" placeholder="https://script.google.com/macros/s/…/exec"
+      style="flex:1;min-width:260px;padding:6px 10px;border-radius:6px;border:none;font-size:12px;color:#1f2937"
+      onkeydown="if(event.key==='Enter')saveQuickScriptUrl()">
+    <button onclick="saveQuickScriptUrl()" style="background:#fff;color:#1a6b3a;border:none;border-radius:6px;padding:6px 14px;font-weight:600;cursor:pointer;font-size:12px">💾 Save &amp; Connect</button>
+  </div>
 
 <!-- ═══════════════════════════════════════════
      LOGIN SCREEN
@@ -629,7 +644,7 @@
               <div class="card-header"><div class="card-icon blue">ℹ️</div><h3>About KNNDCmdb</h3></div>
               <div class="card-body" style="text-align:center;padding:40px">
                 <img src="assets/ndc-logo.png" style="width:80px;margin-bottom:16px">
-                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v3.1.4</div>
+                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v3.1.5</div>
                 <div style="color:var(--gray-500);margin-top:8px">Ketu North NDC Members Database</div>
                 <div style="color:var(--gray-400);font-size:13px;margin-top:4px">Elections & IT Directorate, 2026</div>
               </div>
@@ -641,7 +656,7 @@
 
   </main>
 
-  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v3.1.4</footer>
+  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v3.1.5</footer>
 </div>
 
 <div id="toast-container"></div>
@@ -819,8 +834,8 @@
   </div>
 </div>
 
-<script src="js/app.js?v=3.1.4"></script>
-<script src="js/pages.js?v=3.1.4"></script>
+<script src="js/app.js?v=3.1.5"></script>
+<script src="js/pages.js?v=3.1.5"></script>
 <script>
 // ── PASSWORD TOGGLE ──────────────────────────────────────────
 function togglePassword() {
@@ -846,6 +861,37 @@ function startLockoutCountdown(seconds) {
 }
 
 // ── LOGIN ────────────────────────────────────────────────────
+// ── QUICK SCRIPT URL (emergency connection banner) ────────────
+function saveQuickScriptUrl() {
+  const val = (document.getElementById('quick-script-url')?.value || '').trim();
+  if (!val || !val.startsWith('https://')) {
+    Toast.show('Invalid URL', 'Please paste the full Apps Script Web App URL starting with https://', 'error');
+    return;
+  }
+  App.settings.scriptUrl = val;
+  App.saveSettings();
+  document.getElementById('no-script-banner').style.display = 'none';
+  Toast.show('Connected ✅', 'Script URL saved. Fetching data from Google Sheets…', 'success', 4000);
+  // Trigger immediate data fetch
+  setTimeout(() => {
+    App.fetchFromSheets();
+    App._fetchIdIndex();
+    App._fetchUsersFromSheet();
+    App._fetchAndApplyRemoteSettings();
+  }, 500);
+}
+
+function _updateNoScriptBanner() {
+  const banner = document.getElementById('no-script-banner');
+  if (!banner || !App.currentUser) return;
+  const hasUrl = !!(App.settings?.scriptUrl);
+  banner.style.display = hasUrl ? 'none' : 'flex';
+  if (!hasUrl) {
+    const inp = document.getElementById('quick-script-url');
+    if (inp && !inp.value) inp.focus();
+  }
+}
+
 function doLogin() {
   const u=document.getElementById('login-username').value.trim();
   const p=document.getElementById('login-password').value;
