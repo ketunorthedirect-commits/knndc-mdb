@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v3.0.4.1
+   KNNDCmdb – Core Application Logic  v3.0.5.1
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '3.0.4',
+  VERSION:       '3.0.5',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -1527,19 +1527,16 @@ const App = {
       App.offlineQueue = result.failed;
       App.saveOfflineQ();
 
-      // On officer/ward devices: remove successfully synced records from
-      // LS.MEMBERS — they're now in the Sheet and covered by the ID index.
-      // This keeps LS.MEMBERS at near-zero on entry devices permanently.
-      const syncedIds = App.offlineQueue.length === 0
-        ? (result._sentIds || [])  // worker reports which ids succeeded
-        : [];
-      // Simpler: prune anything that is now confirmed in the index
+      // On officer/ward devices: remove successfully sent records from LS.MEMBERS.
+      // We only remove the EXACT records that were in this queue and confirmed sent.
+      // Never touch records that came from Sheet pulls (fetchFromSheets) — those
+      // are needed for the All Records / My Records views.
       if (result.uploaded > 0) {
-        App._fetchIdIndex().then(() => {
-          // After index refresh, prune local members that are now in the index
-          const indexIds = new Set(App.idIndex.map(e => e.id));
-          App._pruneSyncedLocalMembers([...indexIds]);
-        });
+        const failedIds = new Set(result.failed.map(item => item.data?.id).filter(Boolean));
+        const sentIds = queue
+          .map(item => item.data?.id)
+          .filter(id => id && !failedIds.has(id));
+        App._pruneSyncedLocalMembers(sentIds);
       }
 
       if (!result.failed.length) {
@@ -1574,6 +1571,14 @@ const App = {
       }
       App.offlineQueue = failed;
       App.saveOfflineQ();
+      // Prune only the records that were actually sent successfully
+      if (uploaded > 0) {
+        const failedSet = new Set(failed.map(item => item.data?.id).filter(Boolean));
+        const sentIds = queue
+          .map(item => item.data?.id)
+          .filter(id => id && !failedSet.has(id));
+        App._pruneSyncedLocalMembers(sentIds);
+      }
       if (!failed.length) Toast.show('Sync Complete ✅', `${uploaded} queued operation(s) uploaded.`, 'success', 5000);
       else Toast.show('Partial Sync', `${uploaded} uploaded, ${failed.length} still pending.`, 'warning', 6000);
     }
