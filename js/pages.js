@@ -272,6 +272,11 @@ const PageRenderers = {
   },
 
   submitEntry() {
+    // Lock against double-tap — if a save is already in progress, ignore
+    if (PageRenderers._saveLock) return;
+    PageRenderers._saveLock = true;
+    setTimeout(() => { PageRenderers._saveLock = false; }, 2000);
+
     const required=['f-branch-code','f-station-code','f-last-name','f-first-name','f-party-id','f-gender'];
     let ok=true;
     required.forEach(id=>{
@@ -303,6 +308,30 @@ const PageRenderers = {
       .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
     document.getElementById('f-last-name')?.focus();
   },
+
+  // Real-time duplicate check fired on input of partyId / voterId fields.
+  // Shows an inline warning banner immediately — before the officer hits Save.
+  _checkDuplicateField(field, inputId, warnId) {
+    const input = document.getElementById(inputId);
+    const warn  = document.getElementById(warnId);
+    if (!input || !warn) return;
+    const val = input.value.trim().toLowerCase();
+    if (!val) { warn.style.display = 'none'; input.style.borderColor = ''; return; }
+
+    const members = JSON.parse(localStorage.getItem('knndc_members') || '[]').filter(m => !m._demo);
+    const match   = members.find(m => (m[field] || '').trim().toLowerCase() === val);
+
+    if (match) {
+      warn.style.display = 'block';
+      warn.textContent   = `⚠️ Already registered: ${match.firstName} ${match.lastName} — ${match.station} (Party ID: ${match.partyId || '—'})`;
+      input.style.borderColor = 'var(--ndc-red)';
+    } else {
+      warn.style.display = 'none';
+      input.style.borderColor = 'var(--ndc-green)';
+    }
+  },
+
+  _saveLock: false,
 
   // ══════════════════════════════════════════════════════════
   // MY RECORDS

@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v3.0.2.1
+   KNNDCmdb – Core Application Logic  v3.0.3.1
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '3.0.2',
+  VERSION:       '3.0.3',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -888,47 +888,87 @@ const App = {
 
   // ── MEMBER CRUD ───────────────────────────────────────────
   addMember(data) {
-    // ── PRIMARY KEY CHECK: Party ID must be unique ──────────
-    App.members = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
-    if (data.partyId && data.partyId.trim()) {
-      const existing = App.members.find(m =>
-        m.partyId?.trim().toLowerCase() === data.partyId.trim().toLowerCase()
-        && !m._demo
+    // ── DUPLICATE PREVENTION — re-read localStorage fresh every time ──────────
+    // Reading fresh ensures we catch records added by other sessions or pulled
+    // from the Sheet since App.members was last set in memory.
+    App.members = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+    const real  = App.members.filter(m => !m._demo);
+
+    // 1. Party ID uniqueness (primary key — must be present and unique)
+    const pid = (data.partyId || '').trim().toLowerCase();
+    if (!pid) {
+      Toast.show('Party ID Required', 'Party ID is required and must be unique for every member.', 'error', 6000);
+      return null;
+    }
+    const byPartyId = real.find(m => (m.partyId || '').trim().toLowerCase() === pid);
+    if (byPartyId) {
+      Toast.show(
+        'Duplicate Blocked — Party ID',
+        `Party ID "${data.partyId}" is already registered to ${byPartyId.firstName} ${byPartyId.lastName} at ${byPartyId.station}.`,
+        'error', 8000
       );
-      if (existing) {
+      App.logAudit('DUPLICATE_BLOCKED', `Party ID duplicate: ${data.partyId} — existing: ${byPartyId.firstName} ${byPartyId.lastName}`, App.currentUser.username);
+      return null;
+    }
+
+    // 2. Voter ID uniqueness (if provided)
+    const vid = (data.voterId || '').trim().toLowerCase();
+    if (vid) {
+      const byVoterId = real.find(m => (m.voterId || '').trim().toLowerCase() === vid);
+      if (byVoterId) {
         Toast.show(
-          'Duplicate Entry Blocked',
-          `Member with Party ID "${data.partyId}" is already enrolled as ${existing.firstName} ${existing.lastName} (${existing.station}).`,
-          'error', 7000
+          'Duplicate Blocked — Voter ID',
+          `Voter ID "${data.voterId}" is already registered to ${byVoterId.firstName} ${byVoterId.lastName} at ${byVoterId.station}.`,
+          'error', 8000
         );
-        App.logAudit('DUPLICATE_BLOCKED',
-          `Blocked duplicate Party ID: ${data.partyId} — existing: ${existing.firstName} ${existing.lastName}`,
-          App.currentUser.username
-        );
-        return null; // signal to caller that save was rejected
+        App.logAudit('DUPLICATE_BLOCKED', `Voter ID duplicate: ${data.voterId} — existing: ${byVoterId.firstName} ${byVoterId.lastName}`, App.currentUser.username);
+        return null;
       }
     }
 
-    const member = { id:'m'+Date.now(), ...data, officer:App.currentUser.username, officerName:App.currentUser.name, timestamp:new Date().toLocaleString('en-GH'), isoDate:App._todayISO() };
+    // 3. Name + station combo (catches accidental double-saves of same person)
+    const fname = (data.firstName || '').trim().toLowerCase();
+    const lname = (data.lastName  || '').trim().toLowerCase();
+    const scode = (data.stationCode || '').trim();
+    if (fname && lname && scode) {
+      const byName = real.find(m =>
+        (m.firstName  || '').trim().toLowerCase() === fname &&
+        (m.lastName   || '').trim().toLowerCase() === lname &&
+        (m.stationCode|| '').trim()               === scode
+      );
+      if (byName) {
+        Toast.show(
+          'Possible Duplicate — Same Name & Station',
+          `${data.firstName} ${data.lastName} at this station already has a record (Party ID: ${byName.partyId || 'none'}). Check before saving.`,
+          'warning', 10000
+        );
+        App.logAudit('DUPLICATE_WARNING', `Name+station match: ${data.firstName} ${data.lastName} at ${scode}`, App.currentUser.username);
+        // Warning only — does NOT block save (different person may share a name)
+        // Return a special flag so the form can ask for confirmation if needed
+      }
+    }
+
+    const member = {
+      id: 'm' + Date.now(),
+      ...data,
+      officer:      App.currentUser.username,
+      officerName:  App.currentUser.name,
+      timestamp:    new Date().toLocaleString('en-GH'),
+      isoDate:      App._todayISO()
+    };
     App.members.unshift(member);
     App.saveMembers();
-    App.logAudit('ADD_MEMBER',`Added: ${data.firstName} ${data.lastName} (${data.partyId}) — ${data.station}`, App.currentUser.username);
+    App.logAudit('ADD_MEMBER', `Added: ${data.firstName} ${data.lastName} (${data.partyId}) — ${data.station}`, App.currentUser.username);
 
     if (App.settings.scriptUrl) {
-      // Always queue — then flush immediately if online.
-      // This ensures every record reaches the Sheet eventually, even if the
-      // network drops between now and the XHR completing (navigator.onLine
-      // only checks the adapter, not whether Apps Script is actually reachable).
-      App.offlineQueue.push({ type:'add', data:member });
+      App.offlineQueue.push({ type: 'add', data: member });
       App.saveOfflineQ();
       if (App.isOnline) {
-        // Flush in background — does not block the UI
         setTimeout(() => App.flushOfflineQueue(), 0);
       } else {
         Toast.show('Saved Offline', 'Record saved locally. Will sync to Google Sheets when back online.', 'warning', 4000);
       }
     }
-    // If no scriptUrl configured, record is safely in localStorage only
     return member;
   },
 
