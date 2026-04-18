@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v3.1.1.1
+   KNNDCmdb – Core Application Logic  v3.1.2.1
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '3.1.1',
+  VERSION:       '3.1.2',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -1364,33 +1364,40 @@ const App = {
     }
   },
 
-  // Reliable data fetch using XHR POST — returns a Promise resolving to parsed JSON or null.
-  // Routes ALL data reads through POST to avoid the CORS redirect issue that affects
-  // XHR GET requests to Apps Script. POST simple-requests (no Content-Type header) are
-  // not preflighted and Apps Script responds correctly to both GET and POST actions.
+  // JSONP-based data reader — the only reliably cross-origin read method for Apps Script.
+  // XHR and fetch() both fail because Apps Script's 302 redirect response lacks
+  // Access-Control-Allow-Origin headers. JSONP sidesteps this entirely:
+  // a <script> tag is injected with ?callback=fnName; Apps Script wraps the JSON
+  // in fnName({...}) and the browser executes it as JS — no CORS check applies.
   _xhrGet(url) {
-    // Parse the action and stations param from the URL, then POST them as JSON body
-    try {
-      const u       = new URL(url);
-      const action  = u.searchParams.get('action') || 'ping';
-      const stations= u.searchParams.get('stations') || '';
-      const base    = u.origin + u.pathname;
-      const body    = JSON.stringify(stations ? { action, stations } : { action });
-      return new Promise(resolve => {
-        try {
-          const xhr = new XMLHttpRequest();
-          xhr.open('POST', base, true);
-          xhr.timeout = 20000;
-          xhr.onload = () => {
-            try { resolve(JSON.parse(xhr.responseText)); }
-            catch(_) { resolve(null); }
-          };
-          xhr.onerror   = () => resolve(null);
-          xhr.ontimeout = () => resolve(null);
-          xhr.send(body);
-        } catch(_) { resolve(null); }
-      });
-    } catch(_) { return Promise.resolve(null); }
+    return new Promise((resolve) => {
+      // Build a unique callback name
+      const cbName = '_kncb_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
+      const timeout = setTimeout(() => {
+        delete window[cbName];
+        if (script.parentNode) script.parentNode.removeChild(script);
+        resolve(null);
+      }, 20000);
+
+      window[cbName] = (data) => {
+        clearTimeout(timeout);
+        delete window[cbName];
+        if (script.parentNode) script.parentNode.removeChild(script);
+        resolve(data);
+      };
+
+      // Append callback param to the URL
+      const sep   = url.includes('?') ? '&' : '?';
+      const src   = url + sep + 'callback=' + cbName;
+      const script = document.createElement('script');
+      script.src   = src;
+      script.onerror = () => {
+        clearTimeout(timeout);
+        delete window[cbName];
+        resolve(null);
+      };
+      document.head.appendChild(script);
+    });
   },
 
   // Force a complete re-pull from Sheet for admin/exec.
