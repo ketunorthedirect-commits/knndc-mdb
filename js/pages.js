@@ -310,7 +310,8 @@ const PageRenderers = {
   },
 
   // Real-time duplicate check fired on input of partyId / voterId fields.
-  // Shows an inline warning banner immediately — before the officer hits Save.
+  // Checks the Sheet-wide ID index first, then unsynced local records.
+  // No Sheet query — purely in-memory, zero latency.
   _checkDuplicateField(field, inputId, warnId) {
     const input = document.getElementById(inputId);
     const warn  = document.getElementById(warnId);
@@ -318,17 +319,29 @@ const PageRenderers = {
     const val = input.value.trim().toLowerCase();
     if (!val) { warn.style.display = 'none'; input.style.borderColor = ''; return; }
 
-    const members = JSON.parse(localStorage.getItem('knndc_members') || '[]').filter(m => !m._demo);
-    const match   = members.find(m => (m[field] || '').trim().toLowerCase() === val);
-
-    if (match) {
+    // 1. Check the Sheet-wide index (covers all enrolled members)
+    const idxMatch = App._lookupIdIndex(field, val);
+    if (idxMatch) {
       warn.style.display = 'block';
-      warn.textContent   = `⚠️ Already registered: ${match.firstName} ${match.lastName} — ${match.station} (Party ID: ${match.partyId || '—'})`;
+      warn.textContent   = `⚠️ Already in Sheet: ${idxMatch.firstName} ${idxMatch.lastName} — ${idxMatch.station} (Party ID: ${idxMatch.partyId || '—'})`;
       input.style.borderColor = 'var(--ndc-red)';
-    } else {
-      warn.style.display = 'none';
-      input.style.borderColor = 'var(--ndc-green)';
+      return;
     }
+
+    // 2. Check unsynced local records not yet in the index
+    const local = JSON.parse(localStorage.getItem('knndc_members') || '[]')
+      .filter(m => !m._demo);
+    const localMatch = local.find(m => (m[field] || '').trim().toLowerCase() === val);
+    if (localMatch) {
+      warn.style.display = 'block';
+      warn.textContent   = `⚠️ Already saved locally: ${localMatch.firstName} ${localMatch.lastName} — ${localMatch.station} (Party ID: ${localMatch.partyId || '—'})`;
+      input.style.borderColor = 'var(--ndc-red)';
+      return;
+    }
+
+    // No match — clear warning
+    warn.style.display = 'none';
+    input.style.borderColor = 'var(--ndc-green)';
   },
 
   _saveLock: false,

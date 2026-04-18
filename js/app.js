@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v3.0.3.1
+   KNNDCmdb – Core Application Logic  v3.0.4.1
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '3.0.3',
+  VERSION:       '3.0.4',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -23,6 +23,7 @@ const LS = {
   MEMBERS:        'knndc_members',
   USERS:          'knndc_users',
   AUDIT:          'knndc_audit',
+  ID_INDEX:       'knndc_id_index',   // lightweight partyId/voterId index for all enrolled members
   LOCKOUT:        'knndc_lockout',
   ATTEMPTS:       'knndc_attempts',
   DEMO_CLEARED:   'knndc_demo_cleared',  // flag: admin has cleared demo
@@ -65,6 +66,7 @@ const App = {
   auditLog:         [],
   pollingStations:  [],
   offlineQueue:     [],
+  idIndex:          [],   // lightweight [{partyId,voterId,firstName,lastName,station}] from Sheet
   isOnline:         navigator.onLine,
   _inactivityTimer: null,
   _syncInterval:    null,
@@ -211,6 +213,7 @@ const App = {
 
     App.auditLog     = JSON.parse(localStorage.getItem(LS.AUDIT)    || '[]');
     App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q)|| '[]');
+    App._loadIdIndex();
   },
 
   saveMembers() {
@@ -613,10 +616,11 @@ const App = {
     }
 
     if (App.isOnline && App.settings.scriptUrl) {
-      // Fetch settings AND users in parallel on every login
+      // Fetch settings, users, and ID index in parallel on every login
       Promise.all([
         App._fetchAndApplyRemoteSettings(),
         App._fetchUsersFromSheet(),
+        App._fetchIdIndex(),
       ]).then(([settingsChanged]) => {
         if (settingsChanged) {
           App.applyAppName();
@@ -713,9 +717,10 @@ const App = {
   _startSyncTimer() {
     if (App._syncInterval) clearInterval(App._syncInterval);
     if (App.settings.scriptUrl) {
-      // Every 2 minutes: sync members AND users; re-validate session after user fetch
+      // Every 2 minutes: sync members, users, and ID index
       App._syncInterval = setInterval(async () => {
         App.fetchFromSheets();
+        App._fetchIdIndex(); // refresh duplicate-check index in background
         const changed = await App._fetchUsersFromSheet();
         // Always re-validate so live assignment changes (ward, stations, role)
         // are applied to the active session without requiring a re-login
@@ -888,63 +893,82 @@ const App = {
 
   // ── MEMBER CRUD ───────────────────────────────────────────
   addMember(data) {
-    // ── DUPLICATE PREVENTION — re-read localStorage fresh every time ──────────
-    // Reading fresh ensures we catch records added by other sessions or pulled
-    // from the Sheet since App.members was last set in memory.
+    // ── DUPLICATE PREVENTION ──────────────────────────────────────────────────
+    // Check order:
+    //   1. idIndex  — covers every member confirmed in the Sheet (all devices)
+    //   2. LS.MEMBERS — covers records entered on this device not yet flushed
+    // This combination prevents duplicates even when localStorage has been
+    // pruned and even when other officers have enrolled the same person.
     App.members = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
-    const real  = App.members.filter(m => !m._demo);
+    const local = App.members.filter(m => !m._demo);
 
-    // 1. Party ID uniqueness (primary key — must be present and unique)
+    // 1. Party ID — mandatory and must be globally unique
     const pid = (data.partyId || '').trim().toLowerCase();
     if (!pid) {
       Toast.show('Party ID Required', 'Party ID is required and must be unique for every member.', 'error', 6000);
       return null;
     }
-    const byPartyId = real.find(m => (m.partyId || '').trim().toLowerCase() === pid);
-    if (byPartyId) {
-      Toast.show(
-        'Duplicate Blocked — Party ID',
-        `Party ID "${data.partyId}" is already registered to ${byPartyId.firstName} ${byPartyId.lastName} at ${byPartyId.station}.`,
-        'error', 8000
-      );
-      App.logAudit('DUPLICATE_BLOCKED', `Party ID duplicate: ${data.partyId} — existing: ${byPartyId.firstName} ${byPartyId.lastName}`, App.currentUser.username);
+    // Check Sheet-wide index first
+    const idxPid = App._lookupIdIndex('partyId', pid);
+    if (idxPid) {
+      Toast.show('Duplicate Blocked — Party ID',
+        `Party ID "${data.partyId}" is already registered to ${idxPid.firstName} ${idxPid.lastName} at ${idxPid.station}.`,
+        'error', 8000);
+      App.logAudit('DUPLICATE_BLOCKED', `Party ID duplicate (index): ${data.partyId} — ${idxPid.firstName} ${idxPid.lastName}`, App.currentUser.username);
+      return null;
+    }
+    // Check unsynced local records not yet in index
+    const localPid = local.find(m => (m.partyId || '').trim().toLowerCase() === pid);
+    if (localPid) {
+      Toast.show('Duplicate Blocked — Party ID',
+        `Party ID "${data.partyId}" is already registered to ${localPid.firstName} ${localPid.lastName} at ${localPid.station}.`,
+        'error', 8000);
+      App.logAudit('DUPLICATE_BLOCKED', `Party ID duplicate (local): ${data.partyId} — ${localPid.firstName} ${localPid.lastName}`, App.currentUser.username);
       return null;
     }
 
-    // 2. Voter ID uniqueness (if provided)
+    // 2. Voter ID — unique if provided
     const vid = (data.voterId || '').trim().toLowerCase();
     if (vid) {
-      const byVoterId = real.find(m => (m.voterId || '').trim().toLowerCase() === vid);
-      if (byVoterId) {
-        Toast.show(
-          'Duplicate Blocked — Voter ID',
-          `Voter ID "${data.voterId}" is already registered to ${byVoterId.firstName} ${byVoterId.lastName} at ${byVoterId.station}.`,
-          'error', 8000
-        );
-        App.logAudit('DUPLICATE_BLOCKED', `Voter ID duplicate: ${data.voterId} — existing: ${byVoterId.firstName} ${byVoterId.lastName}`, App.currentUser.username);
+      const idxVid = App._lookupIdIndex('voterId', vid);
+      if (idxVid) {
+        Toast.show('Duplicate Blocked — Voter ID',
+          `Voter ID "${data.voterId}" is already registered to ${idxVid.firstName} ${idxVid.lastName} at ${idxVid.station}.`,
+          'error', 8000);
+        App.logAudit('DUPLICATE_BLOCKED', `Voter ID duplicate (index): ${data.voterId} — ${idxVid.firstName} ${idxVid.lastName}`, App.currentUser.username);
+        return null;
+      }
+      const localVid = local.find(m => (m.voterId || '').trim().toLowerCase() === vid);
+      if (localVid) {
+        Toast.show('Duplicate Blocked — Voter ID',
+          `Voter ID "${data.voterId}" is already registered to ${localVid.firstName} ${localVid.lastName} at ${localVid.station}.`,
+          'error', 8000);
+        App.logAudit('DUPLICATE_BLOCKED', `Voter ID duplicate (local): ${data.voterId} — ${localVid.firstName} ${localVid.lastName}`, App.currentUser.username);
         return null;
       }
     }
 
-    // 3. Name + station combo (catches accidental double-saves of same person)
+    // 3. Name + station combo — warning only (two people can share a name)
     const fname = (data.firstName || '').trim().toLowerCase();
     const lname = (data.lastName  || '').trim().toLowerCase();
     const scode = (data.stationCode || '').trim();
     if (fname && lname && scode) {
-      const byName = real.find(m =>
-        (m.firstName  || '').trim().toLowerCase() === fname &&
-        (m.lastName   || '').trim().toLowerCase() === lname &&
-        (m.stationCode|| '').trim()               === scode
+      const idxName = App.idIndex.find(e =>
+        (e.firstName  || '').toLowerCase() === fname &&
+        (e.lastName   || '').toLowerCase() === lname &&
+        (e.stationCode|| '')               === scode
       );
-      if (byName) {
-        Toast.show(
-          'Possible Duplicate — Same Name & Station',
-          `${data.firstName} ${data.lastName} at this station already has a record (Party ID: ${byName.partyId || 'none'}). Check before saving.`,
-          'warning', 10000
-        );
+      const localName = local.find(m =>
+        (m.firstName  || '').toLowerCase() === fname &&
+        (m.lastName   || '').toLowerCase() === lname &&
+        (m.stationCode|| '')               === scode
+      );
+      const nameMatch = idxName || localName;
+      if (nameMatch) {
+        Toast.show('Possible Duplicate — Same Name & Station',
+          `${data.firstName} ${data.lastName} at this station already has a record (Party ID: ${nameMatch.partyId || '—'}). Check before saving.`,
+          'warning', 10000);
         App.logAudit('DUPLICATE_WARNING', `Name+station match: ${data.firstName} ${data.lastName} at ${scode}`, App.currentUser.username);
-        // Warning only — does NOT block save (different person may share a name)
-        // Return a special flag so the form can ask for confirmation if needed
       }
     }
 
@@ -958,6 +982,7 @@ const App = {
     };
     App.members.unshift(member);
     App.saveMembers();
+    App._addToIdIndex(member); // update local index immediately for next duplicate check
     App.logAudit('ADD_MEMBER', `Added: ${data.firstName} ${data.lastName} (${data.partyId}) — ${data.station}`, App.currentUser.username);
 
     if (App.settings.scriptUrl) {
@@ -1211,6 +1236,80 @@ const App = {
     } catch(_) {}
   },
 
+  // ── ID INDEX — lightweight duplicate detection ────────────────
+  // Stores only partyId + voterId + minimal display info for every enrolled
+  // member. ~60 bytes per entry vs ~480 for a full record. An enrolment of
+  // 10,000 members costs ~600KB — safe on any device including entry phones.
+  // Officer devices use this index instead of caching full member records,
+  // keeping LS.MEMBERS permanently small (only unsynced local entries).
+
+  // Load index from localStorage into memory
+  _loadIdIndex() {
+    try {
+      const raw = localStorage.getItem(LS.ID_INDEX);
+      App.idIndex = raw ? JSON.parse(raw) : [];
+    } catch(_) { App.idIndex = []; }
+  },
+
+  // Persist index to localStorage
+  _saveIdIndex() {
+    try { localStorage.setItem(LS.ID_INDEX, JSON.stringify(App.idIndex)); } catch(_) {}
+  },
+
+  // Add a single new entry to the in-memory index and persist
+  _addToIdIndex(member) {
+    if (!member.partyId && !member.voterId) return;
+    // Remove any existing entry for this record id first
+    App.idIndex = App.idIndex.filter(e => e.id !== member.id);
+    App.idIndex.push({
+      id:          member.id          || '',
+      partyId:     (member.partyId    || '').trim(),
+      voterId:     (member.voterId    || '').trim(),
+      firstName:   (member.firstName  || '').trim(),
+      lastName:    (member.lastName   || '').trim(),
+      station:     (member.station    || '').trim(),
+      stationCode: (member.stationCode|| '').trim(),
+    });
+    App._saveIdIndex();
+  },
+
+  // Look up a value in the index. Returns the matching entry or null.
+  // field: 'partyId' | 'voterId'
+  _lookupIdIndex(field, value) {
+    if (!value) return null;
+    const v = value.trim().toLowerCase();
+    return App.idIndex.find(e => (e[field] || '').toLowerCase() === v) || null;
+  },
+
+  // Fetch the full ID index from Google Sheets in the background.
+  // Called on login and every sync cycle. Does NOT block the UI.
+  async _fetchIdIndex() {
+    if (!App.settings.scriptUrl) return;
+    const data = await App._xhrGet(
+      App.settings.scriptUrl + '?action=getIdIndex&t=' + Date.now()
+    );
+    if (!data?.index?.length) return;
+    App.idIndex = data.index;
+    App._saveIdIndex();
+  },
+
+  // After a successful flush, remove synced records from LS.MEMBERS on
+  // officer/ward devices (they're now in the Sheet and in the index).
+  // Admin/exec keep full LS.MEMBERS — this method exits early for them.
+  _pruneSyncedLocalMembers(syncedIds) {
+    const role = App.currentUser?.role;
+    if (role === 'admin' || role === 'exec') return; // admin keeps everything
+    if (!syncedIds?.length) return;
+
+    const idSet  = new Set(syncedIds);
+    const local  = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+    const pruned = local.filter(m => !idSet.has(m.id)); // keep only unsynced
+    if (pruned.length < local.length) {
+      App.members = pruned;
+      try { localStorage.setItem(LS.MEMBERS, JSON.stringify(pruned)); } catch(_) {}
+    }
+  },
+
   // Reliable GET using XHR — returns a Promise that resolves to parsed JSON or null.
   // Uses XHR instead of fetch() because fetch() triggers a CORS preflight on Apps Script
   // GET responses from GitHub Pages and other cross-origin hosts, which Apps Script
@@ -1427,6 +1526,22 @@ const App = {
       // Worker succeeded — update state from worker result
       App.offlineQueue = result.failed;
       App.saveOfflineQ();
+
+      // On officer/ward devices: remove successfully synced records from
+      // LS.MEMBERS — they're now in the Sheet and covered by the ID index.
+      // This keeps LS.MEMBERS at near-zero on entry devices permanently.
+      const syncedIds = App.offlineQueue.length === 0
+        ? (result._sentIds || [])  // worker reports which ids succeeded
+        : [];
+      // Simpler: prune anything that is now confirmed in the index
+      if (result.uploaded > 0) {
+        App._fetchIdIndex().then(() => {
+          // After index refresh, prune local members that are now in the index
+          const indexIds = new Set(App.idIndex.map(e => e.id));
+          App._pruneSyncedLocalMembers([...indexIds]);
+        });
+      }
+
       if (!result.failed.length) {
         Toast.show('Sync Complete ✅', `${result.uploaded} queued operation(s) uploaded.`, 'success', 5000);
       } else {
