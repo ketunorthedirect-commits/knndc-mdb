@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v3.1.2.1
+   KNNDCmdb – Core Application Logic  v3.1.4.1
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '3.1.2',
+  VERSION:       '3.1.4',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -814,7 +814,15 @@ const App = {
         }
       }
     } catch(e) {
-      // Silent fail — offline will handle it
+      App._memberFetchPending = false;
+      // Only show toast when user is on a data page and store is empty
+      const pg = App.currentPage;
+      if (['records','reports','analytics','dashboard'].includes(pg) &&
+          !JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]').length) {
+        Toast.show('Could not load data',
+          'Google Sheets connection failed. Check the Script URL in Settings and ensure a new deployment is active.',
+          'warning', 8000);
+      }
     }
   },
 
@@ -863,7 +871,14 @@ const App = {
     App.currentPage = page;
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     const el = document.getElementById('page-' + page);
-    if (el) { el.classList.add('active'); PageRenderers[page]?.(); }
+    if (el) {
+      el.classList.add('active');
+      try { PageRenderers[page]?.(); }
+      catch(e) {
+        console.error('Page render error on', page, e);
+        Toast.show('Page Error', 'Could not load ' + page + '. Try refreshing.', 'error', 5000);
+      }
+    }
     document.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('active', a.dataset.page === page));
     window.scrollTo(0, 0);
   },
@@ -1108,23 +1123,30 @@ const App = {
     const u = App.currentUser;
     if (!u) return [];
 
-    // If local store is empty and we have a Sheet connection, trigger a background
-    // re-fetch so the page populates on next render (2s debounce to avoid hammering)
-    if (!all.length && App.settings.scriptUrl && App.isOnline && !App._memberFetchPending) {
+    // If local store is empty, trigger a background re-fetch.
+    // Retry after 30s so a failed JSONP request doesn't block forever.
+    const now = Date.now();
+    if (!all.length && App.settings.scriptUrl && App.isOnline &&
+        (!App._memberFetchPending || now - (App._memberFetchTime||0) > 30000)) {
       App._memberFetchPending = true;
-      setTimeout(() => {
-        App.fetchFromSheets().then(() => {
+      App._memberFetchTime    = now;
+      const countEl = document.getElementById('records-count') ||
+                      document.getElementById('my-records-count');
+      if (countEl) countEl.textContent = 'Loading from Google Sheets…';
+      App.fetchFromSheets()
+        .then(() => {
           App._memberFetchPending = false;
-          if (['records','my-records','reports','analytics','dashboard'].includes(App.currentPage)) {
-            PageRenderers[App.currentPage]?.();
+          const pg = App.currentPage;
+          if (['records','my-records','reports','analytics','dashboard'].includes(pg)) {
+            PageRenderers[pg]?.();
           }
-        });
-      }, 400);
+        })
+        .catch(() => { App._memberFetchPending = false; });
     }
 
     if (u.role==='admin'||u.role==='exec') return all;
-    // Stations this user is authorised to view
-    const codes = (u.assignedStations||[]).length ? u.assignedStations : (u.station ? [u.station] : []);
+    const codes = (u.assignedStations||[]).length ? u.assignedStations
+      : (u.station ? [u.station] : []);
     if (u.role==='ward') {
       return all.filter(m => codes.includes(m.stationCode) || m.ward === u.ward);
     }
