@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v3.0.0.1
+   KNNDCmdb – Core Application Logic  v3.0.2.1
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '3.0.0',
+  VERSION:       '3.0.2',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -224,16 +224,14 @@ const App = {
 
       if (isFullViewRole) {
         // Admin/exec: NEVER trim member records.
-        // Instead, free space by clearing non-critical keys that can be rebuilt.
-        try { localStorage.removeItem(LS.AUDIT);   } catch(_) {}
-        try { localStorage.removeItem(LS.OFFLINE_Q);} catch(_) {}
-        // Try again after freeing audit/queue space
+        // Free space by clearing only the audit log (can be rebuilt from Sheet).
+        // NEVER clear the offline queue — it contains unsynced records.
+        try { localStorage.removeItem(LS.AUDIT); } catch(_) {}
+        // Try again after freeing audit space
         try {
           localStorage.setItem(LS.MEMBERS, JSON.stringify(App.members));
           return; // success — no toast needed
         } catch(_) {}
-        // Still failing: the members data itself is too large for this device's quota.
-        // Tell admin to use Pull All from Sheet on the next load instead of trimming.
         Toast.show(
           '⚠️ Storage Full',
           'This device\'s storage is full. Use 🔄 Pull All from Sheet on the Records page to reload data directly from Google Sheets.',
@@ -915,8 +913,22 @@ const App = {
     App.members.unshift(member);
     App.saveMembers();
     App.logAudit('ADD_MEMBER',`Added: ${data.firstName} ${data.lastName} (${data.partyId}) — ${data.station}`, App.currentUser.username);
-    if (App.isOnline && App.settings.scriptUrl) App.syncToSheets(member);
-    else { App.offlineQueue.push({type:'add',data:member}); App.saveOfflineQ(); if(!App.isOnline) Toast.show('Saved Offline','Will sync when online.','warning'); }
+
+    if (App.settings.scriptUrl) {
+      // Always queue — then flush immediately if online.
+      // This ensures every record reaches the Sheet eventually, even if the
+      // network drops between now and the XHR completing (navigator.onLine
+      // only checks the adapter, not whether Apps Script is actually reachable).
+      App.offlineQueue.push({ type:'add', data:member });
+      App.saveOfflineQ();
+      if (App.isOnline) {
+        // Flush in background — does not block the UI
+        setTimeout(() => App.flushOfflineQueue(), 0);
+      } else {
+        Toast.show('Saved Offline', 'Record saved locally. Will sync to Google Sheets when back online.', 'warning', 4000);
+      }
+    }
+    // If no scriptUrl configured, record is safely in localStorage only
     return member;
   },
 
@@ -1105,6 +1117,49 @@ const App = {
     setTimeout(() => App._xhrPost(App.settings.scriptUrl, payload), 0);
   },
 
+  // ── SYNC WORKER ───────────────────────────────────────────────
+  // Manages a Web Worker that handles all Sheet XHR communication on a
+  // separate thread so the data entry UI is never blocked.
+  // Falls back to the main-thread batch method if Workers are unavailable.
+  _syncWorker: null,
+
+  _getWorker() {
+    if (!window.Worker) return null;
+    if (!App._syncWorker || App._syncWorker._dead) {
+      try {
+        App._syncWorker = new Worker('js/sync-worker.js');
+        App._syncWorker._dead = false;
+        App._syncWorker.onerror = () => { App._syncWorker._dead = true; };
+      } catch(_) { return null; }
+    }
+    return App._syncWorker;
+  },
+
+  // Run a sync job on the worker. Returns a Promise that resolves to
+  // { uploaded, failed } when the worker reports 'done'.
+  // onProgress(uploaded, total) is called after each batch.
+  _runWorker(msg, onProgress) {
+    return new Promise((resolve, reject) => {
+      const worker = App._getWorker();
+      if (!worker) { resolve(null); return; } // caller falls back to main thread
+
+      const handler = (e) => {
+        const d = e.data;
+        if (d.type === 'progress') {
+          if (onProgress) onProgress(d.uploaded, d.total);
+        } else if (d.type === 'done') {
+          worker.removeEventListener('message', handler);
+          resolve({ uploaded: d.uploaded, failed: d.failed });
+        } else if (d.type === 'error') {
+          worker.removeEventListener('message', handler);
+          reject(new Error(d.message));
+        }
+      };
+      worker.addEventListener('message', handler);
+      worker.postMessage(msg);
+    });
+  },
+
   // Reliable fire-and-forget POST using XHR — handles Apps Script redirects correctly
   _xhrPost(url, data) {
     try {
@@ -1170,8 +1225,8 @@ const App = {
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
       // Free up space from non-critical keys before writing the full member set
-      try { localStorage.removeItem(LS.AUDIT);    } catch(_) {}
-      try { localStorage.removeItem(LS.OFFLINE_Q); } catch(_) {}
+      // NEVER clear LS.OFFLINE_Q — it contains unsynced records
+      try { localStorage.removeItem(LS.AUDIT); } catch(_) {}
 
       App.members = merged;
       App.saveMembers(); // uses quota-aware handler
@@ -1311,51 +1366,61 @@ const App = {
   },
 
   async flushOfflineQueue() {
-    // Always reload from localStorage — in-memory array may be stale after a page reload
     App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q) || '[]');
     if (!App.offlineQueue.length || !App.settings.scriptUrl) return;
 
-    Toast.show('Syncing', `Uploading ${App.offlineQueue.length} queued operation(s)…`, 'info', 6000);
+    const total = App.offlineQueue.length;
+    Toast.show('Syncing', `Uploading ${total} queued operation(s) in background…`, 'info', 5000);
 
-    const sendOne = (payload) => new Promise(resolve => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', App.settings.scriptUrl, true);
-      xhr.timeout   = 25000;
-      xhr.onload    = () => resolve(true);
-      xhr.onerror   = () => resolve(false);
-      xhr.ontimeout = () => resolve(false);
-      xhr.send(JSON.stringify(payload));
-    });
+    // Try worker first — keeps the UI fully unblocked
+    const result = await App._runWorker(
+      { cmd: 'flush', queue: App.offlineQueue, scriptUrl: App.settings.scriptUrl },
+      (uploaded, tot) => {
+        const pct = Math.round((uploaded / tot) * 100);
+        // Update any visible queue counter without touching the form
+        const badge = document.getElementById('offline-queue-count');
+        if (badge) badge.textContent = tot - uploaded;
+      }
+    ).catch(() => null);
 
-    const failed   = [];
-    let uploaded   = 0;
-    const BATCH    = 5;
-    const queue    = App.offlineQueue;
-
-    for (let i = 0; i < queue.length; i += BATCH) {
-      const batch = queue.slice(i, i + BATCH);
-
-      // Build payloads for this batch
-      const payloads = batch.map(item => {
-        if (item.type === 'delete') return { action: 'deleteMember', ...item.data };
-        if (item.type === 'update') return { action: 'updateMember', ...item.data };
-        return { action: 'upsertMember', ...item.data };
-      });
-
-      const results = await Promise.all(payloads.map(sendOne));
-      results.forEach((ok, j) => ok ? uploaded++ : failed.push(batch[j]));
-
-      // Yield to browser between batches
-      await new Promise(r => setTimeout(r, 0));
-    }
-
-    App.offlineQueue = failed;
-    App.saveOfflineQ();
-
-    if (!failed.length) {
-      Toast.show('Sync Complete ✅', `${uploaded} queued operation(s) uploaded to Google Sheets.`, 'success', 5000);
+    if (result) {
+      // Worker succeeded — update state from worker result
+      App.offlineQueue = result.failed;
+      App.saveOfflineQ();
+      if (!result.failed.length) {
+        Toast.show('Sync Complete ✅', `${result.uploaded} queued operation(s) uploaded.`, 'success', 5000);
+      } else {
+        Toast.show('Partial Sync', `${result.uploaded} uploaded, ${result.failed.length} still pending.`, 'warning', 6000);
+      }
     } else {
-      Toast.show('Partial Sync', `${uploaded} uploaded, ${failed.length} still pending. Will retry when online.`, 'warning', 6000);
+      // Worker unavailable — fall back to main-thread batching
+      const BATCH = 5;
+      const sendOne = (payload) => new Promise(resolve => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', App.settings.scriptUrl, true);
+        xhr.timeout = 25000;
+        xhr.onload = () => resolve(true);
+        xhr.onerror = () => resolve(false);
+        xhr.ontimeout = () => resolve(false);
+        xhr.send(JSON.stringify(payload));
+      });
+      const failed = []; let uploaded = 0;
+      const queue  = App.offlineQueue;
+      for (let i = 0; i < queue.length; i += BATCH) {
+        const batch    = queue.slice(i, i + BATCH);
+        const payloads = batch.map(item => {
+          if (item.type === 'delete') return { action: 'deleteMember', ...item.data };
+          if (item.type === 'update') return { action: 'updateMember', ...item.data };
+          return { action: 'upsertMember', ...item.data };
+        });
+        const results = await Promise.all(payloads.map(sendOne));
+        results.forEach((ok, j) => ok ? uploaded++ : failed.push(batch[j]));
+        await new Promise(r => setTimeout(r, 0));
+      }
+      App.offlineQueue = failed;
+      App.saveOfflineQ();
+      if (!failed.length) Toast.show('Sync Complete ✅', `${uploaded} queued operation(s) uploaded.`, 'success', 5000);
+      else Toast.show('Partial Sync', `${uploaded} uploaded, ${failed.length} still pending.`, 'warning', 6000);
     }
 
     if (App.currentUser && App.currentPage === 'dashboard') PageRenderers.dashboard();
@@ -1410,6 +1475,8 @@ const App = {
   // Push records visible to the current user to Google Sheet.
   // Used from the Data Entry page — scoped by role and assigned stations.
   // Sends in parallel batches of 5 to avoid hanging the browser.
+  // Push records visible to the current user to Google Sheet.
+  // Runs on the Web Worker thread — the entry form stays fully responsive.
   async pushMyRecordsToSheet() {
     if (!App.settings.scriptUrl) {
       Toast.show('No Script URL', 'Configure the Apps Script URL in Settings → Google Sheets first.', 'error');
@@ -1421,36 +1488,45 @@ const App = {
       return;
     }
 
-    const btns = document.querySelectorAll('[onclick*="pushMyRecordsToSheet"]');
-    btns.forEach(b => { b.disabled = true; b.dataset._orig = b.textContent; b.textContent = '⏳ Pushing…'; });
-
-    const BATCH = 5;
-    let ok = 0, fail = 0;
     const total = records.length;
+    const btns  = document.querySelectorAll('[onclick*="pushMyRecordsToSheet"]');
+    btns.forEach(b => { b.disabled = true; b.dataset._orig = b.textContent; b.textContent = `⏳ 0/${total}`; });
 
-    // Helper: send one record, returns true/false
-    const sendOne = (m) => new Promise(resolve => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', App.settings.scriptUrl, true);
-      xhr.timeout   = 25000;
-      xhr.onload    = () => resolve(true);
-      xhr.onerror   = () => resolve(false);
-      xhr.ontimeout = () => resolve(false);
-      xhr.send(JSON.stringify({ action: 'upsertMember', ...m }));
-    });
+    const onProgress = (uploaded, tot) => {
+      const pct = Math.round((uploaded / tot) * 100);
+      btns.forEach(b => { b.textContent = `⏳ ${pct}% (${uploaded}/${tot})`; });
+    };
 
-    // Process in batches — each batch runs in parallel, batches run in sequence
-    for (let i = 0; i < total; i += BATCH) {
-      const batch   = records.slice(i, i + BATCH);
-      const results = await Promise.all(batch.map(sendOne));
-      results.forEach(sent => sent ? ok++ : fail++);
+    const result = await App._runWorker(
+      { cmd: 'push', records, scriptUrl: App.settings.scriptUrl },
+      onProgress
+    ).catch(() => null);
 
-      // Update button with live progress — keeps user informed, doesn't block UI
-      const pct = Math.round(((i + batch.length) / total) * 100);
-      btns.forEach(b => { b.textContent = `⏳ ${pct}% (${ok}/${total})`; });
+    let ok = 0, fail = 0;
 
-      // Yield to the browser between batches so the UI stays responsive
-      await new Promise(r => setTimeout(r, 0));
+    if (result) {
+      ok   = result.uploaded;
+      fail = result.failed.length;
+    } else {
+      // Worker unavailable — fall back to main-thread batching
+      const BATCH = 5;
+      const sendOne = (m) => new Promise(resolve => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', App.settings.scriptUrl, true);
+        xhr.timeout = 25000;
+        xhr.onload = () => resolve(true);
+        xhr.onerror = () => resolve(false);
+        xhr.ontimeout = () => resolve(false);
+        xhr.send(JSON.stringify({ action: 'upsertMember', ...m }));
+      });
+      for (let i = 0; i < total; i += BATCH) {
+        const batch   = records.slice(i, i + BATCH);
+        const results = await Promise.all(batch.map(sendOne));
+        results.forEach(sent => sent ? ok++ : fail++);
+        const pct = Math.round(((i + batch.length) / total) * 100);
+        btns.forEach(b => { b.textContent = `⏳ ${pct}% (${ok}/${total})`; });
+        await new Promise(r => setTimeout(r, 0));
+      }
     }
 
     btns.forEach(b => { b.disabled = false; b.textContent = b.dataset._orig || '☁️ Push Records to Sheet'; });
@@ -1459,7 +1535,7 @@ const App = {
       Toast.show('Push Complete ✅', `All ${ok} record(s) uploaded to Google Sheets.`, 'success', 6000);
       App.logAudit('PUSH_MY_RECORDS', `Pushed ${ok}/${total} records to Google Sheets`, App.currentUser?.username);
     } else {
-      Toast.show('Partial Upload', `${ok} uploaded, ${fail} failed. Try again to retry the failed ones.`, 'warning', 7000);
+      Toast.show('Partial Upload', `${ok} uploaded, ${fail} failed. Try again to retry.`, 'warning', 7000);
     }
     if (App.currentPage === 'entry') PageRenderers.entry();
   },
