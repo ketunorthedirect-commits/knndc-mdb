@@ -311,17 +311,34 @@ function _setupSummarySheet(ss) {
 // ════════════════════════════════════════════════════════════
 
 function doGet(e) {
-  const action = e?.parameter?.action || 'ping';
+  const action   = e?.parameter?.action   || 'ping';
+  const callback = e?.parameter?.callback || '';
   try {
-    if (action==='getMembers')   return _jsonCors(_getMembers(e?.parameter?.stations || ''));
-    if (action==='getIdIndex')   return _jsonCors(_getIdIndex());
-    if (action==='getStations')  return _jsonCors(_getPollingStations());
-    if (action==='getSettings')  return _jsonCors(_getAppSettings());
-    if (action==='getUsers')     return _jsonCors(_getUsers());
-    if (action==='getAudit')     return _jsonCors(_getAuditLog());
-    if (action==='ping')         return _jsonCors({status:'ok',app:'KNNDCmdb',version:'1.9'});
-    return _jsonCors({error:'Unknown action'});
-  } catch(err) { return _jsonCors({error:err.message}); }
+    let data;
+    if (action==='getMembers')  data = _getMembers(e?.parameter?.stations || '');
+    else if (action==='getIdIndex')  data = _getIdIndex();
+    else if (action==='getStations') data = _getPollingStations();
+    else if (action==='getSettings') data = _getAppSettings();
+    else if (action==='getUsers')    data = _getUsers();
+    else if (action==='getAudit')    data = _getAuditLog();
+    else if (action==='ping')        data = {status:'ok',app:'KNNDCmdb',version:'3.1'};
+    else data = {error:'Unknown action'};
+
+    // JSONP: wrap in callback if requested — bypasses CORS for cross-origin reads
+    if (callback) {
+      return ContentService
+        .createTextOutput(callback + '(' + JSON.stringify(data) + ')')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return _jsonCors(data);
+  } catch(err) {
+    if (callback) {
+      return ContentService
+        .createTextOutput(callback + '(' + JSON.stringify({error:err.message}) + ')')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return _jsonCors({error:err.message});
+  }
 }
 
 function doPost(e) {
