@@ -313,7 +313,7 @@ function _setupSummarySheet(ss) {
 function doGet(e) {
   const action = e?.parameter?.action || 'ping';
   try {
-    if (action==='getMembers')   return _jsonCors(_getMembers());
+    if (action==='getMembers')   return _jsonCors(_getMembers(e?.parameter?.stations || ''));
     if (action==='getIdIndex')   return _jsonCors(_getIdIndex());
     if (action==='getStations')  return _jsonCors(_getPollingStations());
     if (action==='getSettings')  return _jsonCors(_getAppSettings());
@@ -638,11 +638,16 @@ function _getAuditLog() {
   return { entries, total: entries.length };
 }
 
-function _getMembers() {
+function _getMembers(stationFilter) {
   const ss=SpreadsheetApp.getActiveSpreadsheet();
   const sheet=ss.getSheetByName(SHEETS.MEMBERS); if(!sheet) return{members:[]};
   const all=sheet.getDataRange().getValues();
   if(all.length<5) return{members:[]};
+
+  // Parse comma-separated station codes filter (empty = return all)
+  const filterCodes = stationFilter
+    ? stationFilter.split(',').map(s=>s.trim().toLowerCase()).filter(Boolean)
+    : [];
 
   // Headers are on row 4 (index 3)
   const rawHdrs = all[3];
@@ -683,6 +688,11 @@ function _getMembers() {
     const lastName  = g(row,iLast);
     const id        = g(row,iId);
     if(!firstName && !lastName && !id) continue; // skip empty rows
+    // Apply station filter if provided
+    if(filterCodes.length > 0) {
+      const rowCode = String(row[iStCode]||'').trim().toLowerCase();
+      if(!filterCodes.includes(rowCode)) continue;
+    }
     members.push({
       id:          id,
       firstName:   firstName,

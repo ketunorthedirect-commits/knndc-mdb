@@ -285,12 +285,21 @@
           <option value="">All Genders</option><option value="Male">Male</option><option value="Female">Female</option>
         </select>
       </div>
+      <!-- Bulk action bar — admin only, shown when rows are selected -->
+      <div id="bulk-action-bar" style="display:none;align-items:center;gap:10px;padding:10px 16px;background:var(--color-background-info);border-radius:8px;margin-bottom:8px;flex-wrap:wrap">
+        <span id="bulk-count" style="font-weight:500;font-size:13px;color:var(--color-text-info)">0 selected</span>
+        <button class="btn btn-sm btn-primary" onclick="PageRenderers.openBulkBranchEdit()">✏️ Change Branch Code</button>
+        <button class="btn btn-sm btn-secondary" onclick="PageRenderers.clearBulkSelection()">✕ Clear Selection</button>
+      </div>
       <div class="card">
         <div class="table-wrap" style="border:none">
           <table>
-            <thead><tr><th>Full Name</th><th>Gender</th><th>Zone</th><th>Party ID</th><th>Voter ID</th><th>Phone</th><th>Ward</th><th>Station</th><th>Branch</th><th>Date/Time</th><th>Actions</th></tr></thead>
+            <thead><tr>
+              <th style="width:32px"><input type="checkbox" id="select-all-records" title="Select all on this page" onchange="PageRenderers.toggleSelectAll(this.checked)"></th>
+              <th>Full Name</th><th>Gender</th><th>Zone</th><th>Party ID</th><th>Voter ID</th><th>Phone</th><th>Ward</th><th>Station</th><th>Branch</th><th>Date/Time</th><th>Actions</th>
+            </tr></thead>
             <tbody id="records-tbody"></tbody>
-          </table>
+          </table>le>
         </div>
         <div id="records-pagination" class="pagination" style="padding:16px"></div>
       </div>
@@ -620,7 +629,7 @@
               <div class="card-header"><div class="card-icon blue">ℹ️</div><h3>About KNNDCmdb</h3></div>
               <div class="card-body" style="text-align:center;padding:40px">
                 <img src="assets/ndc-logo.png" style="width:80px;margin-bottom:16px">
-                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v3.0.5</div>
+                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v3.1.0</div>
                 <div style="color:var(--gray-500);margin-top:8px">Ketu North NDC Members Database</div>
                 <div style="color:var(--gray-400);font-size:13px;margin-top:4px">Elections & IT Directorate, 2026</div>
               </div>
@@ -632,7 +641,7 @@
 
   </main>
 
-  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v3.0.5</footer>
+  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v3.1.0</footer>
 </div>
 
 <div id="toast-container"></div>
@@ -810,8 +819,8 @@
   </div>
 </div>
 
-<script src="js/app.js?v=3.0.5"></script>
-<script src="js/pages.js?v=3.0.5"></script>
+<script src="js/app.js?v=3.1.0"></script>
+<script src="js/pages.js?v=3.1.0"></script>
 <script>
 // ── PASSWORD TOGGLE ──────────────────────────────────────────
 function togglePassword() {
@@ -1175,5 +1184,41 @@ App.init();
 
 setInterval(()=>{ if(App.currentUser&&App.currentPage==='dashboard') PageRenderers.dashboard(); },30000);
 </script>
+<!-- ════ BULK BRANCH CODE MODAL ════ -->
+<div id="modal-bulk-branch" class="modal-overlay">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <h3 class="modal-title">✏️ Change Branch Code</h3>
+      <button class="modal-close" onclick="Modal.close('modal-bulk-branch')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">
+        Select a new branch and station for the <strong id="bulk-modal-count">0</strong> selected record(s).
+        This will update both the branch code and branch name.
+      </p>
+      <div class="form-group">
+        <label>New Branch Code <span class="required">*</span></label>
+        <div class="search-dropdown-wrap">
+          <input type="text" id="bulk-branch-code-input" placeholder="Type to search branch codes…" autocomplete="off" oninput="PageRenderers._bulkBranchSearch(this.value)">
+          <div id="bulk-branch-dropdown" class="search-dropdown"></div>
+        </div>
+      </div>
+      <div class="form-grid" style="margin-top:12px">
+        <div class="form-group"><label>Branch Name</label><input type="text" id="bulk-branch-name" readonly class="auto-filled"></div>
+        <div class="form-group"><label>Zone</label><input type="text" id="bulk-zone" readonly class="auto-filled"></div>
+        <div class="form-group"><label>Ward</label><input type="text" id="bulk-ward" readonly class="auto-filled"></div>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label>Reason for Change <span class="required">*</span></label>
+        <input type="text" id="bulk-reason" placeholder="e.g. Station reassignment after redistricting">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('modal-bulk-branch')">Cancel</button>
+      <button class="btn btn-primary" onclick="PageRenderers.submitBulkBranchEdit()">✅ Apply to Selected</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
