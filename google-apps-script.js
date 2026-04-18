@@ -372,6 +372,10 @@ function doPost(e) {
 
 // JSON response with permissive CORS headers
 function _jsonCors(data) {
+  // ContentService does not support setting response headers directly.
+  // Apps Script Web Apps handle CORS through deployment settings:
+  // Deploy → Manage deployments → Who has access: Anyone.
+  // The response below works for both doGet (JSONP) and doPost (fire-and-forget).
   return ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
@@ -570,32 +574,55 @@ function _updateMember(data) {
   const all=sheet.getDataRange().getValues();
   if(all.length<5) return{success:false,error:'No data'};
 
-  // Locate columns by header (row 4 = index 3)
   const hdrs=all[3].map(h=>String(h).trim().toLowerCase());
   const c=(names)=>{ for(const n of names){const i=hdrs.indexOf(n.toLowerCase());if(i>=0)return i;} return -1; };
-  const iId    =c(['record id','id']);
-  const iFirst =c(['first name','firstname']);
-  const iLast  =c(['surname','last name','lastname']);
-  const iParty =c(['party id number','party id']);
-  const iVoter =c(['voter id number','voter id']);
-  const iPhone =c(['telephone number','phone']);
-  const iGender=c(['gender']);
+  const iId     = c(['record id','id']);
+  const iFirst  = c(['first name','firstname']);
+  const iLast   = c(['surname','last name','lastname']);
+  const iOther  = c(['other names','othernames']);
+  const iParty  = c(['party id number','party id','partyid']);
+  const iVoter  = c(['voter id number','voter id','voterid']);
+  const iPhone  = c(['telephone number','phone','telephone']);
+  const iGender = c(['gender']);
+  const iZone   = c(['zone']);
+  const iWard   = c(['ward name','ward']);
+  const iStation= c(['polling station','station']);
+  const iStCode = c(['station code','stationcode']);
+  const iBranch = c(['branch name','branch']);
+  const iBrCode = c(['branch code','branchcode']);
+  const iOfficer= c(['officer id','officer']);
+  const iOffName= c(['officer name','officername']);
+  const iTime   = c(['date/time added','timestamp','date added']);
 
   if(iId<0) return{success:false,error:'Record ID column not found'};
 
   for(let i=4;i<all.length;i++){
-    if(String(all[i][iId]||'').trim()===String(data.id).trim()){
+    if(String(all[i][iId]||'').trim()===String(data.id||'').trim()){
       const r=i+1;
-      if(data.firstName  && iFirst>=0)  sheet.getRange(r,iFirst+1).setValue(data.firstName);
-      if(data.lastName   && iLast>=0)   sheet.getRange(r,iLast+1).setValue(data.lastName);
-      if(data.partyId    && iParty>=0)  sheet.getRange(r,iParty+1).setValue(data.partyId);
-      if(data.voterId    && iVoter>=0)  sheet.getRange(r,iVoter+1).setValue(data.voterId);
-      if(data.phone      && iPhone>=0)  sheet.getRange(r,iPhone+1).setValue(data.phone);
-      if(data.gender     && iGender>=0) sheet.getRange(r,iGender+1).setValue(data.gender);
+      // Use setValue for every defined field — allow empty string to clear a value
+      const set=(ci,val)=>{ if(ci>=0 && val!==undefined) sheet.getRange(r,ci+1).setValue(val); };
+      set(iFirst,   data.firstName);
+      set(iLast,    data.lastName);
+      set(iOther,   data.otherNames);
+      set(iParty,   data.partyId);
+      set(iVoter,   data.voterId);
+      set(iPhone,   data.phone);
+      set(iGender,  data.gender);
+      set(iZone,    data.zone);
+      set(iWard,    data.ward);
+      set(iStation, data.station);
+      set(iStCode,  data.stationCode);
+      set(iBranch,  data.branch);
+      set(iBrCode,  data.branchCode);
+      set(iOfficer, data.officer);
+      set(iOffName, data.officerName);
+      if(data.lastModified && iTime>=0) sheet.getRange(r,iTime+1).setValue(data.lastModified);
+      _refreshSummary(ss);
       return{success:true};
     }
   }
-  return{success:false,error:'Record not found'};
+  // Record ID not found — fall back to upsert so edits are never silently lost
+  return _upsertMember(data);
 }
 
 function _deleteMember(data) {
