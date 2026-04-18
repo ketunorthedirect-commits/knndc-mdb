@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v3.0.5.1
+   KNNDCmdb – Core Application Logic  v3.1.0.1
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '3.0.5',
+  VERSION:       '3.1.0',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -734,7 +734,15 @@ const App = {
   async fetchFromSheets() {
     if (!App.isOnline || !App.settings.scriptUrl) return;
     try {
-      const url = App.settings.scriptUrl + '?action=getMembers&t=' + Date.now();
+      // Build station filter for officer/ward — only fetch records they can see
+      const u = App.currentUser;
+      let stationParam = '';
+      if (u && u.role !== 'admin' && u.role !== 'exec') {
+        const codes = (u.assignedStations||[]).length ? u.assignedStations
+          : (u.station ? [u.station] : []);
+        if (codes.length) stationParam = '&stations=' + encodeURIComponent(codes.join(','));
+      }
+      const url = App.settings.scriptUrl + '?action=getMembers&t=' + Date.now() + stationParam;
       const data = await App._xhrGet(url);
       if (!data?.members?.length) return;
 
@@ -986,11 +994,17 @@ const App = {
     App.logAudit('ADD_MEMBER', `Added: ${data.firstName} ${data.lastName} (${data.partyId}) — ${data.station}`, App.currentUser.username);
 
     if (App.settings.scriptUrl) {
-      App.offlineQueue.push({ type: 'add', data: member });
-      App.saveOfflineQ();
       if (App.isOnline) {
-        setTimeout(() => App.flushOfflineQueue(), 0);
+        // Try direct Sheet write — fastest path when online.
+        // If it fails, fall back to queue so nothing is lost.
+        App._xhrPostWithFallback(
+          { action: 'upsertMember', ...member },
+          { type: 'add', data: member }
+        );
       } else {
+        // Offline — queue for sync when connection returns
+        App.offlineQueue.push({ type: 'add', data: member });
+        App.saveOfflineQ();
         Toast.show('Saved Offline', 'Record saved locally. Will sync to Google Sheets when back online.', 'warning', 4000);
       }
     }
@@ -1049,13 +1063,15 @@ const App = {
     App.members[idx] = {...App.members[idx],...updates, lastModified:new Date().toLocaleString('en-GH'), modifiedBy:App.currentUser.username};
     App.saveMembers();
     App.logAudit('EDIT_MEMBER',`Edited: ${before.firstName} ${before.lastName}. Reason: ${reason}`, App.currentUser.username, {before, after:App.members[idx], reason});
-    if (App.isOnline && App.settings.scriptUrl) {
-      App.syncToSheets({...App.members[idx], action:'updateMember'});
-    } else if (App.settings.scriptUrl) {
-      // Queue for sync when back online
-      App.offlineQueue.push({ type:'update', data:{...App.members[idx], action:'updateMember', reason} });
-      App.saveOfflineQ();
-      if (!App.isOnline) Toast.show('Edit Queued','Changes saved locally and will sync when online.','warning');
+    if (App.settings.scriptUrl) {
+      const payload = {...App.members[idx], action:'updateMember', reason};
+      if (App.isOnline) {
+        App._xhrPostWithFallback(payload, { type:'update', data: payload });
+      } else {
+        App.offlineQueue.push({ type:'update', data: payload });
+        App.saveOfflineQ();
+        Toast.show('Edit Queued','Changes saved locally and will sync when online.','warning');
+      }
     }
     return true;
   },
@@ -1073,13 +1089,15 @@ const App = {
     App.members = App.members.filter(mx=>mx.id!==id);
     App.saveMembers();
     App.logAudit('DELETE_MEMBER',`Deleted: ${m.firstName} ${m.lastName} (${m.partyId}). Reason: ${reason}`, App.currentUser.username);
-    if (App.isOnline && App.settings.scriptUrl) {
-      App.syncToSheets({id, action:'deleteMember', reason});
-    } else if (App.settings.scriptUrl) {
-      // Queue for sync when back online
-      App.offlineQueue.push({ type:'delete', data:{id, action:'deleteMember', reason} });
-      App.saveOfflineQ();
-      if (!App.isOnline) Toast.show('Delete Queued','Record removed locally and will sync when online.','warning');
+    if (App.settings.scriptUrl) {
+      const payload = {id, action:'deleteMember', reason};
+      if (App.isOnline) {
+        App._xhrPostWithFallback(payload, { type:'delete', data: payload });
+      } else {
+        App.offlineQueue.push({ type:'delete', data: payload });
+        App.saveOfflineQ();
+        Toast.show('Delete Queued','Record removed locally and will sync when online.','warning');
+      }
     }
     return true;
   },
@@ -1089,15 +1107,28 @@ const App = {
     App.members = all;
     const u = App.currentUser;
     if (!u) return [];
+
+    // If local store is empty and we have a Sheet connection, trigger a background
+    // re-fetch so the page populates on next render (2s debounce to avoid hammering)
+    if (!all.length && App.settings.scriptUrl && App.isOnline && !App._memberFetchPending) {
+      App._memberFetchPending = true;
+      setTimeout(() => {
+        App.fetchFromSheets().then(() => {
+          App._memberFetchPending = false;
+          if (['records','my-records','reports','analytics','dashboard'].includes(App.currentPage)) {
+            PageRenderers[App.currentPage]?.();
+          }
+        });
+      }, 400);
+    }
+
     if (u.role==='admin'||u.role==='exec') return all;
-    // Stations App user is authorised to view
+    // Stations this user is authorised to view
     const codes = (u.assignedStations||[]).length ? u.assignedStations : (u.station ? [u.station] : []);
     if (u.role==='ward') {
-      // Ward coordinators see all records in their assigned stations OR matching ward
       return all.filter(m => codes.includes(m.stationCode) || m.ward === u.ward);
     }
     if (u.role==='officer') {
-      // Officers see only records from their assigned stations (not free-range across the DB)
       return all.filter(m => codes.includes(m.stationCode));
     }
     return [];
@@ -1223,6 +1254,29 @@ const App = {
       worker.addEventListener('message', handler);
       worker.postMessage(msg);
     });
+  },
+
+  // Direct Sheet write with automatic queue fallback.
+  // Sends payload immediately; if the XHR fails (network drop, timeout, Apps Script
+  // error) the queueItem is saved to the offline queue so nothing is lost.
+  _xhrPostWithFallback(payload, queueItem) {
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', App.settings.scriptUrl, true);
+      xhr.timeout = 25000;
+      xhr.onload  = () => {}; // success — Sheet has the record
+      xhr.onerror = xhr.ontimeout = () => {
+        // Direct write failed — queue for retry
+        App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q) || '[]');
+        App.offlineQueue.push(queueItem);
+        App.saveOfflineQ();
+      };
+      xhr.send(JSON.stringify(payload));
+    } catch(_) {
+      App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q) || '[]');
+      App.offlineQueue.push(queueItem);
+      App.saveOfflineQ();
+    }
   },
 
   // Reliable fire-and-forget POST using XHR — handles Apps Script redirects correctly
