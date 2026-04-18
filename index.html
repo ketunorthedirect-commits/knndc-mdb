@@ -213,8 +213,15 @@
                 <option value="Female">Female</option>
               </select>
             </div>
-            <div class="form-group"><label>Party ID Number <span class="required">*</span></label><input type="text" id="f-party-id" placeholder="e.g. NDC-2024-001"></div>
-            <div class="form-group"><label>Voter ID Number</label><input type="text" id="f-voter-id" placeholder="e.g. GH-V-001234"></div>
+            <div class="form-group"><label>Party ID Number <span class="required">*</span></label>
+              <input type="text" id="f-party-id" placeholder="e.g. NDC-2024-001"
+                oninput="PageRenderers._checkDuplicateField('partyId','f-party-id','f-pid-warn')">
+              <div id="f-pid-warn" style="display:none;margin-top:4px;padding:6px 10px;background:var(--color-background-danger);color:var(--color-text-danger);border-radius:6px;font-size:12px;font-weight:500"></div>
+            </div>
+            <div class="form-group"><label>Voter ID Number</label>
+              <input type="text" id="f-voter-id" placeholder="e.g. GH-V-001234"
+                oninput="PageRenderers._checkDuplicateField('voterId','f-voter-id','f-vid-warn')">
+              <div id="f-vid-warn" style="display:none;margin-top:4px;padding:6px 10px;background:var(--color-background-danger);color:var(--color-text-danger);border-radius:6px;font-size:12px;font-weight:500"></div>
             <div class="form-group"><label>Telephone Number</label><input type="tel" id="f-phone" placeholder="e.g. 0244001122"></div>
           </div>
 
@@ -613,7 +620,7 @@
               <div class="card-header"><div class="card-icon blue">ℹ️</div><h3>About KNNDCmdb</h3></div>
               <div class="card-body" style="text-align:center;padding:40px">
                 <img src="assets/ndc-logo.png" style="width:80px;margin-bottom:16px">
-                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v3.0.2</div>
+                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v3.0.3</div>
                 <div style="color:var(--gray-500);margin-top:8px">Ketu North NDC Members Database</div>
                 <div style="color:var(--gray-400);font-size:13px;margin-top:4px">Elections & IT Directorate, 2026</div>
               </div>
@@ -625,7 +632,7 @@
 
   </main>
 
-  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v3.0.2</footer>
+  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v3.0.3</footer>
 </div>
 
 <div id="toast-container"></div>
@@ -803,8 +810,8 @@
   </div>
 </div>
 
-<script src="js/app.js?v=3.0.2"></script>
-<script src="js/pages.js?v=3.0.2"></script>
+<script src="js/app.js?v=3.0.3"></script>
+<script src="js/pages.js?v=3.0.3"></script>
 <script>
 // ── PASSWORD TOGGLE ──────────────────────────────────────────
 function togglePassword() {

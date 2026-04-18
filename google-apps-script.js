@@ -456,7 +456,65 @@ function _upsertMember(data) {
     }
   }
 
-  // Not found — append as new row
+  // Not found by Record ID — check partyId and voterId before appending
+  // This catches cross-device duplicates where the same person was registered
+  // on two devices before either synced, both getting different Record IDs.
+  if (data.partyId && iParty >= 0) {
+    const pid = String(data.partyId).trim().toLowerCase();
+    for (let i = 4; i < all.length; i++) {
+      const sheetPid = String(all[i][iParty] || '').trim().toLowerCase();
+      if (sheetPid && sheetPid === pid) {
+        // Party ID already exists — update that row instead of appending
+        const r = i + 1;
+        const set = (ci, val) => { if (ci >= 0 && val !== undefined && val !== '') sheet.getRange(r, ci + 1).setValue(val); };
+        set(iFirst,   data.firstName);
+        set(iLast,    data.lastName);
+        set(iOther,   data.otherNames);
+        set(iVoter,   data.voterId);
+        set(iPhone,   data.phone);
+        set(iGender,  data.gender);
+        set(iZone,    data.zone);
+        set(iWard,    data.ward);
+        set(iStation, data.station);
+        set(iStCode,  data.stationCode);
+        set(iBranch,  data.branch);
+        set(iBrCode,  data.branchCode);
+        set(iOfficer, data.officer);
+        set(iOffName, data.officerName);
+        _refreshSummary(ss);
+        return { success: true, action: 'merged_party_id' };
+      }
+    }
+  }
+  if (data.voterId && iVoter >= 0) {
+    const vid = String(data.voterId).trim().toLowerCase();
+    for (let i = 4; i < all.length; i++) {
+      const sheetVid = String(all[i][iVoter] || '').trim().toLowerCase();
+      if (sheetVid && sheetVid === vid) {
+        // Voter ID already exists — treat as update
+        const r = i + 1;
+        const set = (ci, val) => { if (ci >= 0 && val !== undefined && val !== '') sheet.getRange(r, ci + 1).setValue(val); };
+        set(iFirst,   data.firstName);
+        set(iLast,    data.lastName);
+        set(iOther,   data.otherNames);
+        set(iParty,   data.partyId);
+        set(iPhone,   data.phone);
+        set(iGender,  data.gender);
+        set(iZone,    data.zone);
+        set(iWard,    data.ward);
+        set(iStation, data.station);
+        set(iStCode,  data.stationCode);
+        set(iBranch,  data.branch);
+        set(iBrCode,  data.branchCode);
+        set(iOfficer, data.officer);
+        set(iOffName, data.officerName);
+        _refreshSummary(ss);
+        return { success: true, action: 'merged_voter_id' };
+      }
+    }
+  }
+
+  // Confirmed not a duplicate — append as new row
   sheet.appendRow([
     data.firstName   || '',
     data.lastName    || '',
