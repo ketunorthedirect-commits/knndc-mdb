@@ -332,6 +332,14 @@ function doPost(e) {
     }
     const data=JSON.parse(e.postData.contents);
     const action=data.action||'addMember';
+    // Read actions routed through POST (avoids CORS GET redirect issues)
+    if (action==='getMembers')   return _jsonCors(_getMembers(data.stations||''));
+    if (action==='getIdIndex')   return _jsonCors(_getIdIndex());
+    if (action==='getStations')  return _jsonCors(_getPollingStations());
+    if (action==='getSettings')  return _jsonCors(_getAppSettings());
+    if (action==='getUsers')     return _jsonCors(_getUsers());
+    if (action==='getAudit')     return _jsonCors(_getAuditLog());
+    // Write actions
     if (action==='addMember')    return _jsonCors(_addMember(data));
     if (action==='upsertMember') return _jsonCors(_upsertMember(data));
     if (action==='updateMember') return _jsonCors(_updateMember(data));
