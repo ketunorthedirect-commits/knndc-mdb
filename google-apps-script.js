@@ -314,6 +314,7 @@ function doGet(e) {
   const action = e?.parameter?.action || 'ping';
   try {
     if (action==='getMembers')   return _jsonCors(_getMembers());
+    if (action==='getIdIndex')   return _jsonCors(_getIdIndex());
     if (action==='getStations')  return _jsonCors(_getPollingStations());
     if (action==='getSettings')  return _jsonCors(_getAppSettings());
     if (action==='getUsers')     return _jsonCors(_getUsers());
@@ -703,6 +704,48 @@ function _getMembers() {
     });
   }
   return{members,total:members.length};
+}
+
+// Lightweight index of all enrolled IDs — used by officer devices for fast
+// duplicate detection without storing full member records in localStorage.
+// Returns only the fields needed for duplicate checks: ~60 bytes per member
+// vs ~480 bytes for a full record. Safe for any device regardless of total enrolment.
+function _getIdIndex() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEETS.MEMBERS);
+  if (!sheet) return { index: [], ts: Date.now() };
+
+  const all = sheet.getDataRange().getValues();
+  if (all.length < 5) return { index: [], ts: Date.now() };
+
+  const hdrs = all[3].map(h => String(h).trim().toLowerCase());
+  const col  = (names) => { for (const n of names) { const i = hdrs.indexOf(n.toLowerCase()); if (i >= 0) return i; } return -1; };
+
+  const iId      = col(['record id','id']);
+  const iFirst   = col(['first name','firstname']);
+  const iLast    = col(['surname','last name','lastname']);
+  const iParty   = col(['party id number','party id','partyid']);
+  const iVoter   = col(['voter id number','voter id','voterid']);
+  const iStation = col(['polling station','station']);
+  const iStCode  = col(['station code','stationcode']);
+
+  const index = [];
+  for (let i = 4; i < all.length; i++) {
+    const row = all[i];
+    const pid = String(row[iParty]  || '').trim();
+    const vid = String(row[iVoter]  || '').trim();
+    if (!pid && !vid) continue; // skip empty rows
+    index.push({
+      id:          String(row[iId]      || '').trim(),
+      partyId:     pid,
+      voterId:     vid,
+      firstName:   String(row[iFirst]   || '').trim(),
+      lastName:    String(row[iLast]    || '').trim(),
+      station:     String(row[iStation] || '').trim(),
+      stationCode: String(row[iStCode]  || '').trim(),
+    });
+  }
+  return { index, total: index.length, ts: Date.now() };
 }
 
 function _getPollingStations() {
