@@ -1204,6 +1204,8 @@ const PageRenderers = {
     App.logAudit('SETTINGS_CHANGE','Updated and pushed settings to Google Sheets', App.currentUser.username);
     Toast.show('Settings Saved','Configuration saved locally and syncing to Google Sheets…','success');
     App._startSyncTimer();   // restart timer with possibly new script URL
+    // Hide the no-script banner if a URL is now set
+    if (typeof _updateNoScriptBanner === 'function') _updateNoScriptBanner();
 
     // Show confirmation once push completes
     if (App.isOnline && App.settings.scriptUrl) {

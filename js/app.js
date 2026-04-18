@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v3.1.4.1
+   KNNDCmdb – Core Application Logic  v3.1.5.1
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '3.1.4',
+  VERSION:       '3.1.5',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -607,6 +607,8 @@ const App = {
     App.renderUserHeader();
     App.setupInactivityTracking();
     App.navigate('dashboard');
+    // Show the no-script-url banner if this device has no Sheet connection
+    if (typeof _updateNoScriptBanner === 'function') _updateNoScriptBanner();
 
     // Flush any queued offline records now that the user is logged in
     // Reload from localStorage first — in-memory array may be stale after a page reload
