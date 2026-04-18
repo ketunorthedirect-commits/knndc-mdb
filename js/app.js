@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v3.1.0.1
+   KNNDCmdb – Core Application Logic  v3.1.1.1
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '3.1.0',
+  VERSION:       '3.1.1',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -1364,25 +1364,33 @@ const App = {
     }
   },
 
-  // Reliable GET using XHR — returns a Promise that resolves to parsed JSON or null.
-  // Uses XHR instead of fetch() because fetch() triggers a CORS preflight on Apps Script
-  // GET responses from GitHub Pages and other cross-origin hosts, which Apps Script
-  // does not handle. XHR treats the response as opaque and does not preflight.
+  // Reliable data fetch using XHR POST — returns a Promise resolving to parsed JSON or null.
+  // Routes ALL data reads through POST to avoid the CORS redirect issue that affects
+  // XHR GET requests to Apps Script. POST simple-requests (no Content-Type header) are
+  // not preflighted and Apps Script responds correctly to both GET and POST actions.
   _xhrGet(url) {
-    return new Promise(resolve => {
-      try {
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', url, true);
-        xhr.timeout = 20000;
-        xhr.onload = () => {
-          try { resolve(JSON.parse(xhr.responseText)); }
-          catch(_) { resolve(null); }
-        };
-        xhr.onerror   = () => resolve(null);
-        xhr.ontimeout = () => resolve(null);
-        xhr.send();
-      } catch(_) { resolve(null); }
-    });
+    // Parse the action and stations param from the URL, then POST them as JSON body
+    try {
+      const u       = new URL(url);
+      const action  = u.searchParams.get('action') || 'ping';
+      const stations= u.searchParams.get('stations') || '';
+      const base    = u.origin + u.pathname;
+      const body    = JSON.stringify(stations ? { action, stations } : { action });
+      return new Promise(resolve => {
+        try {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', base, true);
+          xhr.timeout = 20000;
+          xhr.onload = () => {
+            try { resolve(JSON.parse(xhr.responseText)); }
+            catch(_) { resolve(null); }
+          };
+          xhr.onerror   = () => resolve(null);
+          xhr.ontimeout = () => resolve(null);
+          xhr.send(body);
+        } catch(_) { resolve(null); }
+      });
+    } catch(_) { return Promise.resolve(null); }
   },
 
   // Force a complete re-pull from Sheet for admin/exec.
