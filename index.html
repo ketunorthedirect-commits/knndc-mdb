@@ -1403,7 +1403,7 @@ tbody td { padding: 12px 16px; color: var(--gray-700); vertical-align: middle; }
               <div class="card-header"><div class="card-icon blue">ℹ️</div><h3>About KNNDCmdb</h3></div>
               <div class="card-body" style="text-align:center;padding:40px">
                 <img src="assets/ndc-logo.png" style="width:80px;margin-bottom:16px">
-                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v3.2.3</div>
+                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v3.2.4</div>
                 <div style="color:var(--gray-500);margin-top:8px">Ketu North NDC Members Database</div>
                 <div style="color:var(--gray-400);font-size:13px;margin-top:4px">Elections & IT Directorate, 2026</div>
               </div>
@@ -1415,7 +1415,7 @@ tbody td { padding: 12px 16px; color: var(--gray-700); vertical-align: middle; }
 
   </main>
 
-  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v3.2.3</footer>
+  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v3.2.4</footer>
 </div>
 
 <div id="toast-container"></div>
@@ -1595,7 +1595,7 @@ tbody td { padding: 12px 16px; color: var(--gray-700); vertical-align: middle; }
 
 <script>
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v3.2.3
+   KNNDCmdb – Core Application Logic  v3.2.4
    ============================================================ */
 'use strict';
 
@@ -1606,7 +1606,7 @@ var CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '3.2.3',
+  VERSION:       '3.2.4',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -2973,39 +2973,24 @@ var App = {
     }
   },
 
-  // JSONP-based data reader — the only reliably cross-origin read method for Apps Script.
-  // XHR and fetch() both fail because Apps Script's 302 redirect response lacks
-  // Access-Control-Allow-Origin headers. JSONP sidesteps this entirely:
-  // a <script> tag is injected with ?callback=fnName; Apps Script wraps the JSON
-  // in fnName({...}) and the browser executes it as JS — no CORS check applies.
+  // Reliable GET using XHR — returns a Promise that resolves to parsed JSON or null.
+  // Uses XHR instead of fetch() because fetch() triggers a CORS preflight on Apps Script
+  // GET responses from GitHub Pages and other cross-origin hosts, which Apps Script
+  // does not handle. XHR treats the response as opaque and does not preflight.
   _xhrGet(url) {
-    return new Promise((resolve) => {
-      // Build a unique callback name
-      const cbName = '_kncb_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
-      const timeout = setTimeout(() => {
-        delete window[cbName];
-        if (script.parentNode) script.parentNode.removeChild(script);
-        resolve(null);
-      }, 20000);
-
-      window[cbName] = (data) => {
-        clearTimeout(timeout);
-        delete window[cbName];
-        if (script.parentNode) script.parentNode.removeChild(script);
-        resolve(data);
-      };
-
-      // Append callback param to the URL
-      const sep   = url.includes('?') ? '&' : '?';
-      const src   = url + sep + 'callback=' + cbName;
-      const script = document.createElement('script');
-      script.src   = src;
-      script.onerror = () => {
-        clearTimeout(timeout);
-        delete window[cbName];
-        resolve(null);
-      };
-      document.head.appendChild(script);
+    return new Promise(resolve => {
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.timeout = 20000;
+        xhr.onload = () => {
+          try { resolve(JSON.parse(xhr.responseText)); }
+          catch(_) { resolve(null); }
+        };
+        xhr.onerror   = () => resolve(null);
+        xhr.ontimeout = () => resolve(null);
+        xhr.send();
+      } catch(_) { resolve(null); }
     });
   },
 
