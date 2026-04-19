@@ -4,7 +4,766 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ketu North NDC Members Database</title>
-  <link rel="stylesheet" href="css/styles.css">
+  <style>
+/* ============================================================
+   KNNDCmdb – Ketu North NDC Members Database
+   Colour Palette: NDC Green #1a6b3a, NDC Red #c8102e, White
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap');
+
+:root {
+  --ndc-green:      #1a6b3a;
+  --ndc-green-dk:   #134d2a;
+  --ndc-green-lt:   #2a8a4f;
+  --ndc-green-pale: #e8f5ec;
+  --ndc-red:        #c8102e;
+  --ndc-red-dk:     #a00d24;
+  --ndc-red-pale:   #fde8eb;
+  --white:          #ffffff;
+  --off-white:      #f8faf9;
+  --gray-50:        #f9fafb;
+  --gray-100:       #f3f4f6;
+  --gray-200:       #e5e7eb;
+  --gray-300:       #d1d5db;
+  --gray-400:       #9ca3af;
+  --gray-500:       #6b7280;
+  --gray-600:       #4b5563;
+  --gray-700:       #374151;
+  --gray-800:       #1f2937;
+  --gray-900:       #111827;
+  --shadow-sm:  0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+  --shadow-md:  0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.06);
+  --shadow-lg:  0 10px 25px rgba(0,0,0,.1), 0 4px 10px rgba(0,0,0,.06);
+  --shadow-xl:  0 20px 40px rgba(0,0,0,.15);
+  --radius-sm: 6px;
+  --radius:    10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --transition: all .2s cubic-bezier(.4,0,.2,1);
+  --font-head: 'Outfit', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--off-white);
+  color: var(--gray-800);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ===================== HEADER ===================== */
+.site-header {
+  background: linear-gradient(135deg, var(--ndc-green-dk) 0%, var(--ndc-green) 60%, var(--ndc-green-lt) 100%);
+  color: var(--white);
+  box-shadow: var(--shadow-lg);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.header-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 72px;
+}
+
+.header-logo {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  border-radius: 50%;
+  background: var(--white);
+  padding: 3px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,.3);
+}
+
+.header-brand {
+  flex: 1;
+}
+
+.header-brand h1 {
+  font-family: var(--font-head);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -.3px;
+}
+
+.header-brand .app-name {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  opacity: .8;
+  margin-top: 2px;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: var(--radius);
+  padding: 6px 14px 6px 8px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.header-user:hover { background: rgba(255,255,255,.2); }
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--ndc-red);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 13px;
+  color: white;
+  flex-shrink: 0;
+}
+
+.user-info { line-height: 1.3; }
+.user-name { font-size: 13px; font-weight: 600; }
+.user-role { font-size: 10px; opacity: .75; text-transform: uppercase; letter-spacing: .4px; }
+
+.btn-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.2);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+  font-size: 16px;
+}
+
+.btn-icon:hover { background: rgba(255,255,255,.25); }
+
+/* ===================== NAV ===================== */
+.site-nav {
+  background: var(--ndc-green-dk);
+  border-bottom: 3px solid var(--ndc-red);
+}
+
+.nav-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.nav-inner::-webkit-scrollbar { display: none; }
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 16px;
+  color: rgba(255,255,255,.75);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -3px;
+  white-space: nowrap;
+  transition: var(--transition);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.nav-link:hover { color: white; background: rgba(255,255,255,.08); }
+.nav-link.active { color: white; border-bottom-color: var(--ndc-red); background: rgba(255,255,255,.08); font-weight: 600; }
+.nav-link .nav-icon { font-size: 16px; }
+
+/* ===================== LAYOUT ===================== */
+.main-wrapper {
+  flex: 1;
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.page { display: none; }
+.page.active { display: block; animation: fadeIn .25s ease; }
+
+@keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+
+/* ===================== CARDS ===================== */
+.card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--gray-200);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--gray-100);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(to right, var(--ndc-green-pale), transparent);
+}
+
+.card-header h2, .card-header h3 {
+  font-family: var(--font-head);
+  font-weight: 700;
+  color: var(--ndc-green-dk);
+  font-size: 17px;
+}
+
+.card-icon {
+  width: 38px; height: 38px;
+  border-radius: var(--radius-sm);
+  background: var(--ndc-green);
+  color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.card-icon.red { background: var(--ndc-red); }
+.card-icon.amber { background: #d97706; }
+.card-icon.blue { background: #2563eb; }
+
+.card-body { padding: 24px; }
+
+/* ===================== FORMS ===================== */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group.full-width { grid-column: 1 / -1; }
+
+label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-600);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+label .required { color: var(--ndc-red); margin-left: 3px; }
+
+input, select, textarea {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--gray-800);
+  background: var(--white);
+  border: 1.5px solid var(--gray-300);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  transition: var(--transition);
+  outline: none;
+  width: 100%;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--ndc-green);
+  box-shadow: 0 0 0 3px rgba(26,107,58,.12);
+}
+
+input[readonly], input.auto-filled {
+  background: var(--ndc-green-pale);
+  border-color: var(--ndc-green-lt);
+  color: var(--ndc-green-dk);
+  font-weight: 500;
+  cursor: not-allowed;
+}
+
+input[readonly]:focus { box-shadow: none; }
+
+.input-hint { font-size: 11px; color: var(--gray-400); }
+
+.search-dropdown-wrap { position: relative; }
+.search-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0; right: 0;
+  background: white;
+  border: 1.5px solid var(--ndc-green);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: var(--shadow-md);
+  display: none;
+}
+
+.search-dropdown.open { display: block; }
+.dropdown-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: var(--transition);
+  border-bottom: 1px solid var(--gray-100);
+  font-size: 13px;
+}
+.dropdown-item:hover { background: var(--ndc-green-pale); color: var(--ndc-green-dk); }
+.dropdown-item:last-child { border-bottom: none; }
+
+/* ===================== BUTTONS ===================== */
+.btn {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 22px;
+  border-radius: var(--radius);
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: var(--transition);
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--ndc-green);
+  color: white;
+}
+.btn-primary:hover:not(:disabled) { background: var(--ndc-green-dk); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+
+.btn-danger {
+  background: var(--ndc-red);
+  color: white;
+}
+.btn-danger:hover:not(:disabled) { background: var(--ndc-red-dk); }
+
+.btn-secondary {
+  background: var(--gray-100);
+  color: var(--gray-700);
+  border: 1px solid var(--gray-200);
+}
+.btn-secondary:hover:not(:disabled) { background: var(--gray-200); }
+
+.btn-outline {
+  background: transparent;
+  color: var(--ndc-green);
+  border: 1.5px solid var(--ndc-green);
+}
+.btn-outline:hover:not(:disabled) { background: var(--ndc-green); color: white; }
+
+.btn-sm { font-size: 12px; padding: 6px 14px; }
+.btn-lg { font-size: 15px; padding: 13px 30px; }
+
+.btn-group { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+/* ===================== STATS CARDS ===================== */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  border: 1px solid var(--gray-200);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+  transition: var(--transition);
+}
+
+.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: var(--ndc-green);
+}
+
+.stat-card.red::before { background: var(--ndc-red); }
+.stat-card.amber::before { background: #d97706; }
+.stat-card.blue::before { background: #2563eb; }
+.stat-card.purple::before { background: #7c3aed; }
+
+.stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--gray-500); margin-bottom: 8px; }
+.stat-value { font-family: var(--font-head); font-size: 32px; font-weight: 800; color: var(--gray-900); line-height: 1; }
+.stat-change { font-size: 12px; color: var(--gray-400); margin-top: 6px; }
+.stat-icon { position: absolute; top: 16px; right: 16px; font-size: 28px; opacity: .12; }
+
+/* ===================== TABLE ===================== */
+.table-wrap { overflow-x: auto; border-radius: var(--radius-lg); border: 1px solid var(--gray-200); }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+thead { background: linear-gradient(to right, var(--ndc-green-dk), var(--ndc-green)); }
+thead th {
+  padding: 12px 16px;
+  text-align: left;
+  color: white;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  white-space: nowrap;
+}
+
+tbody tr { border-bottom: 1px solid var(--gray-100); transition: var(--transition); }
+tbody tr:hover { background: var(--ndc-green-pale); }
+tbody tr:last-child { border-bottom: none; }
+
+tbody td { padding: 12px 16px; color: var(--gray-700); vertical-align: middle; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .3px;
+}
+
+.badge-green { background: var(--ndc-green-pale); color: var(--ndc-green-dk); }
+.badge-red   { background: var(--ndc-red-pale); color: var(--ndc-red-dk); }
+.badge-amber { background: #fef3c7; color: #92400e; }
+.badge-blue  { background: #dbeafe; color: #1e40af; }
+.badge-gray  { background: var(--gray-100); color: var(--gray-600); }
+
+/* ===================== SEARCH BAR ===================== */
+.search-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.search-input-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+}
+
+.search-input-wrap input {
+  padding-left: 40px;
+}
+
+.search-input-wrap .search-ico {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--gray-400);
+  font-size: 16px;
+  pointer-events: none;
+}
+
+/* ===================== MODAL ===================== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(4px);
+  z-index: 2000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: overlayIn .2s ease;
+}
+
+.modal-overlay.open { display: flex; }
+
+@keyframes overlayIn { from { opacity:0 } to { opacity:1 } }
+
+.modal {
+  background: white;
+  border-radius: var(--radius-xl);
+  width: 100%;
+  max-width: 620px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-xl);
+  animation: modalIn .25s cubic-bezier(.34,1.56,.64,1);
+}
+
+@keyframes modalIn { from { opacity:0; transform:scale(.92) translateY(20px) } to { opacity:1; transform:none } }
+
+.modal-header {
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid var(--gray-100);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modal-header h3 { font-family: var(--font-head); font-size: 18px; font-weight: 700; color: var(--ndc-green-dk); flex: 1; }
+.modal-close { cursor: pointer; background: var(--gray-100); border: none; width: 32px; height: 32px; border-radius: var(--radius-sm); font-size: 18px; display: flex; align-items: center; justify-content: center; transition: var(--transition); }
+.modal-close:hover { background: var(--gray-200); }
+
+.modal-body { padding: 24px; }
+.modal-footer { padding: 18px 24px; border-top: 1px solid var(--gray-100); display: flex; gap: 10px; justify-content: flex-end; }
+
+/* ===================== TOAST ===================== */
+#toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.toast {
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-xl);
+  padding: 14px 18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 300px;
+  max-width: 380px;
+  border-left: 4px solid var(--ndc-green);
+  animation: toastIn .3s cubic-bezier(.34,1.56,.64,1);
+  pointer-events: all;
+}
+
+.toast.error { border-left-color: var(--ndc-red); }
+.toast.warning { border-left-color: #d97706; }
+.toast.info { border-left-color: #2563eb; }
+.toast.hiding { animation: toastOut .3s ease forwards; }
+
+@keyframes toastIn { from { opacity:0; transform:translateX(40px) } to { opacity:1; transform:none } }
+@keyframes toastOut { to { opacity:0; transform:translateX(40px) } }
+
+.toast-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+.toast-content { flex: 1; }
+.toast-title { font-weight: 700; font-size: 13px; color: var(--gray-900); }
+.toast-msg { font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+.toast-close { cursor: pointer; color: var(--gray-400); font-size: 14px; background: none; border: none; padding: 0; margin-top: 1px; transition: var(--transition); }
+.toast-close:hover { color: var(--gray-700); }
+
+/* ===================== OFFLINE BANNER ===================== */
+#offline-banner {
+  display: none;
+  background: #92400e;
+  color: white;
+  text-align: center;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+#offline-banner.show { display: flex; }
+
+/* ===================== CHARTS ===================== */
+.chart-wrap {
+  position: relative;
+  height: 220px;
+  width: 100%;
+}
+
+/* ===================== LOGIN ===================== */
+.login-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--ndc-green-dk) 0%, var(--ndc-green) 50%, var(--ndc-green-lt) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.login-card {
+  background: white;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  padding: 40px 44px;
+  width: 100%;
+  max-width: 420px;
+  animation: modalIn .4s cubic-bezier(.34,1.56,.64,1);
+}
+
+.login-logo-wrap {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.login-logo { width: 80px; height: 80px; object-fit: contain; margin-bottom: 12px; }
+.login-title { font-family: var(--font-head); font-size: 22px; font-weight: 800; color: var(--ndc-green-dk); }
+.login-subtitle { font-size: 12px; color: var(--gray-500); margin-top: 4px; }
+
+/* ===================== FOOTER ===================== */
+.site-footer {
+  background: var(--ndc-green-dk);
+  color: rgba(255,255,255,.7);
+  text-align: center;
+  padding: 14px 24px;
+  font-size: 12px;
+  border-top: 3px solid var(--ndc-red);
+  margin-top: auto;
+}
+
+.site-footer strong { color: white; }
+
+/* ===================== SECTION HEADER ===================== */
+.section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.section-title { font-family: var(--font-head); font-size: 22px; font-weight: 800; color: var(--gray-900); }
+.section-subtitle { font-size: 13px; color: var(--gray-500); margin-top: 2px; }
+
+/* ===================== TABS ===================== */
+.tabs { display: flex; gap: 4px; border-bottom: 2px solid var(--gray-200); margin-bottom: 20px; overflow-x: auto; scrollbar-width: none; }
+.tab-btn { padding: 10px 18px; border: none; background: none; font-family: var(--font-body); font-size: 13px; font-weight: 500; color: var(--gray-500); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; white-space: nowrap; transition: var(--transition); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+.tab-btn:hover { color: var(--ndc-green); background: var(--ndc-green-pale); }
+.tab-btn.active { color: var(--ndc-green-dk); border-bottom-color: var(--ndc-green); font-weight: 700; }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; animation: fadeIn .2s ease; }
+
+/* ===================== AUDIT LOG ===================== */
+.log-entry {
+  padding: 14px 18px;
+  border-left: 3px solid var(--gray-200);
+  margin-bottom: 10px;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: white;
+  border: 1px solid var(--gray-100);
+  border-left: 3px solid var(--ndc-green-lt);
+  transition: var(--transition);
+}
+.log-entry:hover { border-left-color: var(--ndc-green); }
+.log-entry.danger { border-left-color: var(--ndc-red); }
+.log-entry.warning { border-left-color: #d97706; }
+.log-entry-header { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
+.log-action { font-weight: 700; font-size: 13px; color: var(--gray-900); }
+.log-time { font-size: 11px; color: var(--gray-400); margin-left: auto; }
+.log-details { font-size: 12px; color: var(--gray-500); }
+.log-user { font-size: 11px; font-weight: 600; color: var(--ndc-green-dk); }
+
+/* ===================== PAGINATION ===================== */
+.pagination { display: flex; gap: 4px; align-items: center; margin-top: 16px; justify-content: center; flex-wrap: wrap; }
+.page-btn { min-width: 34px; height: 34px; border-radius: var(--radius-sm); border: 1px solid var(--gray-200); background: white; cursor: pointer; font-size: 13px; font-weight: 500; display: flex; align-items: center; justify-content: center; transition: var(--transition); padding: 0 8px; }
+.page-btn:hover { background: var(--ndc-green-pale); border-color: var(--ndc-green); color: var(--ndc-green-dk); }
+.page-btn.active { background: var(--ndc-green); color: white; border-color: var(--ndc-green); }
+.page-info { font-size: 12px; color: var(--gray-500); }
+
+/* ===================== EMPTY STATE ===================== */
+.empty-state { text-align: center; padding: 48px 24px; }
+.empty-icon { font-size: 48px; margin-bottom: 12px; opacity: .4; }
+.empty-title { font-family: var(--font-head); font-size: 18px; font-weight: 700; color: var(--gray-700); }
+.empty-text { font-size: 13px; color: var(--gray-400); margin-top: 6px; }
+
+/* ===================== SETTINGS ===================== */
+.settings-nav { display: flex; flex-direction: column; gap: 2px; }
+.settings-nav-item { padding: 10px 16px; border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 500; color: var(--gray-600); display: flex; align-items: center; gap: 10px; transition: var(--transition); }
+.settings-nav-item:hover { background: var(--ndc-green-pale); color: var(--ndc-green-dk); }
+.settings-nav-item.active { background: var(--ndc-green); color: white; }
+
+.settings-layout { display: grid; grid-template-columns: 220px 1fr; gap: 20px; }
+
+@media (max-width: 768px) {
+  .settings-layout { grid-template-columns: 1fr; }
+  .header-inner { height: 60px; }
+  .header-brand h1 { font-size: 15px; }
+  .main-wrapper { padding: 16px; }
+  .login-card { padding: 28px 24px; }
+  .form-grid { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gray-400); }
+
+/* Color dot */
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.dot-green { background: var(--ndc-green); }
+.dot-red { background: var(--ndc-red); }
+.dot-amber { background: #d97706; }
+
+/* Progress bar */
+.progress-bar { height: 8px; background: var(--gray-100); border-radius: 99px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--ndc-green); border-radius: 99px; transition: width .5s ease; }
+.progress-fill.red { background: var(--ndc-red); }
+
+/* Divider */
+.divider { border: none; border-top: 1px solid var(--gray-200); margin: 20px 0; }
+
+/* Online indicator */
+.online-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block; box-shadow: 0 0 0 2px rgba(16,185,129,.25); animation: pulse 2s infinite; }
+.offline-dot { background: var(--ndc-red); box-shadow: 0 0 0 2px rgba(200,16,46,.25); animation: none; }
+
+@keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.5 } }
+@keyframes spin   { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
+
+/* Two col grid */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+@media(max-width:900px) { .two-col,.three-col { grid-template-columns: 1fr; } }
+
+  </style>
   <link rel="icon" type="image/png" href="assets/ndc-logo.png">
   <!-- xlsx loaded on demand in exportExcel() — removed from head to prevent blocking page load -->
 <!-- EMERGENCY: If settings page is unreachable, open browser console and run:
@@ -314,7 +1073,7 @@
               <th>Full Name</th><th>Gender</th><th>Zone</th><th>Party ID</th><th>Voter ID</th><th>Phone</th><th>Ward</th><th>Station</th><th>Branch</th><th>Date/Time</th><th>Actions</th>
             </tr></thead>
             <tbody id="records-tbody"></tbody>
-          </table>le>
+          </table>
         </div>
         <div id="records-pagination" class="pagination" style="padding:16px"></div>
       </div>
@@ -644,7 +1403,7 @@
               <div class="card-header"><div class="card-icon blue">ℹ️</div><h3>About KNNDCmdb</h3></div>
               <div class="card-body" style="text-align:center;padding:40px">
                 <img src="assets/ndc-logo.png" style="width:80px;margin-bottom:16px">
-                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v3.2.2</div>
+                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v3.2.3</div>
                 <div style="color:var(--gray-500);margin-top:8px">Ketu North NDC Members Database</div>
                 <div style="color:var(--gray-400);font-size:13px;margin-top:4px">Elections & IT Directorate, 2026</div>
               </div>
@@ -656,7 +1415,7 @@
 
   </main>
 
-  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v3.2.2</footer>
+  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v3.2.3</footer>
 </div>
 
 <div id="toast-container"></div>
@@ -834,8 +1593,3053 @@
   </div>
 </div>
 
-<script src="js/app.js?v=3.2.2"></script>
-<script src="js/pages.js?v=3.2.2"></script>
+<script>
+/* ============================================================
+   KNNDCmdb – Core Application Logic  v3.2.3
+   ============================================================ */
+'use strict';
+
+var CONFIG = {
+  SHEET_ID:      '',
+  API_KEY:       '',
+  SCRIPT_URL:    '',          // ← Fill this once before deploying: paste your Apps Script Web App URL here.
+                              //   Every new device will automatically inherit all settings from the Sheet.
+  APP_NAME:      'Ketu North NDC Members Database',
+  CONSTITUENCY:  'Ketu North',
+  VERSION:       '3.2.3',
+  INACTIVITY_MS: 10 * 60 * 1000,
+  DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
+  ADMIN_PASSWORD:   'admin123',    // default admin password
+};
+
+var LS = {
+  SESSION:        'knndc_session',
+  SETTINGS:       'knndc_settings',
+  OFFLINE_Q:      'knndc_offline_queue',
+  MEMBERS:        'knndc_members',
+  USERS:          'knndc_users',
+  AUDIT:          'knndc_audit',
+  ID_INDEX:       'knndc_id_index',   // lightweight partyId/voterId index for all enrolled members
+  LOCKOUT:        'knndc_lockout',
+  ATTEMPTS:       'knndc_attempts',
+  DEMO_CLEARED:   'knndc_demo_cleared',  // flag: admin has cleared demo
+};
+
+// ─── SYSTEM USERS (non-deletable admin + demo accounts) ──────
+var SYSTEM_USERS = [
+  { id:'u001', username:'admin',    password:CONFIG.ADMIN_PASSWORD,   name:'System Administrator',    role:'admin',   ward:'', station:'', branch:'', assignedStations:[], active:true, mustChangePassword:false, isSystem:true },
+  { id:'u002', username:'exec',     password:CONFIG.DEFAULT_PASSWORD, name:'Constituency Executive',  role:'exec',    ward:'', station:'', branch:'', assignedStations:[], active:true, mustChangePassword:true,  isSystem:true },
+  { id:'u003', username:'ward1',    password:CONFIG.DEFAULT_PASSWORD, name:'Ward Coordinator (Aflao)',role:'ward',    ward:'Aflao Ward', station:'PS-001', branch:'Aflao Branch', assignedStations:['PS-001','PS-002'], active:true, mustChangePassword:true, isSystem:false },
+  { id:'u004', username:'officer1', password:CONFIG.DEFAULT_PASSWORD, name:'Data Entry Officer 1',    role:'officer', ward:'Aflao Ward', station:'PS-001', branch:'Aflao Branch', assignedStations:['PS-001'], active:true, mustChangePassword:true, isSystem:false },
+  { id:'u005', username:'officer2', password:CONFIG.DEFAULT_PASSWORD, name:'Data Entry Officer 2',    role:'officer', ward:'Denu Ward',  station:'PS-003', branch:'Denu Branch',  assignedStations:['PS-003'], active:true, mustChangePassword:true, isSystem:false },
+];
+
+var DEMO_POLLING_STATIONS = [
+  { zone:'Zone A', ward:'Aflao Ward',    code:'PS-001', name:'Aflao A Polling Station',   branch:'Aflao Branch',    branchCode:'BR-001' },
+  { zone:'Zone A', ward:'Aflao Ward',    code:'PS-002', name:'Aflao B Polling Station',   branch:'Aflao Branch',    branchCode:'BR-001' },
+  { zone:'Zone B', ward:'Denu Ward',     code:'PS-003', name:'Denu Polling Station',      branch:'Denu Branch',     branchCode:'BR-002' },
+  { zone:'Zone B', ward:'Agbozume Ward', code:'PS-004', name:'Agbozume Polling Station',  branch:'Agbozume Branch', branchCode:'BR-003' },
+  { zone:'Zone C', ward:'Klikor Ward',   code:'PS-005', name:'Klikor Polling Station',    branch:'Klikor Branch',   branchCode:'BR-004' },
+  { zone:'Zone C', ward:'Adafienu Ward', code:'PS-006', name:'Adafienu Polling Station',  branch:'Adafienu Branch', branchCode:'BR-005' },
+];
+
+// Demo members — only present before admin clears demo data
+var DEMO_MEMBERS = [
+  { id:'m001', firstName:'Kofi',   lastName:'Mensah',  otherNames:'Agyei',  gender:'Male',   zone:'Zone A', partyId:'NDC-2024-001', voterId:'GH-V-001', phone:'0244001122', ward:'Aflao Ward',    station:'Aflao A Polling Station',  stationCode:'PS-001', branch:'Aflao Branch',    branchCode:'BR-001', officer:'officer1', officerName:'Data Entry Officer 1', timestamp:'15/01/2024, 09:30:00', _demo:true },
+  { id:'m002', firstName:'Abena',  lastName:'Korkor',  otherNames:'',       gender:'Female', zone:'Zone A', partyId:'NDC-2024-002', voterId:'GH-V-002', phone:'0244002233', ward:'Aflao Ward',    station:'Aflao A Polling Station',  stationCode:'PS-001', branch:'Aflao Branch',    branchCode:'BR-001', officer:'officer1', officerName:'Data Entry Officer 1', timestamp:'15/01/2024, 10:15:00', _demo:true },
+  { id:'m003', firstName:'Yaw',    lastName:'Tetteh',  otherNames:'Kwame',  gender:'Male',   zone:'Zone B', partyId:'NDC-2024-003', voterId:'GH-V-003', phone:'0554003344', ward:'Denu Ward',     station:'Denu Polling Station',     stationCode:'PS-003', branch:'Denu Branch',     branchCode:'BR-002', officer:'officer2', officerName:'Data Entry Officer 2', timestamp:'16/01/2024, 08:45:00', _demo:true },
+  { id:'m004', firstName:'Akosua', lastName:'Kporku',  otherNames:'',       gender:'Female', zone:'Zone A', partyId:'NDC-2024-004', voterId:'GH-V-004', phone:'0244004455', ward:'Aflao Ward',    station:'Aflao B Polling Station',  stationCode:'PS-002', branch:'Aflao Branch',    branchCode:'BR-001', officer:'officer1', officerName:'Data Entry Officer 1', timestamp:'16/01/2024, 11:20:00', _demo:true },
+  { id:'m005', firstName:'Efo',    lastName:'Dordor',  otherNames:'Selorm', gender:'Male',   zone:'Zone B', partyId:'NDC-2024-005', voterId:'GH-V-005', phone:'0504005566', ward:'Agbozume Ward', station:'Agbozume Polling Station', stationCode:'PS-004', branch:'Agbozume Branch', branchCode:'BR-003', officer:'officer1', officerName:'Data Entry Officer 1', timestamp:'17/01/2024, 09:00:00', _demo:true },
+];
+
+// ─── APP ─────────────────────────────────────────────────────
+var App = {
+  currentUser:      null,
+  currentPage:      'login',
+  settings:         {},
+  members:          [],
+  users:            [],
+  auditLog:         [],
+  pollingStations:  [],
+  offlineQueue:     [],
+  idIndex:          [],   // lightweight [{partyId,voterId,firstName,lastName,station}] from Sheet
+  isOnline:         navigator.onLine,
+  _inactivityTimer: null,
+  _syncInterval:    null,
+
+  init() {
+    App.loadSettings();
+    App.loadData();
+    App.applyAppName();
+    App.setupNetworkListeners();
+    App.checkSession();
+  },
+
+  // ── SETTINGS ──────────────────────────────────────────────
+  loadSettings() {
+    const saved = JSON.parse(localStorage.getItem(LS.SETTINGS) || '{}');
+    App.settings = {
+      sheetId:         saved.sheetId         || CONFIG.SHEET_ID,
+      apiKey:          saved.apiKey          || CONFIG.API_KEY,
+      // CONFIG.SCRIPT_URL is the baked-in fallback — lets fresh devices bootstrap without manual entry
+      scriptUrl:       saved.scriptUrl       || CONFIG.SCRIPT_URL,
+      appName:         saved.appName         || CONFIG.APP_NAME,
+      constituency:    saved.constituency    || CONFIG.CONSTITUENCY,
+      pollingStations: saved.pollingStations || DEMO_POLLING_STATIONS,
+    };
+    App.pollingStations = App.settings.pollingStations;
+  },
+  saveSettings() {
+    localStorage.setItem(LS.SETTINGS, JSON.stringify(App.settings));
+    // Defer settings push — never block UI
+    if (App.settings.scriptUrl) setTimeout(() => App._pushSettingsToSheet(), 0);
+  },
+
+  // Push settings to the Sheet's App Settings tab
+  _pushSettingsToSheet() {
+    if (!App.settings.scriptUrl) return;
+    App._xhrPost(App.settings.scriptUrl, {
+      action:          'saveSettings',
+      scriptUrl:       App.settings.scriptUrl,
+      appName:         App.settings.appName,
+      constituency:    App.settings.constituency,
+      sheetId:         App.settings.sheetId,
+      demoCleared:     localStorage.getItem(LS.DEMO_CLEARED) || '',
+      pollingStations: JSON.stringify(App.pollingStations || []),
+      updatedBy:       App.currentUser?.username || 'system',
+    });
+  },
+
+  // Fetch remote settings from the Sheet and apply them to App device
+  // Called on every login; safe to call without a scriptUrl (returns early)
+  async _fetchAndApplyRemoteSettings() {
+    if (!App.isOnline || !App.settings.scriptUrl) return false;
+    try {
+      const data = await App._xhrGet(App.settings.scriptUrl + '?action=getSettings&t=' + Date.now());
+      if (!data?.settings || !data.exists) return false;
+
+      const remote = data.settings;
+      let changed = false;
+
+      // Apply remote values — remote wins for everything except apiKey (never stored server-side)
+      const apply = (key, remoteKey) => {
+        const rv = remote[remoteKey || key];
+        if (rv && rv !== App.settings[key]) {
+          App.settings[key] = rv;
+          changed = true;
+        }
+      };
+
+      apply('scriptUrl');
+      apply('appName');
+      apply('constituency');
+      apply('sheetId');
+
+      // Sync pollingStations from remote settings if present and non-empty
+      if (Array.isArray(remote.pollingStations) && remote.pollingStations.length) {
+        const localStations  = App.settings.pollingStations || [];
+        const merged         = [...localStations];
+        let   stationsChanged = false;
+        remote.pollingStations.forEach(s => {
+          if (!s.code) return;
+          const idx = merged.findIndex(ps => ps.code === s.code);
+          if (idx >= 0) {
+            const before = JSON.stringify(merged[idx]);
+            merged[idx] = { ...merged[idx], ...s };
+            if (JSON.stringify(merged[idx]) !== before) stationsChanged = true;
+          } else {
+            merged.push(s);
+            stationsChanged = true;
+          }
+        });
+        if (stationsChanged || !localStations.length) {
+          App.settings.pollingStations = merged;
+          App.pollingStations = merged;
+          changed = true;
+        }
+      }
+
+      // Sync demoCleared flag across devices
+      if (remote.demoCleared === '1' && !localStorage.getItem(LS.DEMO_CLEARED)) {
+        localStorage.setItem(LS.DEMO_CLEARED, '1');
+        // Remove demo members on App device too
+        const local = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
+        const clean = local.filter(m => !m._demo);
+        if (clean.length !== local.length) {
+          localStorage.setItem(LS.MEMBERS, JSON.stringify(clean));
+          App.members = clean;
+        }
+        changed = true;
+      }
+
+      if (changed) {
+        localStorage.setItem(LS.SETTINGS, JSON.stringify(App.settings));
+        App.pollingStations = App.settings.pollingStations;
+        App.applyAppName();
+      }
+      return changed;
+    } catch(_) {
+      return false;
+    }
+  },
+
+  // ── DATA LOADING ──────────────────────────────────────────
+  loadData() {
+    const su = localStorage.getItem(LS.USERS);
+    const parsedUsers = su ? JSON.parse(su) : null;
+    if (parsedUsers && parsedUsers.length > 0) {
+      App.users = parsedUsers;
+    } else {
+      // No users in storage — seed with SYSTEM_USERS defaults
+      App.users = JSON.parse(JSON.stringify(SYSTEM_USERS));
+      localStorage.setItem(LS.USERS, JSON.stringify(App.users)); // write directly, no push to Sheet
+    }
+
+    const sm = localStorage.getItem(LS.MEMBERS);
+    const demoCleared = localStorage.getItem(LS.DEMO_CLEARED);
+    if (sm) {
+      App.members = JSON.parse(sm);
+    } else if (!demoCleared) {
+      App.members = JSON.parse(JSON.stringify(DEMO_MEMBERS));
+      App.saveMembers();
+    } else {
+      App.members = [];
+      App.saveMembers();
+    }
+
+    App.auditLog     = JSON.parse(localStorage.getItem(LS.AUDIT)    || '[]');
+    App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q)|| '[]');
+    App._loadIdIndex();
+  },
+
+  saveMembers() {
+    try {
+      localStorage.setItem(LS.MEMBERS, JSON.stringify(App.members));
+    } catch(e) {
+      if (e.name !== 'QuotaExceededError' && e.code !== 22) return; // unexpected error, ignore
+
+      const role = App.currentUser?.role;
+      const isFullViewRole = role === 'admin' || role === 'exec';
+
+      if (isFullViewRole) {
+        // Admin/exec: NEVER trim member records.
+        // Free space by clearing only the audit log (can be rebuilt from Sheet).
+        // NEVER clear the offline queue — it contains unsynced records.
+        try { localStorage.removeItem(LS.AUDIT); } catch(_) {}
+        // Try again after freeing audit space
+        try {
+          localStorage.setItem(LS.MEMBERS, JSON.stringify(App.members));
+          return; // success — no toast needed
+        } catch(_) {}
+        Toast.show(
+          '⚠️ Storage Full',
+          'This device\'s storage is full. Use 🔄 Pull All from Sheet on the Records page to reload data directly from Google Sheets.',
+          'warning', 12000
+        );
+        return;
+      }
+
+      // Officer / ward coordinator: trim oldest Sheet-confirmed records
+      const synced   = App.members.filter(m => m._fromSheet);
+      const unsynced = App.members.filter(m => !m._fromSheet);
+      let trimmed = [...unsynced, ...synced];
+      let saved = false;
+      while (trimmed.length > 100 && !saved) {
+        trimmed = trimmed.slice(0, Math.floor(trimmed.length * 0.8));
+        try { localStorage.setItem(LS.MEMBERS, JSON.stringify(trimmed)); saved = true; } catch(_) {}
+      }
+      if (!saved) {
+        try {
+          const emergency = App.members.slice(0, 500);
+          localStorage.setItem(LS.MEMBERS, JSON.stringify(emergency));
+          saved = true;
+        } catch(_) {}
+      }
+      App.members = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+      Toast.show(
+        '⚠️ Storage Full',
+        'This device is running low on storage. Push your records to Google Sheets now, then the oldest synced records will be cleared automatically.',
+        'warning', 10000
+      );
+      if (App.isOnline && App.settings.scriptUrl && App.currentUser) {
+        setTimeout(() => App.pushMyRecordsToSheet(), 1000);
+      }
+    }
+  },
+  saveAudit()     { localStorage.setItem(LS.AUDIT,     JSON.stringify(App.auditLog)); },
+  saveOfflineQ()  { localStorage.setItem(LS.OFFLINE_Q, JSON.stringify(App.offlineQueue)); },
+
+  // saveUsers: write to localStorage instantly, then push to Sheet in background
+  saveUsers(usersArray) {
+    const toSave = Array.isArray(usersArray) ? usersArray : (App.users || []);
+    // Never overwrite real users with an empty array
+    if (toSave.length === 0) return;
+    App.users = toSave;
+    localStorage.setItem(LS.USERS, JSON.stringify(toSave));
+    // Defer the network call entirely — UI never waits for it
+    const url = (JSON.parse(localStorage.getItem(LS.SETTINGS) || '{}')).scriptUrl || App.settings.scriptUrl;
+    if (url) setTimeout(() => App._pushUsersToSheet(toSave, url), 0);
+  },
+
+  // Background push — fire-and-forget, no-cors avoids redirect/CORS issues
+  _pushUsersToSheet(usersArray, scriptUrl) {
+    const url = scriptUrl || App.settings.scriptUrl;
+    if (!url) return;
+    App._xhrPost(url, { action: 'saveUsers', users: usersArray });
+  },
+
+  // Manual trigger — called from the ☁️ Push Users to Sheet button
+  async forcePushUsersToSheet() {
+    const url = App.settings.scriptUrl || JSON.parse(localStorage.getItem(LS.SETTINGS)||'{}').scriptUrl;
+    if (!url) {
+      Toast.show('No Script URL', 'Set the Apps Script URL in Settings → Google Sheets first.', 'error');
+      return;
+    }
+    const users = JSON.parse(localStorage.getItem(LS.USERS) || '[]');
+    if (!users.length) {
+      Toast.show('No Users', 'No user accounts found in local storage.', 'warning');
+      return;
+    }
+
+    const btns = document.querySelectorAll('[onclick*="forcePushUsersToSheet"]');
+    btns.forEach(b => { b.disabled = true; b.dataset._orig = b.textContent; b.textContent = '⏳ Pushing…'; });
+
+    Toast.show('Pushing Users…', `Sending ${users.length} account(s) to Google Sheets…`, 'info', 10000);
+
+    const body = JSON.stringify({ action: 'saveUsers', users });
+    const success = await new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+      xhr.timeout = 30000;
+      xhr.onload    = () => resolve(true);
+      xhr.onerror   = () => resolve(false);
+      xhr.ontimeout = () => resolve(false);
+      xhr.send(body);
+    });
+
+    btns.forEach(b => { b.disabled = false; b.textContent = b.dataset._orig || '☁️ Push Users to Sheet'; });
+
+    if (success) {
+      Toast.show('Users Pushed ✅', `${users.length} account(s) sent to Google Sheets. Open the Users tab to confirm.`, 'success', 7000);
+      App.logAudit('SYNC_USERS', `Pushed ${users.length} users to Google Sheets`, App.currentUser?.username || 'admin');
+    } else {
+      Toast.show('Push Failed', 'Apps Script did not respond. Verify the Script URL is correct and the Web App deployment is active, then try again.', 'error', 9000);
+    }
+  },
+
+  // Manual trigger — called from the ☁️ Push Stations to Sheet button in Settings
+  async forcePushStationsToSheet() {
+    const url = App.settings.scriptUrl || JSON.parse(localStorage.getItem(LS.SETTINGS)||'{}').scriptUrl;
+    if (!url) {
+      Toast.show('No Script URL', 'Set the Apps Script URL in Settings → Google Sheets first.', 'error');
+      return;
+    }
+    const stations = App.pollingStations || JSON.parse(localStorage.getItem(LS.SETTINGS)||'{}').pollingStations || [];
+    if (!stations.length) {
+      Toast.show('No Stations', 'No polling stations are configured locally. Add stations in Settings → Polling Stations first.', 'warning');
+      return;
+    }
+
+    const btns = document.querySelectorAll('[onclick*="forcePushStationsToSheet"]');
+    btns.forEach(b => { b.disabled = true; b.dataset._orig = b.textContent; b.textContent = '⏳ Pushing…'; });
+
+    Toast.show('Pushing Stations…', `Sending ${stations.length} station(s) to Google Sheets…`, 'info', 10000);
+
+    const body = JSON.stringify({ action: 'saveStations', stations });
+    const success = await new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+      xhr.timeout   = 30000;
+      xhr.onload    = () => resolve(true);
+      xhr.onerror   = () => resolve(false);
+      xhr.ontimeout = () => resolve(false);
+      xhr.send(body);
+    });
+
+    btns.forEach(b => { b.disabled = false; b.textContent = b.dataset._orig || '☁️ Push Stations to Sheet'; });
+
+    if (success) {
+      Toast.show('Stations Pushed ✅', `${stations.length} station(s) sent to Google Sheets. Open the Polling Stations tab to confirm.`, 'success', 7000);
+      App.logAudit('PUSH_STATIONS', `Pushed ${stations.length} configured stations to Google Sheets`, App.currentUser?.username || 'admin');
+    } else {
+      Toast.show('Push Failed', 'Apps Script did not respond. Verify the Script URL is correct and the Web App deployment is active, then try again.', 'error', 9000);
+    }
+  },
+
+  // Pull users from the Sheet and MERGE safely into localStorage.
+  // Rules:
+  //  - Sheet adds new users that aren't local yet
+  //  - Sheet updates non-password fields (name, role, ward, station, assignedStations, active)
+  //  - Password in Sheet only wins if it is non-empty AND different from local
+  //  - Local admin record is ALWAYS preserved — it is never deleted by a Sheet fetch
+  async _fetchUsersFromSheet() {
+    if (!App.isOnline || !App.settings.scriptUrl) return false;
+    try {
+      const data = await App._xhrGet(App.settings.scriptUrl + '?action=getUsers&t=' + Date.now());
+      if (!data) return false;
+
+      if (!data?.users || !Array.isArray(data.users) || data.users.length === 0) {
+        return false; // Sheet empty — keep local users as-is
+      }
+
+      // Start from current local users as the base
+      const local  = JSON.parse(localStorage.getItem(LS.USERS) || '[]');
+      const merged = [...local];
+
+      data.users.forEach(sheetUser => {
+        if (!sheetUser.username && !sheetUser.id) return; // skip malformed rows
+        const idx = merged.findIndex(u =>
+          u.id === sheetUser.id || u.username === sheetUser.username
+        );
+        if (idx >= 0) {
+          // For the currently-logged-in user: keep local password (they know their own password)
+          // For all other users: sheet password wins (propagates password changes across devices)
+          const isCurrentUser = App.currentUser &&
+            (merged[idx].id === App.currentUser.id || merged[idx].username === App.currentUser.username);
+          const localPwd  = merged[idx].password;
+          const sheetPwd  = sheetUser.password?.trim();
+          merged[idx] = {
+            ...merged[idx],
+            ...sheetUser,
+            password: isCurrentUser ? (localPwd || sheetPwd) : (sheetPwd || localPwd),
+          };
+        } else {
+          // New user from Sheet — add only if they have a password
+          if (sheetUser.password?.trim()) {
+            merged.push(sheetUser);
+          }
+        }
+      });
+
+      // Safety net: ensure admin account is always present and has a password
+      const hasAdmin = merged.some(u => u.role === 'admin' && u.password && u.active !== false);
+      if (!hasAdmin) {
+        // Don't overwrite — abort App sync to protect login
+        return false;
+      }
+
+      // Only write back if we ended up with a valid set
+      if (!merged.length) return false;
+
+      localStorage.setItem(LS.USERS, JSON.stringify(merged));
+      App.users = merged;
+      return true;
+    } catch(_) {
+      return false;
+    }
+  },
+
+  applyAppName() {
+    const n = App.settings.appName || CONFIG.APP_NAME;
+    document.querySelectorAll('.app-title-text').forEach(el => el.textContent = n);
+    document.title = n;
+  },
+
+  // ── NETWORK ───────────────────────────────────────────────
+  setupNetworkListeners() {
+    window.addEventListener('online', () => {
+      App.isOnline = true;
+      App.updateOnlineStatus();
+      // Reload queue from localStorage — in-memory array may be stale after page reload
+      App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q) || '[]');
+      if (App.offlineQueue.length) App.flushOfflineQueue();
+    });
+    window.addEventListener('offline', () => { App.isOnline = false; App.updateOnlineStatus(); });
+    App.updateOnlineStatus();
+  },
+  updateOnlineStatus() {
+    document.getElementById('offline-banner')?.classList.toggle('show', !App.isOnline);
+    const dot = document.getElementById('conn-dot');
+    if (dot) dot.className = App.isOnline ? 'online-dot' : 'offline-dot';
+  },
+
+  // ── SESSION / INACTIVITY ──────────────────────────────────
+  checkSession() {
+    const s = sessionStorage.getItem(LS.SESSION);
+    if (s) {
+      try { App.currentUser = JSON.parse(s); App.showApp(); return; } catch(_) {}
+    }
+    App.showLogin();
+  },
+
+  resetInactivityTimer() {
+    if (App._inactivityTimer) clearTimeout(App._inactivityTimer);
+    App._inactivityTimer = setTimeout(() => {
+      if (!App.currentUser) return;
+      App.logAudit('AUTO_LOGOUT','Session expired — 10 min inactivity', App.currentUser.username);
+      Toast.show('Session Expired','Logged out after 10 minutes of inactivity.','warning', 5000);
+      setTimeout(() => App.logout(), 1800);
+    }, CONFIG.INACTIVITY_MS);
+  },
+  setupInactivityTracking() {
+    ['mousemove','keydown','mousedown','touchstart','scroll','click'].forEach(e =>
+      document.addEventListener(e, () => App.resetInactivityTimer(), { passive:true })
+    );
+    App.resetInactivityTimer();
+  },
+  stopInactivityTracking() {
+    if (App._inactivityTimer) clearTimeout(App._inactivityTimer);
+    App._inactivityTimer = null;
+  },
+
+  // ── AUTH ──────────────────────────────────────────────────
+  // NOTE: login() is synchronous so the lockout check stays fast.
+  // Users are fetched from the Sheet inside showApp() (after a successful
+  // login) and also every 2 minutes via the sync timer. On the very first
+  // login on a new device, if the Sheet has no users yet the local SYSTEM_USERS
+  // seed is used; the admin then creates real accounts which push to the Sheet,
+  // and subsequent logins on all devices pick them up automatically.
+  login(username, password) {
+    const MAX = 5, LOCK_MS = 2 * 60 * 1000;
+    const lockData = JSON.parse(localStorage.getItem(LS.LOCKOUT) || 'null');
+    if (lockData) {
+      const rem = lockData.until - Date.now();
+      if (rem > 0) return { locked:true, seconds:Math.ceil(rem/1000) };
+      localStorage.removeItem(LS.LOCKOUT);
+      localStorage.removeItem(LS.ATTEMPTS);
+    }
+
+    // Read users from localStorage; treat missing OR empty array as "use defaults"
+    const storedUsers = JSON.parse(localStorage.getItem(LS.USERS) || 'null');
+    App.users = (storedUsers && storedUsers.length > 0) ? storedUsers : JSON.parse(JSON.stringify(SYSTEM_USERS));
+    const user = App.users.find(u => u.username === username && u.password === password && u.active);
+
+    if (!user) {
+      const n = (parseInt(localStorage.getItem(LS.ATTEMPTS)||'0')) + 1;
+      localStorage.setItem(LS.ATTEMPTS, n);
+      if (n >= MAX) {
+        localStorage.setItem(LS.LOCKOUT, JSON.stringify({ until: Date.now() + LOCK_MS }));
+        localStorage.removeItem(LS.ATTEMPTS);
+        App.logAudit('LOCKOUT', `Locked after ${MAX} failed attempts for: ${username}`, 'system');
+        return { locked:true, seconds: LOCK_MS/1000 };
+      }
+      return { failed:true, attemptsLeft: MAX - n };
+    }
+
+    localStorage.removeItem(LS.ATTEMPTS);
+    localStorage.removeItem(LS.LOCKOUT);
+    App.currentUser = user;
+    sessionStorage.setItem(LS.SESSION, JSON.stringify(user));
+    App.logAudit('LOGIN','Logged in successfully', user.username);
+
+    // Force password change on first login
+    if (user.mustChangePassword) return { success:true, mustChangePassword:true };
+    return { success:true };
+  },
+
+  // ── DEMO DATA CLEAR (admin trigger) ───────────────────────
+  clearDemoData() {
+    App.members = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]').filter(m => !m._demo);
+    App.saveMembers();
+    localStorage.setItem(LS.DEMO_CLEARED, '1');
+    App.logAudit('CLEAR_DEMO','Administrator cleared all demo data', App.currentUser?.username || 'admin');
+    Toast.show('Demo Data Cleared','All sample data has been removed. Only real records remain.','success', 5000);
+    // Push the cleared flag to the Sheet so other devices skip demo data too
+    if (App.isOnline && App.settings.scriptUrl) {
+      App._pushSettingsToSheet().catch(() => {});
+    }
+  },
+
+  // ── PASSWORD MANAGEMENT ───────────────────────────────────
+  changePassword(userId, newPassword) {
+    const stored = localStorage.getItem(LS.USERS);
+    App.users = (stored ? JSON.parse(stored) : null) || JSON.parse(JSON.stringify(SYSTEM_USERS));
+    const u = App.users.find(x => x.id === userId);
+    if (!u) return false;
+    u.password = newPassword;
+    u.mustChangePassword = false;
+    if (App.currentUser?.id === userId) {
+      App.currentUser = { ...App.currentUser, password:newPassword, mustChangePassword:false };
+      sessionStorage.setItem(LS.SESSION, JSON.stringify(App.currentUser));
+    }
+    App.saveUsers(App.users);
+    App.logAudit('PASSWORD_CHANGE', `Password changed for user: ${u.username}`, u.username);
+    return true;
+  },
+
+  // resetPasswordToDefault: admin account resets to ADMIN_PASSWORD; others reset to DEFAULT_PASSWORD
+  resetPasswordToDefault(userId) {
+    const stored = localStorage.getItem(LS.USERS);
+    App.users = (stored ? JSON.parse(stored) : null) || JSON.parse(JSON.stringify(SYSTEM_USERS));
+    const u = App.users.find(x => x.id === userId);
+    if (!u) return false;
+    u.password = (u.role === 'admin') ? CONFIG.ADMIN_PASSWORD : CONFIG.DEFAULT_PASSWORD;
+    u.mustChangePassword = true;
+    App.saveUsers(App.users);
+    App.logAudit('PASSWORD_RESET', `Password reset to default for: ${u.username}`, App.currentUser.username);
+    Toast.show('Password Reset', `${u.name}'s password reset to default. They must change it on next login.`, 'success');
+    return true;
+  },
+
+  logout() {
+    App.logAudit('LOGOUT','User logged out', App.currentUser?.username);
+    App.stopInactivityTracking();
+    if (App._syncInterval) { clearInterval(App._syncInterval); App._syncInterval = null; }
+    App.currentUser = null;
+    sessionStorage.removeItem(LS.SESSION);
+    App.showLogin();
+  },
+
+  showLogin() {
+    document.getElementById('app-shell').style.display    = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+    App.stopInactivityTracking();
+  },
+
+  showApp() {
+    // Check if admin needs to see demo-clear prompt
+    const demoCleared = localStorage.getItem(LS.DEMO_CLEARED);
+    if (App.currentUser?.role === 'admin' && !demoCleared) {
+      const hasDemo = (JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]')).some(m => m._demo);
+      if (hasDemo) {
+        setTimeout(() => Modal.open('modal-demo-clear'), 800);
+      }
+    }
+
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-shell').style.display    = 'flex';
+    document.getElementById('app-shell').style.flexDirection = 'column';
+    App.renderNav();
+    App.renderUserHeader();
+    App.setupInactivityTracking();
+    App.navigate('dashboard');
+    // Show the no-script-url banner if this device has no Sheet connection
+    if (typeof _updateNoScriptBanner === 'function') _updateNoScriptBanner();
+
+    // Flush any queued offline records now that the user is logged in
+    // Reload from localStorage first — in-memory array may be stale after a page reload
+    App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q) || '[]');
+    if (App.isOnline && App.settings.scriptUrl && App.offlineQueue.length) {
+      setTimeout(() => App.flushOfflineQueue(), 1500); // slight delay so UI settles first
+    }
+
+    if (App.isOnline && App.settings.scriptUrl) {
+      // Fetch settings, users, and ID index in parallel on every login
+      Promise.all([
+        App._fetchAndApplyRemoteSettings(),
+        App._fetchUsersFromSheet(),
+        App._fetchIdIndex(),
+      ]).then(([settingsChanged]) => {
+        if (settingsChanged) {
+          App.applyAppName();
+          App.renderUserHeader();
+          if (App.currentPage === 'settings') PageRenderers.settings();
+          Toast.show('Settings Synced','App settings updated from Google Sheets.','info',3000);
+        }
+        // Re-validate session against freshly fetched users
+        App._revalidateSession();
+        App._startSyncTimer();
+      });
+    } else {
+      App._startSyncTimer();
+    }
+  },
+
+  // After fetching users from Sheet, check the current session is still valid.
+  // Propagates any assignment changes (ward, stations, branch, role) to the live session
+  // without requiring a re-login.
+  _revalidateSession() {
+    if (!App.currentUser) return;
+    const fresh = App.users.find(u => u.id === App.currentUser.id || u.username === App.currentUser.username);
+    if (!fresh) return; // user not in merged set — don't touch session
+
+    // Force logout if the account has been deactivated
+    if (fresh.active === false) {
+      Toast.show('Account Disabled','Your account has been deactivated. Contact your administrator.','error', 8000);
+      setTimeout(() => App.logout(), 2500);
+      return;
+    }
+
+    // Snapshot fields that affect data access and UI before overwrite
+    const prev = {
+      stations: JSON.stringify(App.currentUser.assignedStations || []),
+      ward:     App.currentUser.ward     || '',
+      station:  App.currentUser.station  || '',
+      branch:   App.currentUser.branch   || '',
+      role:     App.currentUser.role     || '',
+    };
+
+    // Update session — never overwrite password from a Sheet fetch
+    App.currentUser = {
+      ...fresh,
+      password: App.currentUser.password,
+    };
+    sessionStorage.setItem(LS.SESSION, JSON.stringify(App.currentUser));
+
+    // Detect what changed
+    const now = {
+      stations: JSON.stringify(App.currentUser.assignedStations || []),
+      ward:     App.currentUser.ward     || '',
+      station:  App.currentUser.station  || '',
+      branch:   App.currentUser.branch   || '',
+      role:     App.currentUser.role     || '',
+    };
+
+    const stationsChanged = prev.stations !== now.stations;
+    const wardChanged     = prev.ward     !== now.ward;
+    const branchChanged   = prev.branch   !== now.branch;
+    const roleChanged     = prev.role     !== now.role;
+    const anyChanged      = stationsChanged || wardChanged || branchChanged || roleChanged;
+
+    if (!anyChanged) return;
+
+    // Re-render nav (role may have changed) and header (ward/role display)
+    App.renderNav();
+    App.renderUserHeader();
+
+    // Re-render the active page if it uses assignment data
+    const pagesAffected = ['entry','my-records','records','dashboard','reports','analytics'];
+    if (pagesAffected.includes(App.currentPage)) {
+      PageRenderers[App.currentPage]?.();
+    }
+
+    // Build a meaningful toast message listing what changed
+    const parts = [];
+    if (stationsChanged) {
+      const count = (App.currentUser.assignedStations || []).length;
+      parts.push(`${count} polling station${count !== 1 ? 's' : ''}`);
+    }
+    if (wardChanged && now.ward)   parts.push(`ward: ${now.ward}`);
+    if (branchChanged && now.branch) parts.push(`branch: ${now.branch}`);
+    if (roleChanged)               parts.push(`role: ${now.role}`);
+
+    if (parts.length) {
+      Toast.show(
+        'Assignments Updated',
+        `Your account has been updated — ${parts.join(', ')}.`,
+        'info', 5000
+      );
+    }
+  },
+
+  _startSyncTimer() {
+    if (App._syncInterval) clearInterval(App._syncInterval);
+    if (App.settings.scriptUrl) {
+      // Every 2 minutes: sync members, users, and ID index
+      App._syncInterval = setInterval(async () => {
+        await App.fetchFromSheets();
+        App._fetchIdIndex();
+        const changed = await App._fetchUsersFromSheet();
+        if (changed !== false) App._revalidateSession();
+      }, 2 * 60 * 1000);
+      // Immediate fetch on login — re-render current page when done
+      App.fetchFromSheets().then(() => {
+        App._memberFetchPending = false;
+        const pg = App.currentPage;
+        if (['records','my-records','reports','analytics','dashboard'].includes(pg)) {
+          try { PageRenderers[pg]?.(); } catch(_) {}
+        }
+      }).catch(() => { App._memberFetchPending = false; });
+    }
+  },
+
+  // ── FETCH FROM GOOGLE SHEETS (bidirectional sync) ─────────
+  async fetchFromSheets() {
+    if (!App.isOnline || !App.settings.scriptUrl) return;
+    try {
+      // Build station filter for officer/ward — only fetch records they can see
+      const u = App.currentUser;
+      let stationParam = '';
+      if (u && u.role !== 'admin' && u.role !== 'exec') {
+        const codes = (u.assignedStations||[]).length ? u.assignedStations
+          : (u.station ? [u.station] : []);
+        if (codes.length) stationParam = '&stations=' + encodeURIComponent(codes.join(','));
+      }
+      const url = App.settings.scriptUrl + '?action=getMembers&t=' + Date.now() + stationParam;
+      const data = await App._xhrGet(url);
+      if (!data?.members?.length) return;
+
+      // Merge sheet records with local records — sheet is source of truth
+      const local = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+      const localIds = new Set(local.map(m => m.id || m['Record ID']));
+      const demoCleared = localStorage.getItem(LS.DEMO_CLEARED);
+
+      let merged = [...local.filter(m => !m._demo || !demoCleared)];
+      let added = 0;
+
+      data.members.forEach(sheetRow => {
+        // Normalise sheet columns to app field names
+        const norm = App._normaliseSheetRow(sheetRow);
+        if (!norm.id) return;
+        if (!localIds.has(norm.id)) {
+          merged.unshift(norm);
+          added++;
+        } else {
+          // Update existing from sheet (sheet wins)
+          const idx = merged.findIndex(m => m.id === norm.id);
+          if (idx >= 0) merged[idx] = { ...merged[idx], ...norm };
+        }
+      });
+
+      const localCount = local.filter(m => !m._demo || !demoCleared).length;
+
+      if (added > 0 || merged.length > localCount) {
+        merged.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+        App.members = merged;
+        App.saveMembers();
+        if (added > 0) {
+          Toast.show('Synced from Sheets', `${added} new record(s) pulled from Google Sheets.`, 'info', 3000);
+        }
+        // Refresh current page
+        if (['dashboard','records','my-records','reports','analytics'].includes(App.currentPage)) {
+          PageRenderers[App.currentPage]?.();
+        }
+      }
+
+      // ── Auto-trim: mark Sheet-confirmed records and free local storage ──────
+      // After a successful sync, records confirmed in the Sheet are safe server-side.
+      // Mark them as _fromSheet=true. If local storage is >80% full, drop the oldest
+      // Sheet-sourced records to free space for new entries — they remain in the Sheet.
+      App._autoTrimMembers(data.members);
+
+      // Also fetch polling stations from sheet — update existing + add new
+      const stationsData = await App._xhrGet(App.settings.scriptUrl + '?action=getStations&t=' + Date.now());
+      if (stationsData?.stations?.length) {
+        const local = [...App.pollingStations];
+        let changed = false;
+        stationsData.stations.forEach(s => {
+          if (!s.code) return;
+          const idx = local.findIndex(ps => ps.code === s.code);
+          if (idx >= 0) {
+            // Update existing — sheet wins for zone/ward/name/branch
+            const before = JSON.stringify(local[idx]);
+            local[idx] = { ...local[idx], ...s };
+            if (JSON.stringify(local[idx]) !== before) changed = true;
+          } else {
+            local.push(s);
+            changed = true;
+          }
+        });
+        if (changed) {
+          App.pollingStations = local;
+          App.settings.pollingStations = local;
+          App.saveSettings();
+        }
+      }
+    } catch(e) {
+      App._memberFetchPending = false;
+      // Only show toast when user is on a data page and store is empty
+      const pg = App.currentPage;
+      if (['records','reports','analytics','dashboard'].includes(pg) &&
+          !JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]').length) {
+        Toast.show('Could not load data',
+          'Google Sheets connection failed. Check the Script URL in Settings and ensure a new deployment is active.',
+          'warning', 8000);
+      }
+    }
+  },
+
+  _normaliseSheetRow(row) {
+    // Handle both named-column objects from Apps Script and raw arrays
+    const g = (keys) => {
+      for (const k of keys) {
+        const val = row[k];
+        if (val !== undefined && val !== null && val !== '') return String(val).trim();
+      }
+      return '';
+    };
+    return {
+      id:          g(['Record ID','id','ID']),
+      firstName:   g(['First Name','firstName']),
+      lastName:    g(['Surname','lastName','Last Name']),
+      otherNames:  g(['Other Names','otherNames']),
+      gender:      g(['Gender','gender']),
+      zone:        g(['Zone','zone']),
+      partyId:     g(['Party ID Number','partyId']),
+      voterId:     g(['Voter ID Number','voterId']),
+      phone:       g(['Telephone Number','phone']),
+      ward:        g(['Ward Name','ward']),
+      station:     g(['Polling Station','station']),
+      stationCode: g(['Station Code','stationCode']),
+      branch:      g(['Branch Name','branch']),
+      branchCode:  g(['Branch Code','branchCode']),
+      officer:     g(['Officer ID','officer']),
+      officerName: g(['Officer Name','officerName']),
+      timestamp:   g(['Date/Time Added','timestamp']),
+      _fromSheet:  true,
+    };
+  },
+
+  // ── ROLE ACCESS ───────────────────────────────────────────
+  ROLE_PAGES: {
+    officer: ['dashboard','entry','my-records','records'],
+    ward:    ['dashboard','records','reports'],
+    exec:    ['dashboard','records','reports','analytics'],
+    admin:   ['dashboard','entry','records','reports','analytics','audit','users','settings'],
+  },
+  canAccess(page) { return (App.ROLE_PAGES[App.currentUser?.role]||[]).includes(page); },
+
+  navigate(page) {
+    if (!App.canAccess(page)) {
+      console.warn('[KNNDCmdb] navigate blocked:', page, '| user role:', App.currentUser?.role, '| allowed:', App.ROLE_PAGES[App.currentUser?.role]);
+      Toast.show('Access Denied','You do not have permission to view this page.','error');
+      return;
+    }
+    App.currentPage = page;
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    const el = document.getElementById('page-' + page);
+    if (el) {
+      el.classList.add('active');
+      try { PageRenderers[page]?.(); }
+      catch(e) {
+        console.error('[KNNDCmdb] Page render error on', page, e);
+        Toast.show('Page Error', 'Could not load ' + page + '. Try refreshing.', 'error', 5000);
+      }
+    } else {
+      console.error('[KNNDCmdb] Page div not found: page-' + page);
+    }
+    document.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('active', a.dataset.page === page));
+    window.scrollTo(0, 0);
+  },
+
+  renderNav() {
+    const nav = document.getElementById('main-nav');
+    if (!nav || !App.currentUser) return;
+    const pages = [
+      { id:'dashboard', icon:'📊', label:'Dashboard'  },
+      { id:'entry',     icon:'✍️',  label:'Data Entry'  },
+      { id:'my-records',icon:'📋', label:'My Records'  },
+      { id:'records',   icon:'🗃️',  label:'All Records' },
+      { id:'reports',   icon:'📈', label:'Reports'     },
+      { id:'analytics', icon:'🔬', label:'Analytics'   },
+      { id:'audit',     icon:'🛡️',  label:'Audit Log'   },
+      { id:'users',     icon:'👥', label:'User Mgmt'   },
+      { id:'settings',  icon:'⚙️',  label:'Settings'    },
+    ];
+    nav.innerHTML = pages.filter(p => App.canAccess(p.id)).map(p =>
+      `<a class="nav-link" data-page="${p.id}" onclick="App.navigate('${p.id}')">
+         <span class="nav-icon">${p.icon}</span>${p.label}
+       </a>`
+    ).join('');
+  },
+
+  renderUserHeader() {
+    const u = App.currentUser;
+    if (!u) return;
+    const initials = u.name.split(' ').map(n=>n[0]).slice(0,2).join('');
+    const rl = {officer:'Data Entry Officer',ward:'Ward Coordinator',exec:'Constituency Executive',admin:'System Administrator'}[u.role]||u.role;
+    document.getElementById('user-avatar').textContent   = initials;
+    document.getElementById('user-name-hdr').textContent = u.name;
+    document.getElementById('user-role-hdr').textContent = rl;
+  },
+
+  // ── MEMBER CRUD ───────────────────────────────────────────
+  addMember(data) {
+    // ── DUPLICATE PREVENTION ──────────────────────────────────────────────────
+    // Check order:
+    //   1. idIndex  — covers every member confirmed in the Sheet (all devices)
+    //   2. LS.MEMBERS — covers records entered on this device not yet flushed
+    // This combination prevents duplicates even when localStorage has been
+    // pruned and even when other officers have enrolled the same person.
+    App.members = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+    const local = App.members.filter(m => !m._demo);
+
+    // 1. Party ID — mandatory and must be globally unique
+    const pid = (data.partyId || '').trim().toLowerCase();
+    if (!pid) {
+      Toast.show('Party ID Required', 'Party ID is required and must be unique for every member.', 'error', 6000);
+      return null;
+    }
+    // Check Sheet-wide index first
+    const idxPid = App._lookupIdIndex('partyId', pid);
+    if (idxPid) {
+      Toast.show('Duplicate Blocked — Party ID',
+        `Party ID "${data.partyId}" is already registered to ${idxPid.firstName} ${idxPid.lastName} at ${idxPid.station}.`,
+        'error', 8000);
+      App.logAudit('DUPLICATE_BLOCKED', `Party ID duplicate (index): ${data.partyId} — ${idxPid.firstName} ${idxPid.lastName}`, App.currentUser.username);
+      return null;
+    }
+    // Check unsynced local records not yet in index
+    const localPid = local.find(m => (m.partyId || '').trim().toLowerCase() === pid);
+    if (localPid) {
+      Toast.show('Duplicate Blocked — Party ID',
+        `Party ID "${data.partyId}" is already registered to ${localPid.firstName} ${localPid.lastName} at ${localPid.station}.`,
+        'error', 8000);
+      App.logAudit('DUPLICATE_BLOCKED', `Party ID duplicate (local): ${data.partyId} — ${localPid.firstName} ${localPid.lastName}`, App.currentUser.username);
+      return null;
+    }
+
+    // 2. Voter ID — unique if provided
+    const vid = (data.voterId || '').trim().toLowerCase();
+    if (vid) {
+      const idxVid = App._lookupIdIndex('voterId', vid);
+      if (idxVid) {
+        Toast.show('Duplicate Blocked — Voter ID',
+          `Voter ID "${data.voterId}" is already registered to ${idxVid.firstName} ${idxVid.lastName} at ${idxVid.station}.`,
+          'error', 8000);
+        App.logAudit('DUPLICATE_BLOCKED', `Voter ID duplicate (index): ${data.voterId} — ${idxVid.firstName} ${idxVid.lastName}`, App.currentUser.username);
+        return null;
+      }
+      const localVid = local.find(m => (m.voterId || '').trim().toLowerCase() === vid);
+      if (localVid) {
+        Toast.show('Duplicate Blocked — Voter ID',
+          `Voter ID "${data.voterId}" is already registered to ${localVid.firstName} ${localVid.lastName} at ${localVid.station}.`,
+          'error', 8000);
+        App.logAudit('DUPLICATE_BLOCKED', `Voter ID duplicate (local): ${data.voterId} — ${localVid.firstName} ${localVid.lastName}`, App.currentUser.username);
+        return null;
+      }
+    }
+
+    // 3. Name + station combo — warning only (two people can share a name)
+    const fname = (data.firstName || '').trim().toLowerCase();
+    const lname = (data.lastName  || '').trim().toLowerCase();
+    const scode = (data.stationCode || '').trim();
+    if (fname && lname && scode) {
+      const idxName = App.idIndex.find(e =>
+        (e.firstName  || '').toLowerCase() === fname &&
+        (e.lastName   || '').toLowerCase() === lname &&
+        (e.stationCode|| '')               === scode
+      );
+      const localName = local.find(m =>
+        (m.firstName  || '').toLowerCase() === fname &&
+        (m.lastName   || '').toLowerCase() === lname &&
+        (m.stationCode|| '')               === scode
+      );
+      const nameMatch = idxName || localName;
+      if (nameMatch) {
+        Toast.show('Possible Duplicate — Same Name & Station',
+          `${data.firstName} ${data.lastName} at this station already has a record (Party ID: ${nameMatch.partyId || '—'}). Check before saving.`,
+          'warning', 10000);
+        App.logAudit('DUPLICATE_WARNING', `Name+station match: ${data.firstName} ${data.lastName} at ${scode}`, App.currentUser.username);
+      }
+    }
+
+    const member = {
+      id: 'm' + Date.now(),
+      ...data,
+      officer:      App.currentUser.username,
+      officerName:  App.currentUser.name,
+      timestamp:    new Date().toLocaleString('en-GH'),
+      isoDate:      App._todayISO()
+    };
+    App.members.unshift(member);
+    App.saveMembers();
+    App._addToIdIndex(member); // update local index immediately for next duplicate check
+    App.logAudit('ADD_MEMBER', `Added: ${data.firstName} ${data.lastName} (${data.partyId}) — ${data.station}`, App.currentUser.username);
+
+    if (App.settings.scriptUrl) {
+      if (App.isOnline) {
+        // Try direct Sheet write — fastest path when online.
+        // If it fails, fall back to queue so nothing is lost.
+        App._xhrPostWithFallback(
+          { action: 'upsertMember', ...member },
+          { type: 'add', data: member }
+        );
+      } else {
+        // Offline — queue for sync when connection returns
+        App.offlineQueue.push({ type: 'add', data: member });
+        App.saveOfflineQ();
+        Toast.show('Saved Offline', 'Record saved locally. Will sync to Google Sheets when back online.', 'warning', 4000);
+      }
+    }
+    return member;
+  },
+
+  // ── PERMISSION CHECK — can App user edit/delete App record? ──
+  // canEditMember — can this user EDIT this record?
+  // exec (Constituency Executive) can edit any record; ward/officer are station-scoped.
+  canEditMember(m) {
+    const u = App.currentUser;
+    if (!u) return false;
+    if (u.role === 'admin') return true;
+    if (u.role === 'exec')  return true;   // exec can edit (but not delete)
+    const codes = (u.assignedStations||[]).length ? u.assignedStations : (u.station ? [u.station] : []);
+    if (u.role === 'ward') {
+      return codes.includes(m.stationCode) || m.ward === u.ward || m.branch === u.branch;
+    }
+    if (u.role === 'officer') {
+      return m.officer === u.username && codes.includes(m.stationCode);
+    }
+    return false;
+  },
+
+  // canDeleteMember — can this user DELETE this record?
+  // exec is explicitly blocked from deletion (view + edit only).
+  canDeleteMember(m) {
+    const u = App.currentUser;
+    if (!u) return false;
+    if (u.role === 'admin') return true;
+    if (u.role === 'exec')  return false;  // exec cannot delete
+    const codes = (u.assignedStations||[]).length ? u.assignedStations : (u.station ? [u.station] : []);
+    if (u.role === 'ward') {
+      return codes.includes(m.stationCode) || m.ward === u.ward || m.branch === u.branch;
+    }
+    if (u.role === 'officer') {
+      return m.officer === u.username && codes.includes(m.stationCode);
+    }
+    return false;
+  },
+
+  // canModifyMember — legacy alias used by deleteMember(); maps to canDeleteMember
+  canModifyMember(m) { return App.canDeleteMember(m); },
+
+  updateMember(id, updates, reason) {
+    App.members = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
+    const idx = App.members.findIndex(m=>m.id===id);
+    if (idx<0) return false;
+    // Permission check — use canEditMember (exec can edit; officer scoped to own records)
+    if (!App.canEditMember(App.members[idx])) {
+      Toast.show('Permission Denied','You can only edit records from your assigned stations.','error');
+      App.logAudit('EDIT_DENIED',`Blocked edit attempt on record ${id} by ${App.currentUser.username}`,App.currentUser.username);
+      return false;
+    }
+    const before = {...App.members[idx]};
+    App.members[idx] = {...App.members[idx],...updates, lastModified:new Date().toLocaleString('en-GH'), modifiedBy:App.currentUser.username};
+    App.saveMembers();
+    App.logAudit('EDIT_MEMBER',`Edited: ${before.firstName} ${before.lastName}. Reason: ${reason}`, App.currentUser.username, {before, after:App.members[idx], reason});
+    if (App.settings.scriptUrl) {
+      const payload = {...App.members[idx], action:'updateMember', reason};
+      if (App.isOnline) {
+        App._xhrPostWithFallback(payload, { type:'update', data: payload });
+      } else {
+        App.offlineQueue.push({ type:'update', data: payload });
+        App.saveOfflineQ();
+        Toast.show('Edit Queued','Changes saved locally and will sync when online.','warning');
+      }
+    }
+    return true;
+  },
+
+  deleteMember(id, reason) {
+    App.members = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
+    const m = App.members.find(m=>m.id===id);
+    if (!m) return false;
+    // Permission check
+    if (!App.canModifyMember(m)) {
+      Toast.show('Permission Denied','You can only delete records from your assigned stations.','error');
+      App.logAudit('DELETE_DENIED',`Blocked delete attempt on record ${id} by ${App.currentUser.username}`,App.currentUser.username);
+      return false;
+    }
+    App.members = App.members.filter(mx=>mx.id!==id);
+    App.saveMembers();
+    App.logAudit('DELETE_MEMBER',`Deleted: ${m.firstName} ${m.lastName} (${m.partyId}). Reason: ${reason}`, App.currentUser.username);
+    if (App.settings.scriptUrl) {
+      const payload = {id, action:'deleteMember', reason};
+      if (App.isOnline) {
+        App._xhrPostWithFallback(payload, { type:'delete', data: payload });
+      } else {
+        App.offlineQueue.push({ type:'delete', data: payload });
+        App.saveOfflineQ();
+        Toast.show('Delete Queued','Record removed locally and will sync when online.','warning');
+      }
+    }
+    return true;
+  },
+
+  getMembersForUser() {
+    // ── Pure synchronous read — exactly as in v2.x ──────────────
+    // Never triggers async work here. Fetches are driven by the
+    // sync timer and the manual pull button. This keeps all page
+    // renderers fast and predictable.
+    const all = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
+    App.members = all;
+    const u = App.currentUser;
+    if (!u) return [];
+    if (u.role==='admin'||u.role==='exec') return all;
+    const codes = (u.assignedStations||[]).length ? u.assignedStations
+      : (u.station ? [u.station] : []);
+    if (u.role==='ward')    return all.filter(m => codes.includes(m.stationCode) || m.ward === u.ward);
+    if (u.role==='officer') return all.filter(m => codes.includes(m.stationCode));
+    return [];
+  },
+
+  logAudit(action, details, user, extra={}) {
+    const entry = {id:'a'+Date.now(),action,details,user:user||'system',timestamp:new Date().toLocaleString('en-GH'),...extra};
+    App.auditLog = JSON.parse(localStorage.getItem(LS.AUDIT)||'[]');
+    App.auditLog.unshift(entry);
+    if (App.auditLog.length>10000) App.auditLog=App.auditLog.slice(0,10000);
+    localStorage.setItem(LS.AUDIT, JSON.stringify(App.auditLog));
+    // Defer audit sheet sync — never block UI
+    if (App.settings.scriptUrl) setTimeout(() => App._syncAuditEntry(entry), 0);
+  },
+
+  _syncAuditEntry(entry) {
+    if (!App.settings.scriptUrl) return;
+    App._xhrPost(App.settings.scriptUrl, {
+      action:      'logAudit',
+      auditAction: entry.action,
+      timestamp:   entry.timestamp,
+      user:        entry.user,
+      details:     entry.details,
+      extra:       entry.reason || '',
+    });
+  },
+
+  // Pull audit entries from the Sheet and merge with local log.
+  // Called when admin navigates to the Audit Log page and Sheet is configured.
+  // Returns true if new entries were found, false otherwise.
+  async _fetchAuditFromSheet() {
+    if (!App.isOnline || !App.settings.scriptUrl) return false;
+    try {
+      const data = await App._xhrGet(App.settings.scriptUrl + '?action=getAudit&t=' + Date.now());
+      if (!data?.entries) return false;
+      if (!data?.entries?.length) return false;
+
+      // Build a dedup key: timestamp + action + user (Sheet has no id field)
+      const local  = JSON.parse(localStorage.getItem(LS.AUDIT) || '[]');
+      const seenKeys = new Set(local.map(e => `${e.timestamp}|${e.action}|${e.user}`));
+
+      const newEntries = data.entries
+        .filter(e => {
+          const k = `${e.timestamp}|${e.action}|${e.user}`;
+          return !seenKeys.has(k);
+        })
+        .map(e => ({
+          id:        'a_sheet_' + Math.random().toString(36).slice(2),
+          action:    e.action,
+          details:   e.details,
+          user:      e.user,
+          timestamp: e.timestamp,
+          reason:    e.extra || '',
+          _fromSheet: true,
+        }));
+
+      if (!newEntries.length) return false;
+
+      // Merge: combine local + sheet entries, sort newest-first, cap at 10 000
+      const merged = [...local, ...newEntries]
+        .sort((a, b) => {
+          // Sort by id timestamp where available, else lexicographic on timestamp string
+          const ta = a.id?.startsWith('a') && !a._fromSheet ? parseInt(a.id.slice(1)) : 0;
+          const tb = b.id?.startsWith('a') && !b._fromSheet ? parseInt(b.id.slice(1)) : 0;
+          return tb - ta || b.timestamp.localeCompare(a.timestamp);
+        })
+        .slice(0, 10000);
+
+      App.auditLog = merged;
+      localStorage.setItem(LS.AUDIT, JSON.stringify(merged));
+      return true;
+    } catch(_) {
+      return false;
+    }
+  },
+
+  syncToSheets(data) {
+    if (!App.settings.scriptUrl) return;
+    // Use upsertMember as default: if record already exists in Sheet it updates in-place,
+    // preventing duplicate rows when records sync more than once (e.g. after offline/online cycle).
+    const payload = data.action ? data : {...data, action:'upsertMember'};
+    setTimeout(() => App._xhrPost(App.settings.scriptUrl, payload), 0);
+  },
+
+  // ── SYNC WORKER ───────────────────────────────────────────────
+  // Manages a Web Worker that handles all Sheet XHR communication on a
+  // separate thread so the data entry UI is never blocked.
+  // Falls back to the main-thread batch method if Workers are unavailable.
+  _syncWorker: null,
+
+  _getWorker() {
+    if (!window.Worker) return null;
+    if (!App._syncWorker || App._syncWorker._dead) {
+      try {
+        App._syncWorker = new Worker('js/sync-worker.js');
+        App._syncWorker._dead = false;
+        App._syncWorker.onerror = () => { App._syncWorker._dead = true; };
+      } catch(_) { return null; }
+    }
+    return App._syncWorker;
+  },
+
+  // Run a sync job on the worker. Returns a Promise that resolves to
+  // { uploaded, failed } when the worker reports 'done'.
+  // onProgress(uploaded, total) is called after each batch.
+  _runWorker(msg, onProgress) {
+    return new Promise((resolve, reject) => {
+      const worker = App._getWorker();
+      if (!worker) { resolve(null); return; } // caller falls back to main thread
+
+      const handler = (e) => {
+        const d = e.data;
+        if (d.type === 'progress') {
+          if (onProgress) onProgress(d.uploaded, d.total);
+        } else if (d.type === 'done') {
+          worker.removeEventListener('message', handler);
+          resolve({ uploaded: d.uploaded, failed: d.failed });
+        } else if (d.type === 'error') {
+          worker.removeEventListener('message', handler);
+          reject(new Error(d.message));
+        }
+      };
+      worker.addEventListener('message', handler);
+      worker.postMessage(msg);
+    });
+  },
+
+  // Direct Sheet write with automatic queue fallback.
+  // Sends payload immediately; if the XHR fails (network drop, timeout, Apps Script
+  // error) the queueItem is saved to the offline queue so nothing is lost.
+  _xhrPostWithFallback(payload, queueItem) {
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', App.settings.scriptUrl, true);
+      xhr.timeout = 25000;
+      xhr.onload  = () => {}; // success — Sheet has the record
+      xhr.onerror = xhr.ontimeout = () => {
+        // Direct write failed — queue for retry
+        App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q) || '[]');
+        App.offlineQueue.push(queueItem);
+        App.saveOfflineQ();
+      };
+      xhr.send(JSON.stringify(payload));
+    } catch(_) {
+      App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q) || '[]');
+      App.offlineQueue.push(queueItem);
+      App.saveOfflineQ();
+    }
+  },
+
+  // Reliable fire-and-forget POST using XHR — handles Apps Script redirects correctly
+  _xhrPost(url, data) {
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true); // async
+      xhr.timeout = 20000;
+      xhr.send(JSON.stringify(data));
+      // No response handling — fire and forget
+    } catch(_) {}
+  },
+
+  // ── ID INDEX — lightweight duplicate detection ────────────────
+  // Stores only partyId + voterId + minimal display info for every enrolled
+  // member. ~60 bytes per entry vs ~480 for a full record. An enrolment of
+  // 10,000 members costs ~600KB — safe on any device including entry phones.
+  // Officer devices use this index instead of caching full member records,
+  // keeping LS.MEMBERS permanently small (only unsynced local entries).
+
+  // Load index from localStorage into memory
+  _loadIdIndex() {
+    try {
+      const raw = localStorage.getItem(LS.ID_INDEX);
+      App.idIndex = raw ? JSON.parse(raw) : [];
+    } catch(_) { App.idIndex = []; }
+  },
+
+  // Persist index to localStorage
+  _saveIdIndex() {
+    try { localStorage.setItem(LS.ID_INDEX, JSON.stringify(App.idIndex)); } catch(_) {}
+  },
+
+  // Add a single new entry to the in-memory index and persist
+  _addToIdIndex(member) {
+    if (!member.partyId && !member.voterId) return;
+    // Remove any existing entry for this record id first
+    App.idIndex = App.idIndex.filter(e => e.id !== member.id);
+    App.idIndex.push({
+      id:          member.id          || '',
+      partyId:     (member.partyId    || '').trim(),
+      voterId:     (member.voterId    || '').trim(),
+      firstName:   (member.firstName  || '').trim(),
+      lastName:    (member.lastName   || '').trim(),
+      station:     (member.station    || '').trim(),
+      stationCode: (member.stationCode|| '').trim(),
+    });
+    App._saveIdIndex();
+  },
+
+  // Look up a value in the index. Returns the matching entry or null.
+  // field: 'partyId' | 'voterId'
+  _lookupIdIndex(field, value) {
+    if (!value) return null;
+    const v = value.trim().toLowerCase();
+    return App.idIndex.find(e => (e[field] || '').toLowerCase() === v) || null;
+  },
+
+  // Fetch the full ID index from Google Sheets in the background.
+  // Called on login and every sync cycle. Does NOT block the UI.
+  async _fetchIdIndex() {
+    if (!App.settings.scriptUrl) return;
+    const data = await App._xhrGet(
+      App.settings.scriptUrl + '?action=getIdIndex&t=' + Date.now()
+    );
+    if (!data?.index?.length) return;
+    App.idIndex = data.index;
+    App._saveIdIndex();
+  },
+
+  // After a successful flush, remove synced records from LS.MEMBERS on
+  // officer/ward devices (they're now in the Sheet and in the index).
+  // Admin/exec keep full LS.MEMBERS — this method exits early for them.
+  _pruneSyncedLocalMembers(syncedIds) {
+    const role = App.currentUser?.role;
+    if (role === 'admin' || role === 'exec') return; // admin keeps everything
+    if (!syncedIds?.length) return;
+
+    const idSet  = new Set(syncedIds);
+    const local  = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+    const pruned = local.filter(m => !idSet.has(m.id)); // keep only unsynced
+    if (pruned.length < local.length) {
+      App.members = pruned;
+      try { localStorage.setItem(LS.MEMBERS, JSON.stringify(pruned)); } catch(_) {}
+    }
+  },
+
+  // JSONP-based data reader — the only reliably cross-origin read method for Apps Script.
+  // XHR and fetch() both fail because Apps Script's 302 redirect response lacks
+  // Access-Control-Allow-Origin headers. JSONP sidesteps this entirely:
+  // a <script> tag is injected with ?callback=fnName; Apps Script wraps the JSON
+  // in fnName({...}) and the browser executes it as JS — no CORS check applies.
+  _xhrGet(url) {
+    return new Promise((resolve) => {
+      // Build a unique callback name
+      const cbName = '_kncb_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
+      const timeout = setTimeout(() => {
+        delete window[cbName];
+        if (script.parentNode) script.parentNode.removeChild(script);
+        resolve(null);
+      }, 20000);
+
+      window[cbName] = (data) => {
+        clearTimeout(timeout);
+        delete window[cbName];
+        if (script.parentNode) script.parentNode.removeChild(script);
+        resolve(data);
+      };
+
+      // Append callback param to the URL
+      const sep   = url.includes('?') ? '&' : '?';
+      const src   = url + sep + 'callback=' + cbName;
+      const script = document.createElement('script');
+      script.src   = src;
+      script.onerror = () => {
+        clearTimeout(timeout);
+        delete window[cbName];
+        resolve(null);
+      };
+      document.head.appendChild(script);
+    });
+  },
+
+  // Force a complete re-pull from Sheet for admin/exec.
+  // Clears the local member cache first so fetchFromSheets re-downloads everything,
+  // not just the delta. Used when admin notices local count < Sheet count.
+  async _pullAllFromSheet() {
+    if (!App.settings.scriptUrl) {
+      Toast.show('No Script URL', 'Configure the Apps Script URL in Settings → Google Sheets.', 'error');
+      return;
+    }
+    const btn = document.getElementById('records-pull-btn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Pulling…'; }
+    Toast.show('Pulling from Sheet', 'Downloading all records from Google Sheets…', 'info', 8000);
+
+    try {
+      const url  = App.settings.scriptUrl + '?action=getMembers&t=' + Date.now();
+      const data = await App._xhrGet(url);
+
+      if (!data?.members?.length) {
+        Toast.show('No Records', 'The Google Sheet returned no records. Check the Sheet has data.', 'warning');
+        if (btn) { btn.disabled = false; btn.textContent = '🔄 Pull All from Sheet'; }
+        return;
+      }
+
+      // Keep any locally-entered records that haven't been pushed to Sheet yet
+      const local       = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+      const sheetIds    = new Set(data.members.map(m => m.id).filter(Boolean));
+      const localOnly   = local.filter(m => m.id && !sheetIds.has(m.id) && !m._demo);
+
+      // Build fresh set: all Sheet records + any local-only unsynced records
+      const sheetNormed = data.members.map(r => ({ ...App._normaliseSheetRow(r), _fromSheet: true }));
+      const merged      = [...localOnly, ...sheetNormed]
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      // Free up space from non-critical keys before writing the full member set
+      // NEVER clear LS.OFFLINE_Q — it contains unsynced records
+      try { localStorage.removeItem(LS.AUDIT); } catch(_) {}
+
+      App.members = merged;
+      App.saveMembers(); // uses quota-aware handler
+
+      Toast.show('Pull Complete ✅',
+        `${data.members.length} record(s) loaded from Google Sheets${localOnly.length ? ` + ${localOnly.length} local unsynced` : ''}.`,
+        'success', 6000);
+      App.logAudit('PULL_ALL_SHEET', `Admin force-pulled ${data.members.length} records from Google Sheets`, App.currentUser?.username);
+
+      // Refresh all relevant pages
+      if (['records','dashboard','reports','analytics'].includes(App.currentPage)) {
+        PageRenderers[App.currentPage]?.();
+      }
+    } catch(e) {
+      Toast.show('Pull Failed', 'Could not reach Google Sheets. Check your connection and Script URL.', 'error');
+    }
+
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Pull All from Sheet'; }
+  },
+  // Called after every Sheet sync. Marks records confirmed in the Sheet as
+  // _fromSheet:true, then checks storage usage on officer/ward devices only.
+  // Admin and exec devices are NEVER trimmed — they need the full dataset visible.
+  // Only locally-entered unsynced records are always preserved.
+  _autoTrimMembers(sheetMembers) {
+    if (!sheetMembers?.length) return;
+
+    // Never trim admin or exec — they need full visibility
+    const role = App.currentUser?.role;
+    const isFullViewRole = role === 'admin' || role === 'exec';
+
+    const sheetIds = new Set(sheetMembers.map(m => m.id).filter(Boolean));
+    const local    = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+
+    // Mark confirmed records as _fromSheet
+    let changed = false;
+    local.forEach(m => {
+      if (sheetIds.has(m.id) && !m._fromSheet) {
+        m._fromSheet = true;
+        changed = true;
+      }
+    });
+    if (changed) {
+      App.members = local;
+      try { localStorage.setItem(LS.MEMBERS, JSON.stringify(local)); } catch(_) {}
+    }
+
+    // Admin and exec: stop here — no trimming ever
+    if (isFullViewRole) return;
+
+    // Officer/ward: check storage and trim oldest synced records if needed
+    const raw = localStorage.getItem(LS.MEMBERS) || '[]';
+    const sizeKB = (raw.length * 2) / 1024;
+    const THRESHOLD_KB = 3500;
+
+    if (sizeKB < THRESHOLD_KB) return;
+
+    const unsynced = local.filter(m => !m._fromSheet);
+    const synced   = local.filter(m =>  m._fromSheet);
+
+    synced.sort((a, b) => {
+      const da = a.isoDate || App._isoDate(a.timestamp) || '0000';
+      const db = b.isoDate || App._isoDate(b.timestamp) || '0000';
+      return da.localeCompare(db);
+    });
+
+    let trimmed = [...unsynced, ...synced];
+    while (trimmed.length > unsynced.length) {
+      trimmed.shift();
+      const testSize = (JSON.stringify(trimmed).length * 2) / 1024;
+      if (testSize < THRESHOLD_KB) break;
+    }
+
+    if (trimmed.length < local.length) {
+      const freed = local.length - trimmed.length;
+      App.members = trimmed;
+      try {
+        localStorage.setItem(LS.MEMBERS, JSON.stringify(trimmed));
+        App.logAudit('STORAGE_TRIM', `Auto-trimmed ${freed} synced record(s) from local storage to free space. All records remain in Google Sheets.`, 'system');
+      } catch(_) {}
+    }
+  },
+  // Returns 'YYYY-MM-DD' from any stored timestamp string, locale-independent.
+  // Handles en-GH 'D/M/YYYY, ...' and en-US 'M/D/YYYY, ...' fallback formats.
+  _isoDate(timestamp) {
+    if (!timestamp) return '';
+    // If already ISO format
+    if (/^\d{4}-\d{2}-\d{2}/.test(timestamp)) return timestamp.slice(0, 10);
+    // Try native Date parse first (works for M/D/YYYY = en-US)
+    const d = new Date(timestamp);
+    if (!isNaN(d)) return d.toISOString().slice(0, 10);
+    // Manual parse for D/M/YYYY (en-GH): extract day, month, year
+    const m = timestamp.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (m) {
+      const [, day, month, year] = m;
+      const forced = new Date(`${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}`);
+      if (!isNaN(forced)) return forced.toISOString().slice(0, 10);
+    }
+    return '';
+  },
+
+  // Returns today's date as 'YYYY-MM-DD' in local time (immune to locale and timezone drift)
+  _todayISO() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  },
+
+  // Returns 'YYYY-MM-DD' for a date N days ago
+  _daysAgoISO(n) {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  },
+
+  getStats() {
+    const all   = App.getMembersForUser();
+    const todayISO = App._todayISO();
+    const byStation={}, byDay={}, byGender={Male:0,Female:0,Other:0}, byZone={};
+    all.forEach(m => {
+      byStation[m.station] = (byStation[m.station]||0)+1;
+      const g = m.gender==='Male'?'Male':m.gender==='Female'?'Female':'Other';
+      byGender[g]++;
+      if (m.zone) byZone[m.zone] = (byZone[m.zone]||0)+1;
+    });
+    // Build 7-day trend using ISO date keys — locale-independent
+    for (let i=6;i>=0;i--) {
+      const key = App._daysAgoISO(i);
+      byDay[key] = all.filter(m => (m.isoDate || App._isoDate(m.timestamp)) === key).length;
+    }
+    const todayCount = all.filter(m => (m.isoDate || App._isoDate(m.timestamp)) === todayISO).length;
+    return { total:all.length, today:todayCount, byStation, byDay, stations:Object.keys(byStation).length, byGender, byZone };
+  },
+
+  async flushOfflineQueue() {
+    App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q) || '[]');
+    if (!App.offlineQueue.length || !App.settings.scriptUrl) return;
+
+    const total = App.offlineQueue.length;
+    Toast.show('Syncing', `Uploading ${total} queued operation(s) in background…`, 'info', 5000);
+
+    // Try worker first — keeps the UI fully unblocked
+    const result = await App._runWorker(
+      { cmd: 'flush', queue: App.offlineQueue, scriptUrl: App.settings.scriptUrl },
+      (uploaded, tot) => {
+        const pct = Math.round((uploaded / tot) * 100);
+        // Update any visible queue counter without touching the form
+        const badge = document.getElementById('offline-queue-count');
+        if (badge) badge.textContent = tot - uploaded;
+      }
+    ).catch(() => null);
+
+    if (result) {
+      // Worker succeeded — update state from worker result
+      App.offlineQueue = result.failed;
+      App.saveOfflineQ();
+
+      // On officer/ward devices: remove successfully sent records from LS.MEMBERS.
+      // We only remove the EXACT records that were in this queue and confirmed sent.
+      // Never touch records that came from Sheet pulls (fetchFromSheets) — those
+      // are needed for the All Records / My Records views.
+      if (result.uploaded > 0) {
+        const failedIds = new Set(result.failed.map(item => item.data?.id).filter(Boolean));
+        const sentIds = queue
+          .map(item => item.data?.id)
+          .filter(id => id && !failedIds.has(id));
+        App._pruneSyncedLocalMembers(sentIds);
+      }
+
+      if (!result.failed.length) {
+        Toast.show('Sync Complete ✅', `${result.uploaded} queued operation(s) uploaded.`, 'success', 5000);
+      } else {
+        Toast.show('Partial Sync', `${result.uploaded} uploaded, ${result.failed.length} still pending.`, 'warning', 6000);
+      }
+    } else {
+      // Worker unavailable — fall back to main-thread batching
+      const BATCH = 5;
+      const sendOne = (payload) => new Promise(resolve => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', App.settings.scriptUrl, true);
+        xhr.timeout = 25000;
+        xhr.onload = () => resolve(true);
+        xhr.onerror = () => resolve(false);
+        xhr.ontimeout = () => resolve(false);
+        xhr.send(JSON.stringify(payload));
+      });
+      const failed = []; let uploaded = 0;
+      const queue  = App.offlineQueue;
+      for (let i = 0; i < queue.length; i += BATCH) {
+        const batch    = queue.slice(i, i + BATCH);
+        const payloads = batch.map(item => {
+          if (item.type === 'delete') return { action: 'deleteMember', ...item.data };
+          if (item.type === 'update') return { action: 'updateMember', ...item.data };
+          return { action: 'upsertMember', ...item.data };
+        });
+        const results = await Promise.all(payloads.map(sendOne));
+        results.forEach((ok, j) => ok ? uploaded++ : failed.push(batch[j]));
+        await new Promise(r => setTimeout(r, 0));
+      }
+      App.offlineQueue = failed;
+      App.saveOfflineQ();
+      // Prune only the records that were actually sent successfully
+      if (uploaded > 0) {
+        const failedSet = new Set(failed.map(item => item.data?.id).filter(Boolean));
+        const sentIds = queue
+          .map(item => item.data?.id)
+          .filter(id => id && !failedSet.has(id));
+        App._pruneSyncedLocalMembers(sentIds);
+      }
+      if (!failed.length) Toast.show('Sync Complete ✅', `${uploaded} queued operation(s) uploaded.`, 'success', 5000);
+      else Toast.show('Partial Sync', `${uploaded} uploaded, ${failed.length} still pending.`, 'warning', 6000);
+    }
+
+    if (App.currentUser && App.currentPage === 'dashboard') PageRenderers.dashboard();
+  },
+
+  // Push ALL local members to Sheet (for records entered before Sheets was configured)
+  // Uses upsertMember — safe to run multiple times: existing rows are updated, new rows appended.
+  // Sends in parallel batches of 5 to avoid hanging the browser.
+  async bulkPushToSheets() {
+    if (!App.settings.scriptUrl) {
+      Toast.show('No Script URL', 'Configure the Apps Script URL in Settings → Google Sheets.', 'error');
+      return;
+    }
+    const all = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]').filter(m => !m._demo);
+    if (!all.length) { Toast.show('No Records', 'There are no real member records to push.', 'warning'); return; }
+
+    const btn = document.querySelector('[onclick*="bulkPushToSheets"]');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Pushing…'; }
+
+    const BATCH = 5;
+    let ok = 0, fail = 0;
+    const total = all.length;
+
+    const sendOne = (m) => new Promise(resolve => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', App.settings.scriptUrl, true);
+      xhr.timeout   = 25000;
+      xhr.onload    = () => resolve(true);
+      xhr.onerror   = () => resolve(false);
+      xhr.ontimeout = () => resolve(false);
+      xhr.send(JSON.stringify({ action: 'upsertMember', ...m }));
+    });
+
+    for (let i = 0; i < total; i += BATCH) {
+      const batch   = all.slice(i, i + BATCH);
+      const results = await Promise.all(batch.map(sendOne));
+      results.forEach(sent => sent ? ok++ : fail++);
+
+      const pct = Math.round(((i + batch.length) / total) * 100);
+      if (btn) btn.textContent = `⏳ ${pct}% (${ok}/${total})`;
+
+      await new Promise(r => setTimeout(r, 0));
+    }
+
+    if (btn) { btn.disabled = false; btn.textContent = '☁️ Push All Records to Sheet'; }
+
+    if (fail === 0) Toast.show('Push Complete ✅', `All ${ok} record(s) uploaded to Google Sheets.`, 'success', 6000);
+    else            Toast.show('Partial Upload', `${ok} uploaded, ${fail} failed. Try again.`, 'warning', 6000);
+    App.logAudit('BULK_PUSH', `Bulk pushed ${ok}/${total} records to Google Sheets`, App.currentUser?.username || 'admin');
+  },
+
+  // Push records visible to the current user to Google Sheet.
+  // Used from the Data Entry page — scoped by role and assigned stations.
+  // Sends in parallel batches of 5 to avoid hanging the browser.
+  // Push records visible to the current user to Google Sheet.
+  // Runs on the Web Worker thread — the entry form stays fully responsive.
+  async pushMyRecordsToSheet() {
+    if (!App.settings.scriptUrl) {
+      Toast.show('No Script URL', 'Configure the Apps Script URL in Settings → Google Sheets first.', 'error');
+      return;
+    }
+    const records = App.getMembersForUser().filter(m => !m._demo);
+    if (!records.length) {
+      Toast.show('No Records', 'No records found for your assigned station(s).', 'warning');
+      return;
+    }
+
+    const total = records.length;
+    const btns  = document.querySelectorAll('[onclick*="pushMyRecordsToSheet"]');
+    btns.forEach(b => { b.disabled = true; b.dataset._orig = b.textContent; b.textContent = `⏳ 0/${total}`; });
+
+    const onProgress = (uploaded, tot) => {
+      const pct = Math.round((uploaded / tot) * 100);
+      btns.forEach(b => { b.textContent = `⏳ ${pct}% (${uploaded}/${tot})`; });
+    };
+
+    const result = await App._runWorker(
+      { cmd: 'push', records, scriptUrl: App.settings.scriptUrl },
+      onProgress
+    ).catch(() => null);
+
+    let ok = 0, fail = 0;
+
+    if (result) {
+      ok   = result.uploaded;
+      fail = result.failed.length;
+    } else {
+      // Worker unavailable — fall back to main-thread batching
+      const BATCH = 5;
+      const sendOne = (m) => new Promise(resolve => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', App.settings.scriptUrl, true);
+        xhr.timeout = 25000;
+        xhr.onload = () => resolve(true);
+        xhr.onerror = () => resolve(false);
+        xhr.ontimeout = () => resolve(false);
+        xhr.send(JSON.stringify({ action: 'upsertMember', ...m }));
+      });
+      for (let i = 0; i < total; i += BATCH) {
+        const batch   = records.slice(i, i + BATCH);
+        const results = await Promise.all(batch.map(sendOne));
+        results.forEach(sent => sent ? ok++ : fail++);
+        const pct = Math.round(((i + batch.length) / total) * 100);
+        btns.forEach(b => { b.textContent = `⏳ ${pct}% (${ok}/${total})`; });
+        await new Promise(r => setTimeout(r, 0));
+      }
+    }
+
+    btns.forEach(b => { b.disabled = false; b.textContent = b.dataset._orig || '☁️ Push Records to Sheet'; });
+
+    if (fail === 0) {
+      Toast.show('Push Complete ✅', `All ${ok} record(s) uploaded to Google Sheets.`, 'success', 6000);
+      App.logAudit('PUSH_MY_RECORDS', `Pushed ${ok}/${total} records to Google Sheets`, App.currentUser?.username);
+    } else {
+      Toast.show('Partial Upload', `${ok} uploaded, ${fail} failed. Try again to retry.`, 'warning', 7000);
+    }
+    if (App.currentPage === 'entry') PageRenderers.entry();
+  },
+};
+
+// ─── TOAST ───────────────────────────────────────────────────
+var Toast = {
+  show(title, msg='', type='success', duration=4000) {
+    const c = document.getElementById('toast-container');
+    if (!c) return;
+    const icons={success:'✅',error:'❌',warning:'⚠️',info:'ℹ️'};
+    const t=document.createElement('div');
+    t.className=`toast ${type}`;
+    t.innerHTML=`<span class="toast-icon">${icons[type]||'✅'}</span>
+      <div class="toast-content"><div class="toast-title">${title}</div>${msg?`<div class="toast-msg">${msg}</div>`:''}</div>
+      <button class="toast-close" onclick="App.parentElement.remove()">✕</button>`;
+    c.appendChild(t);
+    setTimeout(()=>{t.classList.add('hiding');setTimeout(()=>t.remove(),300);},duration);
+  }
+};
+
+var Modal = {
+  open(id)   { document.getElementById(id)?.classList.add('open'); },
+  close(id)  { document.getElementById(id)?.classList.remove('open'); },
+  closeAll() { document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open')); },
+};
+document.addEventListener('click',e=>{ if(e.target.classList.contains('modal-overlay')) Modal.closeAll(); });
+
+
+/* ============================================================
+   KNNDCmdb – Page Renderers  v1.3
+   ============================================================ */
+'use strict';
+
+var PageRenderers = {
+
+  // ══════════════════════════════════════════════════════════
+  // DASHBOARD — with gender + zone distribution
+  // ══════════════════════════════════════════════════════════
+  dashboard() {
+    const s = App.getStats();
+    const u = App.currentUser;
+    const rl = {officer:'Data Entry Officer',ward:'Ward Coordinator',exec:'Constituency Executive',admin:'System Administrator'}[u.role]||u.role;
+    document.getElementById('dash-welcome').textContent  = `Welcome back, ${u.name.split(' ')[0]}`;
+    document.getElementById('dash-role').textContent     = rl;
+    document.getElementById('dash-total').textContent    = s.total.toLocaleString();
+    document.getElementById('dash-today').textContent    = s.today;
+    document.getElementById('dash-stations').textContent = s.stations;
+    document.getElementById('dash-offline').textContent  = App.offlineQueue.length;
+
+    // Gender stats
+    const male = s.byGender?.Male||0, female = s.byGender?.Female||0;
+    document.getElementById('dash-male').textContent   = male;
+    document.getElementById('dash-female').textContent = female;
+    const mPct = s.total ? Math.round(male/s.total*100) : 0;
+    const fPct = s.total ? Math.round(female/s.total*100) : 0;
+    const mBar = document.getElementById('dash-male-bar');
+    const fBar = document.getElementById('dash-female-bar');
+    if (mBar) mBar.style.width = mPct + '%';
+    if (fBar) fBar.style.width = fPct + '%';
+    document.getElementById('dash-male-pct').textContent   = mPct + '%';
+    document.getElementById('dash-female-pct').textContent = fPct + '%';
+
+    // Zone stats
+    this._renderZoneList('dash-zone-list', s.byZone, s.total);
+
+    const recent = App.getMembersForUser().slice(0,8);
+    const tbody  = document.getElementById('dash-recent-tbody');
+    if (tbody) tbody.innerHTML = recent.length
+      ? recent.map(m=>`<tr>
+          <td><strong>${m.lastName||''},</strong> ${m.firstName||''} ${m.otherNames||''}</td>
+          <td>${m.gender||'—'}</td>
+          <td>${m.zone||'—'}</td>
+          <td>${m.partyId||'—'}</td>
+          <td>${m.station||'—'}</td>
+          <td><span class="badge badge-blue">${m.officer||'—'}</span></td>
+          <td>${m.timestamp||'—'}</td>
+        </tr>`).join('')
+      : `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No records yet</div></div></td></tr>`;
+
+    setTimeout(()=>{
+      this._drawBarChart('dash-chart', s.byDay);
+      this._drawGenderDonut('dash-gender-chart', s.byGender);
+      this._drawZoneBar('dash-zone-chart', s.byZone, s.total);
+    }, 100);
+  },
+
+  // Render zone breakdown list (progress bars)
+  _renderZoneList(containerId, byZone, total) {
+    const c = document.getElementById(containerId); if (!c) return;
+    const zones = Object.entries(byZone||{}).sort((a,b)=>b[1]-a[1]);
+    const colors = ['#1a6b3a','#2563eb','#d97706','#7c3aed','#c8102e','#10b981','#f59e0b'];
+    if (!zones.length) { c.innerHTML='<div style="color:var(--gray-400);font-size:13px;text-align:center;padding:12px">No zone data</div>'; return; }
+    c.innerHTML = zones.map(([zone,count],i)=>{
+      const pct = total ? Math.round(count/total*100) : 0;
+      return `<div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+          <span style="font-size:12px;font-weight:600;color:var(--gray-700)">${zone}</span>
+          <span style="font-size:12px;color:var(--gray-500)">${count} &nbsp;<span style="color:var(--gray-400)">(${pct}%)</span></span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${colors[i%colors.length]}"></div></div>
+      </div>`;
+    }).join('');
+  },
+
+  // Draw horizontal zone bar chart on canvas
+  _drawZoneBar(canvasId, byZone, total) {
+    const canvas = document.getElementById(canvasId); if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const entries = Object.entries(byZone||{}).sort((a,b)=>b[1]-a[1]);
+    if (!entries.length) return;
+    const colors = ['#1a6b3a','#2563eb','#d97706','#7c3aed','#c8102e','#10b981','#f59e0b'];
+    const W = canvas.width = canvas.offsetWidth || 300;
+    const rowH = 28, pad = 8, labelW = 80;
+    const H = canvas.height = entries.length * rowH + pad * 2;
+    ctx.clearRect(0,0,W,H);
+    const maxVal = Math.max(...entries.map(e=>e[1]), 1);
+    const barAreaW = W - labelW - 60;
+
+    entries.forEach(([zone,count],i) => {
+      const y = pad + i * rowH;
+      const bw = Math.max((count/maxVal)*barAreaW, 2);
+      const pct = total ? Math.round(count/total*100) : 0;
+
+      // Label
+      ctx.fillStyle = '#4b5563'; ctx.font = '11px Inter'; ctx.textAlign = 'right';
+      const label = zone.length > 10 ? zone.substring(0,10)+'…' : zone;
+      ctx.fillText(label, labelW - 6, y + rowH/2 + 4);
+
+      // Bar
+      const g = ctx.createLinearGradient(labelW, 0, labelW + bw, 0);
+      g.addColorStop(0, colors[i%colors.length]);
+      g.addColorStop(1, colors[i%colors.length] + '99');
+      ctx.fillStyle = g;
+      if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(labelW, y+4, bw, rowH-10, 3); ctx.fill(); }
+      else { ctx.fillRect(labelW, y+4, bw, rowH-10); }
+
+      // Value label
+      ctx.fillStyle = '#1f2937'; ctx.font = 'bold 11px Inter'; ctx.textAlign = 'left';
+      ctx.fillText(`${count} (${pct}%)`, labelW + bw + 6, y + rowH/2 + 4);
+    });
+  },
+
+  _drawBarChart(canvasId, byDay) {
+    const canvas=document.getElementById(canvasId); if(!canvas) return;
+    const ctx=canvas.getContext('2d');
+    const labels=Object.keys(byDay), data=Object.values(byDay), max=Math.max(...data,1);
+    const W=canvas.width=canvas.offsetWidth||400, H=canvas.height=160;
+    ctx.clearRect(0,0,W,H);
+    const barW=(W-80)/labels.length, gap=barW*0.28;
+    for(let i=0;i<=4;i++){
+      const y=20+(H-50)*i/4;
+      ctx.strokeStyle='#e5e7eb';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(40,y);ctx.lineTo(W-10,y);ctx.stroke();
+      ctx.fillStyle='#9ca3af';ctx.font='10px Inter';ctx.textAlign='right';
+      ctx.fillText(Math.round(max-(max*i/4)),36,y+4);
+    }
+    data.forEach((v,i)=>{
+      const x=40+i*barW+gap/2,bw=barW-gap,bh=((v/max)*(H-60))||2,y=H-30-bh;
+      const g=ctx.createLinearGradient(0,y,0,H-30);
+      g.addColorStop(0,'#1a6b3a');g.addColorStop(1,'rgba(26,107,58,.25)');
+      ctx.fillStyle=g;
+      if(ctx.roundRect){ctx.beginPath();ctx.roundRect(x,y,bw,bh,3);ctx.fill();}else{ctx.fillRect(x,y,bw,bh);}
+      ctx.fillStyle='#6b7280';ctx.font='9px Inter';ctx.textAlign='center';
+      const d=new Date(labels[i]);
+      ctx.fillText(isNaN(d)?labels[i]:d.toLocaleDateString('en',{weekday:'short'}),x+bw/2,H-12);
+      if(v>0){ctx.fillStyle='#1a6b3a';ctx.font='bold 10px Inter';ctx.fillText(v,x+bw/2,y-4);}
+    });
+  },
+
+  _drawGenderDonut(canvasId, byGender) {
+    const canvas=document.getElementById(canvasId); if(!canvas) return;
+    const ctx=canvas.getContext('2d');
+    const W=canvas.width=canvas.offsetWidth||220, H=canvas.height=180;
+    ctx.clearRect(0,0,W,H);
+    const male=byGender?.Male||0, female=byGender?.Female||0, total=male+female;
+    if(!total){ ctx.fillStyle='#e5e7eb';ctx.beginPath();ctx.arc(W/2,H/2,60,0,Math.PI*2);ctx.fill();return; }
+    const cx=W/2, cy=H/2, r=Math.min(cx,cy)-15;
+    const slices=[
+      {val:male,  color:'#1a6b3a',label:'Male'},
+      {val:female,color:'#c8102e',label:'Female'},
+    ];
+    let angle=-Math.PI/2;
+    slices.forEach(s=>{
+      const slice=(s.val/total)*Math.PI*2;
+      ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,angle,angle+slice);ctx.closePath();
+      ctx.fillStyle=s.color;ctx.fill();
+      angle+=slice;
+    });
+    // Donut hole
+    ctx.beginPath();ctx.arc(cx,cy,r*.55,0,Math.PI*2);ctx.fillStyle='white';ctx.fill();
+    ctx.fillStyle='#1f2937';ctx.font='bold 16px Outfit';ctx.textAlign='center';
+    ctx.fillText(total,cx,cy+4);
+    ctx.fillStyle='#6b7280';ctx.font='9px Inter';ctx.fillText('Total',cx,cy+16);
+  },
+
+  // ══════════════════════════════════════════════════════════
+  // DATA ENTRY — Zone + Gender fields added
+  // ══════════════════════════════════════════════════════════
+  entry() {
+    const u = App.currentUser;
+    const assigned = u.assignedStations || [];
+
+    // Auto-fill station fields when the user has exactly one assigned station
+    // (applies to both officers and ward coordinators)
+    if (assigned.length === 1) {
+      const s = App.pollingStations.find(ps => ps.code === assigned[0]);
+      if (s) this._fillStationFields(s);
+    }
+
+    // Show/hide Push Records button based on whether Sheet sync is configured
+    const pushBtn = document.getElementById('entry-push-btn');
+    if (pushBtn) {
+      if (App.settings.scriptUrl) {
+        const myCount = App.getMembersForUser().filter(m => !m._demo).length;
+        pushBtn.style.display = '';
+        pushBtn.title = `Force-upload your ${myCount} record(s) to Google Sheets`;
+        pushBtn.innerHTML = `☁️ Push Records to Sheet <span style="font-size:11px;opacity:.8">(${myCount})</span>`;
+      } else {
+        pushBtn.style.display = 'none';
+      }
+    }
+
+    // Clear gender selection
+    const gEl = document.getElementById('f-gender');
+    if (gEl) gEl.value = '';
+    this._setupBranchCodeSearch(u.role);
+  },
+
+  _fillStationFields(s) {
+    const set=(id,val)=>{ const el=document.getElementById(id); if(el) el.value=val||''; };
+    set('f-zone',        s.zone);
+    set('f-ward-name',   s.ward);
+    set('f-station-name',s.name);
+    set('f-branch-name', s.branch);
+    set('f-station-code',s.code);
+    set('f-branch-code', s.branchCode);
+  },
+
+  _setupBranchCodeSearch(role) {
+    const input    = document.getElementById('f-branch-code');
+    const dropdown = document.getElementById('branch-code-dropdown');
+    if (!input||!dropdown) return;
+
+    const u = App.currentUser;
+    const assigned = u.assignedStations || [];
+
+    // Lock the field to readonly when the user has exactly one assigned station
+    // (applies to both officers and ward coordinators)
+    const isLocked = assigned.length === 1;
+    if (isLocked) { input.setAttribute('readonly',true); input.classList.add('auto-filled'); return; }
+
+    input.removeAttribute('readonly'); input.classList.remove('auto-filled');
+    input.placeholder='Type branch code, zone, ward or station name…';
+
+    const getPool = () => {
+      // Restrict dropdown to assigned stations for officers and ward coordinators
+      if ((role==='officer' || role==='ward') && assigned.length)
+        return App.pollingStations.filter(s => assigned.includes(s.code));
+      return App.pollingStations;
+    };
+
+    const show = (q) => {
+      const hits = getPool().filter(s=>!q||
+        s.branchCode?.toLowerCase().includes(q)||s.branch?.toLowerCase().includes(q)||
+        s.name?.toLowerCase().includes(q)||s.ward?.toLowerCase().includes(q)||
+        s.zone?.toLowerCase().includes(q)||s.code?.toLowerCase().includes(q)
+      ).slice(0,30);
+      dropdown.innerHTML = hits.length
+        ? hits.map(s=>`
+            <div class="dropdown-item" data-code="${s.code}">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+                <div>
+                  <strong style="color:var(--ndc-green-dk)">${s.branchCode}</strong>
+                  <span style="color:var(--gray-500);font-size:11px;margin-left:6px">${s.name}</span>
+                </div>
+                <div style="display:flex;gap:4px">
+                  <span class="badge badge-green" style="font-size:10px">${s.zone||''}</span>
+                  <span class="badge badge-blue"  style="font-size:10px">${s.ward||''}</span>
+                </div>
+              </div>
+              <div style="font-size:11px;color:var(--gray-400);margin-top:2px">Branch: ${s.branch} · Code: ${s.code}</div>
+            </div>`).join('')
+        : '<div class="dropdown-item" style="color:var(--gray-400);text-align:center;padding:16px">No matching stations</div>';
+      dropdown.classList.add('open');
+      dropdown.querySelectorAll('.dropdown-item[data-code]').forEach(item=>{
+        item.onclick=()=>{
+          const s = App.pollingStations.find(ps => ps.code === item.dataset.code);
+          if(s){this._fillStationFields(s);Toast.show('Station Selected',`${s.name} · ${s.branchCode}`,'success');}
+          dropdown.classList.remove('open');
+        };
+      });
+    };
+
+    const ni=input.cloneNode(true); input.parentNode.replaceChild(ni,input);
+    ni.addEventListener('focus',()=>show(ni.value.toLowerCase().trim()));
+    ni.addEventListener('input',()=>show(ni.value.toLowerCase().trim()));
+    document.addEventListener('click',e=>{if(!ni.contains(e.target)&&!dropdown.contains(e.target))dropdown.classList.remove('open');});
+    // Auto-open dropdown on focus for users with multiple assigned stations
+    if (role !== 'officer' && role !== 'ward') setTimeout(()=>show(''),150);
+    else if (assigned.length > 1)              setTimeout(()=>show(''),150);
+  },
+
+  submitEntry() {
+    // Lock against double-tap — if a save is already in progress, ignore
+    if (PageRenderers._saveLock) return;
+    PageRenderers._saveLock = true;
+    setTimeout(() => { PageRenderers._saveLock = false; }, 2000);
+
+    const required=['f-branch-code','f-station-code','f-last-name','f-first-name','f-party-id','f-gender'];
+    let ok=true;
+    required.forEach(id=>{
+      const el=document.getElementById(id);
+      if(el&&!el.value.trim()){el.style.borderColor='var(--ndc-red)';ok=false;}
+      else if(el) el.style.borderColor='';
+    });
+    if(!ok){Toast.show('Validation Error','Please fill all required fields including Gender.','error');return;}
+    const g=id=>document.getElementById(id)?.value.trim()||'';
+    const result = App.addMember({
+      zone:        g('f-zone'),
+      ward:        g('f-ward-name'),
+      station:     g('f-station-name'),
+      stationCode: g('f-station-code'),
+      branch:      g('f-branch-name'),
+      branchCode:  g('f-branch-code'),
+      lastName:    g('f-last-name'),
+      firstName:   g('f-first-name'),
+      otherNames:  g('f-other-names'),
+      gender:      g('f-gender'),
+      partyId:     g('f-party-id'),
+      voterId:     g('f-voter-id'),
+      phone:       g('f-phone'),
+    });
+    // null = duplicate was blocked — toast already shown by App.addMember, do not clear form
+    if (result === null) return;
+    Toast.show('Record Saved',`${g('f-first-name')} ${g('f-last-name')} registered successfully.`,'success');
+    ['f-last-name','f-first-name','f-other-names','f-gender','f-party-id','f-voter-id','f-phone']
+      .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    document.getElementById('f-last-name')?.focus();
+  },
+
+  // Real-time duplicate check fired on input of partyId / voterId fields.
+  // Checks the Sheet-wide ID index first, then unsynced local records.
+  // No Sheet query — purely in-memory, zero latency.
+  _checkDuplicateField(field, inputId, warnId) {
+    const input = document.getElementById(inputId);
+    const warn  = document.getElementById(warnId);
+    if (!input || !warn) return;
+    const val = input.value.trim().toLowerCase();
+    if (!val) { warn.style.display = 'none'; input.style.borderColor = ''; return; }
+
+    // 1. Check the Sheet-wide index (covers all enrolled members)
+    const idxMatch = App._lookupIdIndex(field, val);
+    if (idxMatch) {
+      warn.style.display = 'block';
+      warn.textContent   = `⚠️ Already in Sheet: ${idxMatch.firstName} ${idxMatch.lastName} — ${idxMatch.station} (Party ID: ${idxMatch.partyId || '—'})`;
+      input.style.borderColor = 'var(--ndc-red)';
+      return;
+    }
+
+    // 2. Check unsynced local records not yet in the index
+    const local = JSON.parse(localStorage.getItem('knndc_members') || '[]')
+      .filter(m => !m._demo);
+    const localMatch = local.find(m => (m[field] || '').trim().toLowerCase() === val);
+    if (localMatch) {
+      warn.style.display = 'block';
+      warn.textContent   = `⚠️ Already saved locally: ${localMatch.firstName} ${localMatch.lastName} — ${localMatch.station} (Party ID: ${localMatch.partyId || '—'})`;
+      input.style.borderColor = 'var(--ndc-red)';
+      return;
+    }
+
+    // No match — clear warning
+    warn.style.display = 'none';
+    input.style.borderColor = 'var(--ndc-green)';
+  },
+
+  _saveLock: false,
+  _selectedIds: new Set(),
+
+  // ── BULK SELECTION (admin only — All Records page) ────────────────────────
+  onRowSelect() {
+    const checked = [...document.querySelectorAll('.row-select:checked')];
+    PageRenderers._selectedIds = new Set(checked.map(c => c.dataset.id));
+    const bar   = document.getElementById('bulk-action-bar');
+    const count = document.getElementById('bulk-count');
+    const selAll = document.getElementById('select-all-records');
+    const total  = document.querySelectorAll('.row-select').length;
+    if (bar)    bar.style.display    = PageRenderers._selectedIds.size ? 'flex' : 'none';
+    if (count)  count.textContent    = `${PageRenderers._selectedIds.size} selected`;
+    if (selAll) selAll.indeterminate = PageRenderers._selectedIds.size > 0 && PageRenderers._selectedIds.size < total;
+    if (selAll) selAll.checked       = PageRenderers._selectedIds.size === total && total > 0;
+  },
+
+  toggleSelectAll(checked) {
+    document.querySelectorAll('.row-select').forEach(cb => {
+      cb.checked = checked;
+      if (checked) PageRenderers._selectedIds.add(cb.dataset.id);
+    });
+    if (!checked) PageRenderers._selectedIds.clear();
+    PageRenderers.onRowSelect();
+  },
+
+  clearBulkSelection() {
+    PageRenderers._selectedIds.clear();
+    document.querySelectorAll('.row-select').forEach(cb => { cb.checked = false; });
+    const selAll = document.getElementById('select-all-records');
+    if (selAll) { selAll.checked = false; selAll.indeterminate = false; }
+    const bar = document.getElementById('bulk-action-bar');
+    if (bar) bar.style.display = 'none';
+  },
+
+  openBulkBranchEdit() {
+    if (!PageRenderers._selectedIds.size) return;
+    document.getElementById('bulk-modal-count').textContent = PageRenderers._selectedIds.size;
+    document.getElementById('bulk-branch-code-input').value = '';
+    document.getElementById('bulk-branch-name').value = '';
+    document.getElementById('bulk-zone').value = '';
+    document.getElementById('bulk-ward').value = '';
+    document.getElementById('bulk-reason').value = '';
+    document.getElementById('bulk-branch-dropdown').innerHTML = '';
+    Modal.open('modal-bulk-branch');
+  },
+
+  _bulkBranchSearch(q) {
+    const dd = document.getElementById('bulk-branch-dropdown');
+    if (!dd) return;
+    const term = q.trim().toLowerCase();
+    if (!term) { dd.innerHTML = ''; dd.style.display = 'none'; return; }
+    const matches = App.pollingStations.filter(s =>
+      (s.branchCode||'').toLowerCase().includes(term) ||
+      (s.branch||'').toLowerCase().includes(term)
+    ).slice(0, 10);
+    if (!matches.length) { dd.innerHTML = ''; dd.style.display = 'none'; return; }
+    dd.style.display = 'block';
+    dd.innerHTML = matches.map(s =>
+      `<div class="search-dropdown-item" onclick="PageRenderers._bulkFillBranch(${JSON.stringify(s).replace(/"/g,'&quot;')})">
+        <strong>${s.branchCode}</strong> — ${s.branch} <span style="color:var(--gray-500);font-size:11px">(${s.zone||''})</span>
+      </div>`
+    ).join('');
+  },
+
+  _bulkFillBranch(s) {
+    document.getElementById('bulk-branch-code-input').value = s.branchCode||'';
+    document.getElementById('bulk-branch-name').value       = s.branch||'';
+    document.getElementById('bulk-zone').value              = s.zone||'';
+    document.getElementById('bulk-ward').value              = s.ward||'';
+    document.getElementById('bulk-branch-dropdown').style.display = 'none';
+    PageRenderers._bulkSelectedStation = s;
+  },
+
+  _bulkSelectedStation: null,
+
+  async submitBulkBranchEdit() {
+    const s = PageRenderers._bulkSelectedStation;
+    const reason = (document.getElementById('bulk-reason')?.value||'').trim();
+    if (!s?.branchCode) {
+      Toast.show('Select Branch','Please select a branch from the dropdown.','error'); return;
+    }
+    if (!reason) {
+      Toast.show('Reason Required','Please enter a reason for this bulk change.','error'); return;
+    }
+    const ids = [...PageRenderers._selectedIds];
+    Modal.close('modal-bulk-branch');
+    Toast.show('Updating…', `Applying branch change to ${ids.length} record(s)…`, 'info', 8000);
+
+    let ok = 0, fail = 0;
+    for (const id of ids) {
+      const success = App.updateMember(id, {
+        branchCode: s.branchCode,
+        branch:     s.branch,
+        zone:       s.zone,
+        ward:       s.ward,
+      }, `Bulk branch change: ${reason}`);
+      if (success) ok++; else fail++;
+    }
+
+    PageRenderers.clearBulkSelection();
+    PageRenderers._renderAllRecords();
+
+    if (fail === 0) Toast.show('Bulk Update Complete ✅', `${ok} record(s) updated to branch ${s.branchCode}.`, 'success', 6000);
+    else            Toast.show('Partial Update', `${ok} updated, ${fail} failed.`, 'warning', 6000);
+
+    App.logAudit('BULK_BRANCH_EDIT',
+      `Admin changed branch to ${s.branchCode} (${s.branch}) for ${ok} record(s). Reason: ${reason}`,
+      App.currentUser?.username);
+  },
+
+  // ══════════════════════════════════════════════════════════
+  // MY RECORDS
+  // ══════════════════════════════════════════════════════════
+  'my-records'() {
+    const members = App.getMembersForUser();
+    document.getElementById('my-records-count').textContent = `${members.length} record${members.length!==1?'s':''}`;
+    // showActions=true so officers can edit their own records from this page
+    this._renderMembersTable('my-records-tbody', members, true);
+  },
+
+  // ══════════════════════════════════════════════════════════
+  // ALL RECORDS — with ward/station/branch/gender filters
+  // ══════════════════════════════════════════════════════════
+  records() {
+    PageRenderers._allState = PageRenderers._allState || { q:'', page:1, zone:'', ward:'', station:'', branch:'', gender:'' };
+
+    // Show Pull All from Sheet button for admin only
+    const pullBtn = document.getElementById('records-pull-btn');
+    if (pullBtn) {
+      pullBtn.style.display = (App.currentUser?.role === 'admin' && App.settings.scriptUrl) ? '' : 'none';
+    }
+
+    // Admin: trigger a background Sheet sync every time they visit this page
+    // so the count stays current without manual intervention
+    if (App.currentUser?.role === 'admin' && App.isOnline && App.settings.scriptUrl) {
+      App.fetchFromSheets();
+    }
+
+    this._populateRecordFilters();
+    this._renderAllRecords();
+  },
+
+  _populateRecordFilters() {
+    const all = App.getMembersForUser();
+    const pop=(id,vals,lbl)=>{ const el=document.getElementById(id);if(!el)return;const cur=el.value;el.innerHTML=`<option value="">All ${lbl}</option>`+vals.map(v=>`<option value="${v}"${v===cur?' selected':''}>${v}</option>`).join(''); };
+    pop('filter-zone',    [...new Set(all.map(m=>m.zone).filter(Boolean))].sort(),    'Zones');
+    pop('filter-ward',    [...new Set(all.map(m=>m.ward).filter(Boolean))].sort(),    'Wards');
+    pop('filter-station', [...new Set(all.map(m=>m.station).filter(Boolean))].sort(), 'Stations');
+    pop('filter-branch',  [...new Set(all.map(m=>m.branch).filter(Boolean))].sort(),  'Branches');
+  },
+
+  _renderAllRecords() {
+    const st = PageRenderers._allState;
+    let members = App.getMembersForUser();
+
+    // Multi-criteria AND search: split on whitespace, every token must match at least one field
+    if (st.q) {
+      const tokens = st.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      members = members.filter(m => {
+        const fields = [
+          m.firstName, m.lastName, m.otherNames, m.partyId, m.voterId,
+          m.phone, m.station, m.stationCode, m.ward, m.zone, m.branch,
+          m.branchCode, m.officerName
+        ].map(v => (v||'').toLowerCase());
+        // Every token must appear in at least one field (AND logic across tokens)
+        return tokens.every(tok => fields.some(f => f.includes(tok)));
+      });
+    }
+    if (st.zone)    members=members.filter(m=>m.zone===st.zone);
+    if (st.ward)    members=members.filter(m=>m.ward===st.ward);
+    if (st.station) members=members.filter(m=>m.station===st.station);
+    if (st.branch)  members=members.filter(m=>m.branch===st.branch);
+    if (st.gender)  members=members.filter(m=>m.gender===st.gender);
+
+    const per=20, total=members.length, pages=Math.ceil(total/per)||1;
+    const page=Math.min(st.page,pages), slice=members.slice((page-1)*per,page*per);
+
+    document.getElementById('records-count').textContent=`${total.toLocaleString()} record${total!==1?'s':''}`;
+    this._renderMembersTable('records-tbody',slice,true);
+
+    const pc=document.getElementById('records-pagination'); if(!pc) return; pc.innerHTML='';
+    if(pages>1){
+      const mk=(lbl,pg,active,disabled)=>{ const b=document.createElement('button');b.className='page-btn'+(active?' active':'');b.textContent=lbl;b.disabled=disabled;b.onclick=()=>{PageRenderers._allState.page=pg;PageRenderers._renderAllRecords();}; return b; };
+      pc.appendChild(mk('‹',page-1,false,page===1));
+      for(let i=1;i<=pages;i++){
+        if(i===1||i===pages||Math.abs(i-page)<=2) pc.appendChild(mk(i,i,i===page));
+        else if(Math.abs(i-page)===3){const s=document.createElement('span');s.className='page-btn';s.textContent='…';pc.appendChild(s);}
+      }
+      pc.appendChild(mk('›',page+1,false,page===pages));
+    }
+  },
+
+  _renderMembersTable(tbodyId, members, showActions) {
+    const tbody=document.getElementById(tbodyId); if(!tbody) return;
+    const isAdmin = App.currentUser?.role === 'admin';
+    const isRecordsPage = tbodyId === 'records-tbody';
+    tbody.innerHTML = members.length
+      ? members.map(m => {
+          const canEdit = showActions && App.canEditMember(m);
+          const canDel  = showActions && App.canDeleteMember(m);
+          const chk = (isAdmin && isRecordsPage)
+            ? `<td style="width:32px"><input type="checkbox" class="row-select" data-id="${m.id}" onchange="PageRenderers.onRowSelect()"></td>`
+            : (isRecordsPage ? '<td></td>' : '');
+          return `<tr data-id="${m.id}">
+            ${chk}
+            <td><strong>${m.lastName||''},</strong> ${m.firstName||''} ${m.otherNames||''}</td>
+            <td><span class="badge ${m.gender==='Male'?'badge-blue':'badge-red'}" style="font-size:11px">${m.gender||'—'}</span></td>
+            <td>${m.zone||'—'}</td>
+            <td>${m.partyId||'—'}</td>
+            <td>${m.voterId||'—'}</td>
+            <td>${m.phone||'—'}</td>
+            <td>${m.ward||'—'}</td>
+            <td>${m.station||'—'}</td>
+            <td>${m.branch||'—'}</td>
+            <td>${m.timestamp||'—'}</td>
+            ${showActions ? `<td>
+              ${canEdit ? `<button class="btn btn-sm btn-secondary" onclick="PageRenderers.openEdit('${m.id}')" title="Edit">✏️</button>` : ''}
+              ${canDel  ? `<button class="btn btn-sm btn-danger"    onclick="PageRenderers.confirmDelete('${m.id}')" title="Delete">🗑️</button>` : ''}
+              ${showActions && !canEdit && !canDel ? '<span style="color:var(--gray-300);font-size:11px">—</span>' : ''}
+            </td>` : ''}
+          </tr>`;
+        }).join('')
+      : `<tr><td colspan="12"><div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">No records found</div></div></td></tr>`;
+  },
+
+
+  openEdit(id) {
+    const m = App.members.find(x=>x.id===id); if (!m) return;
+    // Permission guard — use canEditMember (exec can edit; officer scoped to own records)
+    if (!App.canEditMember(m)) {
+      Toast.show('Permission Denied','You can only edit records from your assigned stations.','error');
+      return;
+    }
+
+    // Populate personal fields
+    const set = (fid, val) => { const el=document.getElementById(fid); if(el) el.value=val||''; };
+    set('edit-id',     id);
+    set('edit-first',  m.firstName);
+    set('edit-last',   m.lastName);
+    set('edit-other',  m.otherNames);
+    set('edit-gender', m.gender);
+    set('edit-party',  m.partyId);
+    set('edit-voter',  m.voterId);
+    set('edit-phone',  m.phone);
+    set('edit-reason', '');
+
+    // Populate station fields (read-only display, editable via search)
+    set('edit-branch-code',  m.branchCode);
+    set('edit-zone',         m.zone);
+    set('edit-ward',         m.ward);
+    set('edit-station-name', m.station);
+    set('edit-branch-name',  m.branch);
+    set('edit-station-code', m.stationCode);
+
+    document.getElementById('edit-current-info').textContent =
+      `Editing: ${m.firstName} ${m.lastName} | Party ID: ${m.partyId} | Station: ${m.station||'—'} | Added: ${m.timestamp}`;
+
+    // Setup branch-code search inside modal
+    this._setupEditStationSearch();
+    Modal.open('modal-edit');
+  },
+
+  _setupEditStationSearch() {
+    const input    = document.getElementById('edit-branch-code');
+    const dropdown = document.getElementById('edit-branch-dropdown');
+    if (!input || !dropdown) return;
+
+    input.removeAttribute('readonly');
+
+    const show = (q) => {
+      const hits = App.pollingStations.filter(s =>
+        !q ||
+        s.branchCode?.toLowerCase().includes(q) ||
+        s.branch?.toLowerCase().includes(q) ||
+        s.name?.toLowerCase().includes(q) ||
+        s.ward?.toLowerCase().includes(q) ||
+        s.zone?.toLowerCase().includes(q) ||
+        s.code?.toLowerCase().includes(q)
+      ).slice(0, 30);
+
+      dropdown.innerHTML = hits.length
+        ? hits.map(s => `
+            <div class="dropdown-item" data-code="${s.code}">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+                <div>
+                  <strong style="color:var(--ndc-green-dk)">${s.branchCode}</strong>
+                  <span style="color:var(--gray-500);font-size:11px;margin-left:6px">${s.name}</span>
+                </div>
+                <div style="display:flex;gap:4px">
+                  <span class="badge badge-green" style="font-size:10px">${s.zone||''}</span>
+                  <span class="badge badge-blue"  style="font-size:10px">${s.ward||''}</span>
+                </div>
+              </div>
+              <div style="font-size:11px;color:var(--gray-400);margin-top:2px">Branch: ${s.branch} · Code: ${s.code}</div>
+            </div>`)
+          .join('')
+        : '<div class="dropdown-item" style="color:var(--gray-400);text-align:center;padding:12px">No matching stations</div>';
+
+      dropdown.classList.add('open');
+
+      dropdown.querySelectorAll('.dropdown-item[data-code]').forEach(item => {
+        item.onclick = () => {
+          const s = App.pollingStations.find(ps => ps.code === item.dataset.code);
+          if (s) {
+            document.getElementById('edit-branch-code').value  = s.branchCode;
+            document.getElementById('edit-zone').value         = s.zone;
+            document.getElementById('edit-ward').value         = s.ward;
+            document.getElementById('edit-station-name').value = s.name;
+            document.getElementById('edit-branch-name').value  = s.branch;
+            document.getElementById('edit-station-code').value = s.code;
+            Toast.show('Station Updated', `${s.name} · ${s.branchCode}`, 'success');
+          }
+          dropdown.classList.remove('open');
+        };
+      });
+    };
+
+    // Clone to remove old listeners
+    const ni = input.cloneNode(true);
+    input.parentNode.replaceChild(ni, input);
+    ni.addEventListener('focus', () => show(ni.value.toLowerCase().trim()));
+    ni.addEventListener('input', () => show(ni.value.toLowerCase().trim()));
+    document.addEventListener('click', e => {
+      if (!ni.contains(e.target) && !dropdown.contains(e.target)) dropdown.classList.remove('open');
+    });
+  },
+
+  submitEdit() {
+    const id     = document.getElementById('edit-id').value;
+    const reason = document.getElementById('edit-reason').value.trim();
+    if (!reason) { Toast.show('Reason Required','Please provide a reason for this change.','error'); return; }
+
+    const g = fid => document.getElementById(fid)?.value.trim() || '';
+    const saved = App.updateMember(id, {
+      firstName:   g('edit-first'),
+      lastName:    g('edit-last'),
+      otherNames:  g('edit-other'),
+      gender:      g('edit-gender'),
+      partyId:     g('edit-party'),
+      voterId:     g('edit-voter'),
+      phone:       g('edit-phone'),
+      zone:        g('edit-zone'),
+      ward:        g('edit-ward'),
+      station:     g('edit-station-name'),
+      stationCode: g('edit-station-code'),
+      branch:      g('edit-branch-name'),
+      branchCode:  g('edit-branch-code'),
+    }, reason);
+    if (saved === false) return; // permission denied — toast already shown
+    Modal.close('modal-edit');
+    Toast.show('Record Updated','Changes saved and synced.','success');
+    // Refresh whichever records page the user was on
+    const page = App.currentPage;
+    if (page === 'my-records') PageRenderers['my-records']();
+    else PageRenderers.records();
+  },
+
+  confirmDelete(id) {
+    const m=App.members.find(x=>x.id===id);
+    if (!m) return;
+    // Permission guard — re-check before opening the modal
+    if (!App.canModifyMember(m)) {
+      Toast.show('Permission Denied','You can only delete records from your assigned stations.','error');
+      return;
+    }
+    document.getElementById('del-id').value=id;
+    document.getElementById('del-name').textContent=`${m.firstName} ${m.lastName} (${m.partyId})`;
+    document.getElementById('del-reason').value='';
+    Modal.open('modal-delete');
+  },
+
+  submitDelete() {
+    const id=document.getElementById('del-id').value;
+    const reason=document.getElementById('del-reason').value.trim();
+    if(!reason){Toast.show('Reason Required','Please provide a reason.','error');return;}
+    const deleted = App.deleteMember(id,reason);
+    if (deleted === false) return; // permission denied — toast already shown
+    Modal.close('modal-delete');
+    Toast.show('Record Deleted','Member removed.','error');
+    PageRenderers.records();
+  },
+
+  // ══════════════════════════════════════════════════════════
+  // REPORTS — with filters
+  // ══════════════════════════════════════════════════════════
+  reports() {
+    PageRenderers._repState = PageRenderers._repState || { zone:'', ward:'', station:'', branch:'', gender:'' };
+    this._populateReportFilters();
+    this._renderReports();
+  },
+
+  _populateReportFilters() {
+    const all=App.getMembersForUser();
+    const pop=(id,vals,lbl)=>{ const el=document.getElementById(id);if(!el)return;const cur=el.value;el.innerHTML=`<option value="">All ${lbl}</option>`+vals.map(v=>`<option value="${v}"${v===cur?' selected':''}>${v}</option>`).join(''); };
+    pop('rep-filter-zone',   [...new Set(all.map(m=>m.zone).filter(Boolean))].sort(),    'Zones');
+    pop('rep-filter-ward',   [...new Set(all.map(m=>m.ward).filter(Boolean))].sort(),    'Wards');
+    pop('rep-filter-station',[...new Set(all.map(m=>m.station).filter(Boolean))].sort(), 'Stations');
+    pop('rep-filter-branch', [...new Set(all.map(m=>m.branch).filter(Boolean))].sort(),  'Branches');
+  },
+
+  _renderReports() {
+    const st=PageRenderers._repState;
+    let members=App.getMembersForUser();
+    if(st.zone)    members=members.filter(m=>m.zone===st.zone);
+    if(st.ward)    members=members.filter(m=>m.ward===st.ward);
+    if(st.station) members=members.filter(m=>m.station===st.station);
+    if(st.branch)  members=members.filter(m=>m.branch===st.branch);
+    if(st.gender)  members=members.filter(m=>m.gender===st.gender);
+
+    const byStation={};
+    members.forEach(m=>{
+      if(!byStation[m.station]) byStation[m.station]={station:m.station,branch:m.branch||'',ward:m.ward||'',zone:m.zone||'',count:0,male:0,female:0};
+      byStation[m.station].count++;
+      if(m.gender==='Male') byStation[m.station].male++;
+      if(m.gender==='Female') byStation[m.station].female++;
+    });
+    const rows=Object.values(byStation).sort((a,b)=>b.count-a.count);
+    const tbody=document.getElementById('report-tbody');
+    if(tbody) tbody.innerHTML=rows.length
+      ? rows.map((r,i)=>`<tr>
+          <td>${i+1}</td><td>${r.zone||'—'}</td><td>${r.ward}</td><td><strong>${r.station}</strong></td><td>${r.branch}</td>
+          <td>${r.count}</td>
+          <td><span class="badge badge-blue">${r.male}</span></td>
+          <td><span class="badge badge-red">${r.female}</span></td>
+          <td><div class="progress-bar" style="width:90px"><div class="progress-fill" style="width:${members.length?Math.round(r.count/members.length*100):0}%"></div></div></td>
+          <td>${members.length?Math.round(r.count/members.length*100):0}%</td>
+        </tr>`).join('')
+      : `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--gray-400)">No data</td></tr>`;
+
+    document.getElementById('report-total').textContent=members.length.toLocaleString();
+    const todayISO = App._todayISO();
+    const dailyCount = members.filter(m => (m.isoDate || App._isoDate(m.timestamp)) === todayISO).length;
+    document.getElementById('daily-count').textContent = dailyCount;
+    document.getElementById('daily-date').textContent  = new Date().toLocaleDateString('en-GH');
+
+    const male=members.filter(m=>m.gender==='Male').length;
+    const female=members.filter(m=>m.gender==='Female').length;
+    document.getElementById('rep-male-count').textContent=male;
+    document.getElementById('rep-female-count').textContent=female;
+
+    setTimeout(()=>{ this._drawPieChart(byStation,members.length); this._drawGenderDonut('rep-gender-chart',{Male:male,Female:female}); },100);
+  },
+
+  _drawPieChart(byStation,total) {
+    const canvas=document.getElementById('report-chart'); if(!canvas||!total) return;
+    const ctx=canvas.getContext('2d');
+    const W=canvas.width=canvas.offsetWidth||280, H=canvas.height=200;
+    ctx.clearRect(0,0,W,H);
+    const cx=W/2, cy=H/2, r=Math.min(cx,cy)-20;
+    const colors=['#1a6b3a','#c8102e','#2563eb','#d97706','#7c3aed','#10b981','#f59e0b','#ef4444','#8b5cf6'];
+    let angle=-Math.PI/2;
+    Object.values(byStation).forEach((s,i)=>{
+      const slice=(s.count/total)*Math.PI*2;
+      ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,angle,angle+slice);ctx.closePath();
+      ctx.fillStyle=colors[i%colors.length];ctx.fill();angle+=slice;
+    });
+    ctx.beginPath();ctx.arc(cx,cy,r*.55,0,Math.PI*2);ctx.fillStyle='white';ctx.fill();
+    ctx.fillStyle='#1f2937';ctx.font='bold 20px Outfit';ctx.textAlign='center';
+    ctx.fillText(total,cx,cy+4);
+    ctx.fillStyle='#6b7280';ctx.font='10px Inter';ctx.fillText('Total',cx,cy+18);
+  },
+
+  exportExcel() {
+    const members=App.getMembersForUser(), constituency=App.settings.constituency||'Ketu North';
+    if(typeof XLSX==='undefined'){
+      const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload=()=>PageRenderers.exportExcel();document.head.appendChild(s);Toast.show('Loading','Preparing…','info');return;
+    }
+    const wb=XLSX.utils.book_new();
+    const hdr=['First Name','Surname','Party ID Number','Voter ID Number','Telephone Number'];
+    const mkSheet=(rows)=>{ const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[{wch:18},{wch:18},{wch:20},{wch:20},{wch:18}];ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:3}},{s:{r:1,c:0},e:{r:1,c:3}}];return ws; };
+    XLSX.utils.book_append_sheet(wb,mkSheet([['MEMBERSHIP DATABASE','','','',''],['Polling Station / Branch Name: ALL STATIONS','','','',`Constituency: ${constituency}`],['','','','',''],hdr,...members.map(m=>[m.firstName,m.lastName,m.partyId,m.voterId,m.phone])]),'All Members');
+    const byStation={};
+    members.forEach(m=>{ const k=m.stationCode||'UNK';if(!byStation[k])byStation[k]={info:m,members:[]};byStation[k].members.push(m); });
+    Object.values(byStation).forEach(({info,members:sm})=>{
+      const name=(info.station||'Station').replace(/[\\\/\?\*\[\]:]/g,'').substring(0,31);
+      XLSX.utils.book_append_sheet(wb,mkSheet([['MEMBERSHIP DATABASE','','','',''],['Polling Station / Branch Name: '+info.station+' / '+info.branch,'','','',`Constituency: ${constituency}`],['','','','',''],hdr,...sm.map(m=>[m.firstName,m.lastName,m.partyId,m.voterId,m.phone])]),name);
+    });
+    const wsSummary=XLSX.utils.aoa_to_sheet([['MEMBERSHIP DATABASE — SUMMARY','','',''],['Constituency: '+constituency,'','','Export Date: '+new Date().toLocaleDateString('en-GH')],['','','',''],['Ward','Polling Station','Branch','Total Members'],...Object.values(byStation).map(({info,members:sm})=>[info.ward||'—',info.station||'—',info.branch||'—',sm.length]),['','','GRAND TOTAL',members.length]]);
+    wsSummary['!cols']=[{wch:20},{wch:28},{wch:22},{wch:15}];
+    XLSX.utils.book_append_sheet(wb,wsSummary,'Summary');
+    XLSX.writeFile(wb,`KNNDCmdb_${new Date().toISOString().slice(0,10)}.xlsx`);
+    Toast.show('Export Ready',`${members.length} records exported.`,'success');
+    App.logAudit('EXPORT_EXCEL',`Exported ${members.length} records`,App.currentUser.username);
+  },
+
+  exportPDF() { window.print(); App.logAudit('EXPORT_PDF','Printed/exported as PDF',App.currentUser.username); },
+
+  // ══════════════════════════════════════════════════════════
+  // ANALYTICS — with gender distribution and filters
+  // ══════════════════════════════════════════════════════════
+  analytics() {
+    PageRenderers._anaState = PageRenderers._anaState || { zone:'', ward:'', station:'', branch:'', gender:'' };
+    this._populateAnaFilters();
+    this._renderAnalytics();
+  },
+
+  _populateAnaFilters() {
+    const all=App.getMembersForUser();
+    const pop=(id,vals,lbl)=>{ const el=document.getElementById(id);if(!el)return;const cur=el.value;el.innerHTML=`<option value="">All ${lbl}</option>`+vals.map(v=>`<option value="${v}"${v===cur?' selected':''}>${v}</option>`).join(''); };
+    pop('ana-filter-zone',   [...new Set(all.map(m=>m.zone).filter(Boolean))].sort(),    'Zones');
+    pop('ana-filter-ward',   [...new Set(all.map(m=>m.ward).filter(Boolean))].sort(),    'Wards');
+    pop('ana-filter-station',[...new Set(all.map(m=>m.station).filter(Boolean))].sort(), 'Stations');
+    pop('ana-filter-branch', [...new Set(all.map(m=>m.branch).filter(Boolean))].sort(),  'Branches');
+  },
+
+  _renderAnalytics() {
+    const st=PageRenderers._anaState;
+    let members=App.getMembersForUser();
+    if(st.zone)    members=members.filter(m=>m.zone===st.zone);
+    if(st.ward)    members=members.filter(m=>m.ward===st.ward);
+    if(st.station) members=members.filter(m=>m.station===st.station);
+    if(st.branch)  members=members.filter(m=>m.branch===st.branch);
+    if(st.gender)  members=members.filter(m=>m.gender===st.gender);
+
+    const male=members.filter(m=>m.gender==='Male').length;
+    const female=members.filter(m=>m.gender==='Female').length;
+
+    // Use ISO date keys — locale-independent, works on all devices
+    const todayISO = App._todayISO();
+    const yesterdayISO = App._daysAgoISO(1);
+    const isoOf = m => m.isoDate || App._isoDate(m.timestamp);
+
+    const todayCount = members.filter(m => isoOf(m) === todayISO).length;
+    const byStation={}, byZone={};
+    members.forEach(m=>{
+      byStation[m.station]=(byStation[m.station]||0)+1;
+      if(m.zone) byZone[m.zone]=(byZone[m.zone]||0)+1;
+    });
+
+    document.getElementById('ana-total').textContent    = members.length.toLocaleString();
+    document.getElementById('ana-today').textContent    = todayCount;
+    document.getElementById('ana-stations').textContent = Object.keys(byStation).length;
+    document.getElementById('ana-male').textContent     = male;
+    document.getElementById('ana-female').textContent   = female;
+    document.getElementById('ana-male-pct').textContent = members.length?Math.round(male/members.length*100)+'%':'0%';
+    document.getElementById('ana-female-pct').textContent=members.length?Math.round(female/members.length*100)+'%':'0%';
+
+    // Zone count stat
+    const zoneCount = Object.keys(byZone).length;
+    const anaZones = document.getElementById('ana-zones');
+    if (anaZones) anaZones.textContent = zoneCount;
+
+    // Day-over-day growth — locale-independent
+    const yCount = members.filter(m => isoOf(m) === yesterdayISO).length;
+    const growth = yCount ? ((todayCount-yCount)/yCount*100).toFixed(0) : (todayCount>0?'∞':0);
+    document.getElementById('ana-growth').textContent=(typeof growth==='number'&&growth>0?'+':'')+growth+(growth!=='∞'?'%':'');
+
+    // 7-day trend — ISO date keys
+    const byDay={};
+    for(let i=6;i>=0;i--){
+      const k = App._daysAgoISO(i);
+      byDay[k] = members.filter(m => isoOf(m) === k).length;
+    }
+
+    // Render zone list
+    this._renderZoneList('ana-zone-list', byZone, members.length);
+
+    setTimeout(()=>{
+      this._drawBarChart('ana-chart',byDay);
+      this._drawGenderDonut('ana-gender-chart',{Male:male,Female:female});
+      this._drawZoneBar('ana-zone-chart', byZone, members.length);
+      this._drawPieChart(byStation,members.length);
+    },100);
+
+    const byOfficer={};
+    members.forEach(m=>{byOfficer[m.officer]=(byOfficer[m.officer]||0)+1;});
+    const top=Object.entries(byOfficer).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    const t=document.getElementById('ana-officers-tbody');
+    if(t) t.innerHTML=top.length
+      ? top.map(([name,count])=>`<tr><td>${name}</td><td>${count}</td><td><div class="progress-bar"><div class="progress-fill" style="width:${members.length?Math.round(count/members.length*100):0}%"></div></div></td><td>${members.length?Math.round(count/members.length*100):0}%</td></tr>`).join('')
+      : '<tr><td colspan="4" style="text-align:center">No data</td></tr>';
+  },
+
+  // ══════════════════════════════════════════════════════════
+  // AUDIT LOG
+  // ══════════════════════════════════════════════════════════
+  audit() {
+    // Admin: pull latest entries from Sheet first (non-blocking)
+    // so the log shows activity from ALL devices, not just this one.
+    if (App.currentUser?.role === 'admin' && App.isOnline && App.settings.scriptUrl) {
+      const banner = document.getElementById('audit-sync-banner');
+      if (banner) banner.style.display = 'flex';
+      App._fetchAuditFromSheet().then(hasNew => {
+        if (banner) banner.style.display = 'none';
+        if (hasNew) PageRenderers._renderAuditEntries(); // re-render with fresh data
+      });
+    }
+    PageRenderers._renderAuditEntries();
+  },
+
+  _renderAuditEntries() {
+    const q=document.getElementById('audit-search')?.value?.toLowerCase()||'';
+    const filter=document.getElementById('audit-filter')?.value||'';
+    const userFilter=document.getElementById('audit-user-filter')?.value||'';
+    App.auditLog=JSON.parse(localStorage.getItem('knndc_audit')||'[]');
+    let log=App.auditLog;
+    if(q)          log=log.filter(e=>e.action?.toLowerCase().includes(q)||e.details?.toLowerCase().includes(q)||e.user?.toLowerCase().includes(q));
+    if(filter)     log=log.filter(e=>e.action===filter);
+    if(userFilter) log=log.filter(e=>e.user===userFilter);
+    const c=document.getElementById('audit-entries'); if(!c) return;
+
+    // Populate user filter dropdown from all known users in the log
+    const userSelect = document.getElementById('audit-user-filter');
+    if (userSelect && !userSelect.dataset.populated) {
+      const allUsers = [...new Set(App.auditLog.map(e=>e.user).filter(Boolean))].sort();
+      userSelect.innerHTML = '<option value="">All Users</option>' +
+        allUsers.map(u=>`<option value="${u}"${u===userFilter?' selected':''}>${u}</option>`).join('');
+      userSelect.dataset.populated = '1';
+    }
+
+    c.innerHTML=log.slice(0,500).map(e=>{
+      const isDanger=['DELETE_MEMBER','LOCKOUT','DISABLE_USER','CLEAR_DEMO','EDIT_DENIED','DELETE_DENIED'].includes(e.action);
+      const isWarn=['EDIT_MEMBER','EXPORT_EXCEL','EXPORT_PDF','AUTO_LOGOUT','PASSWORD_RESET','PASSWORD_CHANGE','ASSIGN_STATIONS'].includes(e.action);
+      const fromSheet = e._fromSheet ? '<span style="font-size:10px;color:var(--gray-400);margin-left:4px">☁️</span>' : '';
+      return `<div class="log-entry ${isDanger?'danger':isWarn?'warning':''}">
+        <div class="log-entry-header">
+          <span class="badge ${isDanger?'badge-red':isWarn?'badge-amber':'badge-green'}">${e.action}</span>
+          <span class="log-user">👤 ${e.user}${fromSheet}</span>
+          <span class="log-time">${e.timestamp}</span>
+        </div>
+        <div class="log-details">${e.details||''}</div>
+        ${e.reason?`<div class="log-details" style="color:var(--ndc-red);margin-top:4px">⚠️ ${e.reason}</div>`:''}
+      </div>`;
+    }).join('')||`<div class="empty-state"><div class="empty-icon">🛡️</div><div class="empty-title">No entries found</div></div>`;
+  },
+
+  // ══════════════════════════════════════════════════════════
+  // USER MANAGEMENT — password reset + assign
+  // ══════════════════════════════════════════════════════════
+  users() {
+    const tbody=document.getElementById('users-tbody'); if(!tbody) return;
+    const rLabels={officer:'Data Entry Officer',ward:'Ward Coordinator',exec:'Constituency Exec',admin:'System Admin'};
+    const rBadge={officer:'badge-green',ward:'badge-amber',exec:'badge-blue',admin:'badge-red'};
+    const stored = localStorage.getItem(LS.USERS);
+    App.users = (stored ? JSON.parse(stored) : null) || JSON.parse(JSON.stringify(SYSTEM_USERS));
+
+    tbody.innerHTML=App.users.map(u=>`
+      <tr>
+        <td><div style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:var(--ndc-green);color:white;font-weight:700;font-size:12px;font-family:var(--font-head)">${u.name.split(' ').map(n=>n[0]).slice(0,2).join('')}</div></td>
+        <td><strong>${u.name}</strong><br><small style="color:var(--gray-400)">${u.username}</small></td>
+        <td><span class="badge ${rBadge[u.role]||'badge-gray'}">${rLabels[u.role]||u.role}</span></td>
+        <td>
+          ${u.mustChangePassword
+            ? '<span class="badge badge-amber">⚠️ Must change</span>'
+            : '<span class="badge badge-green">✅ Set</span>'}
+        </td>
+        <td>${u.ward||'—'}</td>
+        <td>${(u.assignedStations||[]).length?(u.assignedStations||[]).map(c=>`<span class="badge badge-blue" style="font-size:10px;margin:1px">${c}</span>`).join(''):'<span style="color:var(--gray-400);font-size:12px">None</span>'}</td>
+        <td><span class="badge ${u.active?'badge-green':'badge-gray'}">${u.active?'Active':'Inactive'}</span></td>
+        <td>
+          <div class="btn-group" style="flex-wrap:nowrap;gap:4px">
+            <button class="btn btn-sm btn-secondary" onclick="PageRenderers.openEditUser('${u.id}')" title="Edit user">✏️</button>
+            <button class="btn btn-sm btn-outline"   onclick="PageRenderers.resetPassword('${u.id}')" title="Reset password to default">🔑</button>
+            ${(u.role==='officer'||u.role==='ward')?`<button class="btn btn-sm btn-secondary" style="border-color:var(--ndc-green);color:var(--ndc-green)" onclick="PageRenderers.openAssignModal('${u.id}')" title="${u.role==='ward'?'Assign ward & stations':'Assign stations'}">📍</button>`:''}
+            <button class="btn btn-sm btn-danger"    onclick="PageRenderers.toggleUser('${u.id}')" title="${u.active?'Disable':'Enable'}">${u.active?'🚫':'✅'}</button>
+          </div>
+        </td>
+      </tr>`).join('');
+  },
+
+  resetPassword(userId) {
+    const u=App.users.find(x=>x.id===userId); if(!u) return;
+    if(!confirm(`Reset ${u.name}'s password to the system default?\n\nThey will be required to change it on next login.`)) return;
+    App.resetPasswordToDefault(userId);
+    PageRenderers.users();
+  },
+
+  openAddUser() {
+    document.getElementById('user-modal-title').textContent='Add New User';
+    document.getElementById('edit-user-id').value='';
+    ['u-name','u-username','u-password','u-ward','u-station','u-branch'].forEach(id=>{ const el=document.getElementById(id);if(el)el.value=''; });
+    document.getElementById('u-role').value='officer';
+    Modal.open('modal-user');
+  },
+
+  openEditUser(id) {
+    const u=App.users.find(x=>x.id===id); if(!u) return;
+    document.getElementById('user-modal-title').textContent='Edit User';
+    document.getElementById('edit-user-id').value=id;
+    document.getElementById('u-name').value    =u.name;
+    document.getElementById('u-username').value=u.username;
+    document.getElementById('u-password').value=u.password;
+    document.getElementById('u-role').value    =u.role;
+    document.getElementById('u-ward').value    =u.ward||'';
+    document.getElementById('u-station').value =u.station||'';
+    document.getElementById('u-branch').value  =u.branch||'';
+    Modal.open('modal-user');
+  },
+
+  submitUser() {
+    const id   = document.getElementById('edit-user-id').value;
+    const data = {
+      name:     document.getElementById('u-name').value.trim(),
+      username: document.getElementById('u-username').value.trim(),
+      password: document.getElementById('u-password').value.trim(),
+      role:     document.getElementById('u-role').value,
+      ward:     document.getElementById('u-ward').value.trim(),
+      station:  document.getElementById('u-station').value.trim(),
+      branch:   document.getElementById('u-branch').value.trim(),
+      active:   true,
+    };
+    if (!data.name || !data.username || !data.password) {
+      Toast.show('Error','Name, username and password are required.','error'); return;
+    }
+    // Always load from localStorage with SYSTEM_USERS as the safe fallback
+    const stored = localStorage.getItem(LS.USERS);
+    App.users = (stored ? JSON.parse(stored) : null) || JSON.parse(JSON.stringify(SYSTEM_USERS));
+
+    if (id) {
+      const idx = App.users.findIndex(u => u.id === id);
+      if (idx < 0) { Toast.show('Error','User not found — refresh and try again.','error'); return; }
+      App.users[idx] = { ...App.users[idx], ...data };
+      App.logAudit('EDIT_USER', `Edited user: ${data.username} (${data.role})`, App.currentUser.username);
+      Toast.show('User Updated','Changes saved.','success');
+    } else {
+      if (App.users.find(u => u.username === data.username)) {
+        Toast.show('Error','Username already exists.','error'); return;
+      }
+      App.users.push({ id:'u'+Date.now(), ...data, assignedStations:[], mustChangePassword:true });
+      App.logAudit('ADD_USER', `Created: ${data.username} (${data.role})`, App.currentUser.username);
+      Toast.show('User Created','New user added. They must change password on first login.','success');
+    }
+    App.saveUsers(App.users);
+    Modal.close('modal-user');
+    PageRenderers.users();
+  },
+
+  toggleUser(id) {
+    const stored = localStorage.getItem(LS.USERS);
+    App.users = (stored ? JSON.parse(stored) : null) || JSON.parse(JSON.stringify(SYSTEM_USERS));
+    const u = App.users.find(x => x.id === id); if (!u) return;
+    u.active = !u.active;
+    App.saveUsers(App.users);
+    App.logAudit(u.active?'ENABLE_USER':'DISABLE_USER', `${u.active?'Enabled':'Disabled'}: ${u.username}`, App.currentUser.username);
+    Toast.show('Status Updated', `${u.name} is now ${u.active?'active':'inactive'}.`, u.active?'success':'warning');
+    PageRenderers.users();
+  },
+
+  openAssignModal(userId) {
+    const stored = localStorage.getItem(LS.USERS);
+    App.users = (stored ? JSON.parse(stored) : null) || JSON.parse(JSON.stringify(SYSTEM_USERS));
+    const u = App.users.find(x => x.id === userId); if (!u) return;
+    document.getElementById('assign-user-id').value=userId;
+    document.getElementById('assign-user-name').textContent=u.name;
+    const roleLabel = u.role==='ward' ? 'Ward Coordinator' : 'Data Entry Officer';
+    document.getElementById('assign-user-role').textContent=roleLabel;
+    // Update modal title to reflect role
+    const modalTitle = document.querySelector('#modal-assign .modal-header h3');
+    if (modalTitle) modalTitle.textContent = u.role==='ward' ? 'Assign Ward & Polling Stations' : 'Assign Polling Stations';
+    const assigned=u.assignedStations||[];
+    const byWard={};
+    App.pollingStations.forEach(s=>{if(!byWard[s.ward])byWard[s.ward]=[];byWard[s.ward].push(s);});
+    document.getElementById('assign-stations-container').innerHTML=Object.entries(byWard).map(([ward,sts])=>`
+      <div style="margin-bottom:18px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:700;color:var(--ndc-green-dk);text-transform:none;letter-spacing:0;font-size:13px">
+            <input type="checkbox" class="ward-check" data-ward="${ward}" ${sts.every(s=>assigned.includes(s.code))?'checked':''} onchange="PageRenderers.toggleWardCheck('${ward}',this.checked)" style="width:auto;accent-color:var(--ndc-green)">
+            🏘️ ${ward}
+          </label>
+          <span class="badge badge-green" style="font-size:10px">${sts.length} station${sts.length!==1?'s':''}</span>
+        </div>
+        <div style="padding-left:20px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          ${sts.map(s=>`<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;padding:8px 10px;border:1px solid var(--gray-200);border-radius:var(--radius);background:white;transition:var(--transition);text-transform:none;letter-spacing:0;font-weight:400;font-size:12px">
+            <input type="checkbox" class="station-check" name="assign_stations" value="${s.code}" data-ward="${ward}" ${assigned.includes(s.code)?'checked':''} onchange="PageRenderers.updateWardCheckState('${ward}')" style="width:auto;accent-color:var(--ndc-green);margin-top:2px">
+            <div><div style="font-weight:600;color:var(--gray-800)">${s.name}</div><div style="color:var(--gray-400)">${s.code} · ${s.branchCode}</div></div>
+          </label>`).join('')}
+        </div>
+      </div>`).join('')||'<div class="empty-state"><div class="empty-icon">🏢</div><div class="empty-title">No stations configured</div></div>';
+    Modal.open('modal-assign');
+  },
+
+  toggleWardCheck(ward,checked) { document.querySelectorAll(`.station-check[data-ward="${ward}"]`).forEach(cb=>cb.checked=checked); },
+  updateWardCheckState(ward) {
+    const all=document.querySelectorAll(`.station-check[data-ward="${ward}"]`);
+    const wc=document.querySelector(`.ward-check[data-ward="${ward}"]`); if(!wc) return;
+    const n=[...all].filter(cb=>cb.checked).length;
+    wc.checked=n===all.length; wc.indeterminate=n>0&&n<all.length;
+  },
+
+  submitAssignment() {
+    const userId  = document.getElementById('assign-user-id').value;
+    const selected = [...document.querySelectorAll('.station-check:checked')].map(cb => cb.value);
+    const stored  = localStorage.getItem(LS.USERS);
+    App.users = (stored ? JSON.parse(stored) : null) || JSON.parse(JSON.stringify(SYSTEM_USERS));
+    const u = App.users.find(x => x.id === userId); if (!u) return;
+    const prev = u.assignedStations || [];
+    u.assignedStations = selected;
+    if (selected.length > 0) {
+      const p = App.pollingStations.find(s => s.code === selected[0]);
+      if (p) {
+        u.station = p.code;
+        u.branch  = p.branch;
+        // For ward coordinators, derive their ward from the first assigned station
+        // For officers, also set the ward
+        u.ward = p.ward;
+      }
+    }
+    App.saveUsers(App.users);
+    App.logAudit('ASSIGN_STATIONS', `Assigned ${selected.length} station(s) to ${u.username} (${u.role}): [${selected.join(', ')}]. Prev: [${prev.join(', ')}]`, App.currentUser.username);
+    Modal.close('modal-assign');
+    Toast.show('Assignment Saved', `${u.name} assigned to ${selected.length} station${selected.length!==1?'s':''}.`, 'success');
+    PageRenderers.users();
+  },
+
+  // ══════════════════════════════════════════════════════════
+  // SETTINGS
+  // ══════════════════════════════════════════════════════════
+  settings() {
+    const s = App.settings;
+    ['set-app-name','set-constituency','set-sheet-id','set-api-key','set-script-url'].forEach(id => {
+      const map = { 'set-app-name':s.appName,'set-constituency':s.constituency,'set-sheet-id':s.sheetId,'set-api-key':s.apiKey,'set-script-url':s.scriptUrl };
+      const el = document.getElementById(id); if (el) el.value = map[id] || '';
+    });
+    // Show bootstrap banner if this device has no Script URL yet
+    const banner = document.getElementById('bootstrap-banner');
+    if (banner) banner.style.display = s.scriptUrl ? 'none' : 'block';
+    this._renderStationsList();
+  },
+
+  saveGeneralSettings() {
+    App.settings.appName      = document.getElementById('set-app-name').value.trim()      || CONFIG.APP_NAME;
+    App.settings.constituency = document.getElementById('set-constituency').value.trim();
+    App.settings.sheetId      = document.getElementById('set-sheet-id').value.trim();
+    App.settings.apiKey       = document.getElementById('set-api-key').value.trim();
+    App.settings.scriptUrl    = document.getElementById('set-script-url').value.trim();
+    App.saveSettings();      // saves to localStorage AND pushes to Sheet
+    App.applyAppName();
+    App.logAudit('SETTINGS_CHANGE','Updated and pushed settings to Google Sheets', App.currentUser.username);
+    Toast.show('Settings Saved','Configuration saved locally and syncing to Google Sheets…','success');
+    App._startSyncTimer();   // restart timer with possibly new script URL
+    // Hide the no-script banner if a URL is now set
+    if (typeof _updateNoScriptBanner === 'function') _updateNoScriptBanner();
+
+    // Show confirmation once push completes
+    if (App.isOnline && App.settings.scriptUrl) {
+      App._pushSettingsToSheet().then(() => {
+        Toast.show('Settings Synced ☁️','Settings saved to Google Sheets — all future logins on any device will use these settings.','success', 6000);
+      }).catch(() => {
+        Toast.show('Sheet Sync Warning','Settings saved locally but could not reach Google Sheets. Check your Script URL.','warning', 6000);
+      });
+    }
+  },
+
+  _renderStationsList() {
+    const c=document.getElementById('stations-list'); if(!c) return;
+    const sc=document.getElementById('station-count');
+    if(sc) sc.textContent=App.pollingStations.length;
+    // Also keep the push-stations card count in sync
+    const pc=document.getElementById('push-station-count');
+    if(pc) pc.textContent=App.pollingStations.length;
+    if(!App.pollingStations.length){c.innerHTML='<div class="empty-state"><div class="empty-icon">🏢</div><div class="empty-title">No stations configured</div><div class="empty-text">Add manually or use "Import from Sheet" above.</div></div>';return;}
+    c.innerHTML=`<div class="table-wrap"><table>
+      <thead><tr><th>#</th><th>Zone</th><th>Ward</th><th>Polling Station</th><th>Branch</th><th>Stn Code</th><th>Branch Code</th><th>Action</th></tr></thead>
+      <tbody>${App.pollingStations.map((s,i)=>`<tr>
+        <td>${i+1}</td>
+        <td><span class="badge badge-green" style="font-size:11px">${s.zone||'—'}</span></td>
+        <td>${s.ward||'—'}</td>
+        <td><strong>${s.name||'—'}</strong></td>
+        <td>${s.branch||'—'}</td>
+        <td><span class="badge badge-blue">${s.code||'—'}</span></td>
+        <td><span class="badge" style="background:var(--gray-100);color:var(--gray-700)">${s.branchCode||'—'}</span></td>
+        <td><button class="btn btn-sm btn-danger" onclick="PageRenderers.removeStation(${i})">🗑️</button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+  },
+
+  addStation() {
+    const g=id=>document.getElementById(id)?.value.trim()||'';
+    const zone=g('st-zone'),ward=g('st-ward'),name=g('st-name'),code=g('st-code'),branch=g('st-branch'),bCode=g('st-bcode');
+    if(!zone||!ward||!name||!code||!branch||!bCode){Toast.show('Error','All 6 fields are required.','error');return;}
+    if(App.pollingStations.find(s=>s.code===code)){Toast.show('Duplicate','Station Code already exists.','error');return;}
+    App.pollingStations.push({zone,ward,name,code,branch,branchCode:bCode});
+    App.settings.pollingStations=App.pollingStations;App.saveSettings();
+    ['st-zone','st-ward','st-name','st-code','st-branch','st-bcode'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    this._renderStationsList();
+    Toast.show('Station Added',`${name} (${code}) saved.`,'success');
+    App.logAudit('ADD_STATION',`Added: ${name} (${code}), Zone: ${zone}, Ward: ${ward}`,App.currentUser.username);
+  },
+
+  removeStation(i) {
+    const s=App.pollingStations[i];
+    App.pollingStations.splice(i,1);App.settings.pollingStations=App.pollingStations;App.saveSettings();
+    this._renderStationsList();
+    Toast.show('Station Removed',`${s.name} removed.`,'warning');
+    App.logAudit('REMOVE_STATION',`Removed: ${s.name} (${s.code})`,App.currentUser.username);
+  },
+};
+
+</script>
 <script>
 // ── PASSWORD TOGGLE ──────────────────────────────────────────
 function togglePassword() {
