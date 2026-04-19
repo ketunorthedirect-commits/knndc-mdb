@@ -3,7 +3,7 @@
    ============================================================ */
 'use strict';
 
-const PageRenderers = {
+var PageRenderers = {
 
   // ══════════════════════════════════════════════════════════
   // DASHBOARD — with gender + zone distribution

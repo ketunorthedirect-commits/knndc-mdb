@@ -3,7 +3,7 @@
    ============================================================ */
 'use strict';
 
-const CONFIG = {
+var CONFIG = {
   SHEET_ID:      '',
   API_KEY:       '',
   SCRIPT_URL:    '',          // ← Fill this once before deploying: paste your Apps Script Web App URL here.
@@ -16,7 +16,7 @@ const CONFIG = {
   ADMIN_PASSWORD:   'admin123',    // default admin password
 };
 
-const LS = {
+var LS = {
   SESSION:        'knndc_session',
   SETTINGS:       'knndc_settings',
   OFFLINE_Q:      'knndc_offline_queue',
@@ -30,7 +30,7 @@ const LS = {
 };
 
 // ─── SYSTEM USERS (non-deletable admin + demo accounts) ──────
-const SYSTEM_USERS = [
+var SYSTEM_USERS = [
   { id:'u001', username:'admin',    password:CONFIG.ADMIN_PASSWORD,   name:'System Administrator',    role:'admin',   ward:'', station:'', branch:'', assignedStations:[], active:true, mustChangePassword:false, isSystem:true },
   { id:'u002', username:'exec',     password:CONFIG.DEFAULT_PASSWORD, name:'Constituency Executive',  role:'exec',    ward:'', station:'', branch:'', assignedStations:[], active:true, mustChangePassword:true,  isSystem:true },
   { id:'u003', username:'ward1',    password:CONFIG.DEFAULT_PASSWORD, name:'Ward Coordinator (Aflao)',role:'ward',    ward:'Aflao Ward', station:'PS-001', branch:'Aflao Branch', assignedStations:['PS-001','PS-002'], active:true, mustChangePassword:true, isSystem:false },
@@ -38,7 +38,7 @@ const SYSTEM_USERS = [
   { id:'u005', username:'officer2', password:CONFIG.DEFAULT_PASSWORD, name:'Data Entry Officer 2',    role:'officer', ward:'Denu Ward',  station:'PS-003', branch:'Denu Branch',  assignedStations:['PS-003'], active:true, mustChangePassword:true, isSystem:false },
 ];
 
-const DEMO_POLLING_STATIONS = [
+var DEMO_POLLING_STATIONS = [
   { zone:'Zone A', ward:'Aflao Ward',    code:'PS-001', name:'Aflao A Polling Station',   branch:'Aflao Branch',    branchCode:'BR-001' },
   { zone:'Zone A', ward:'Aflao Ward',    code:'PS-002', name:'Aflao B Polling Station',   branch:'Aflao Branch',    branchCode:'BR-001' },
   { zone:'Zone B', ward:'Denu Ward',     code:'PS-003', name:'Denu Polling Station',      branch:'Denu Branch',     branchCode:'BR-002' },
@@ -48,7 +48,7 @@ const DEMO_POLLING_STATIONS = [
 ];
 
 // Demo members — only present before admin clears demo data
-const DEMO_MEMBERS = [
+var DEMO_MEMBERS = [
   { id:'m001', firstName:'Kofi',   lastName:'Mensah',  otherNames:'Agyei',  gender:'Male',   zone:'Zone A', partyId:'NDC-2024-001', voterId:'GH-V-001', phone:'0244001122', ward:'Aflao Ward',    station:'Aflao A Polling Station',  stationCode:'PS-001', branch:'Aflao Branch',    branchCode:'BR-001', officer:'officer1', officerName:'Data Entry Officer 1', timestamp:'15/01/2024, 09:30:00', _demo:true },
   { id:'m002', firstName:'Abena',  lastName:'Korkor',  otherNames:'',       gender:'Female', zone:'Zone A', partyId:'NDC-2024-002', voterId:'GH-V-002', phone:'0244002233', ward:'Aflao Ward',    station:'Aflao A Polling Station',  stationCode:'PS-001', branch:'Aflao Branch',    branchCode:'BR-001', officer:'officer1', officerName:'Data Entry Officer 1', timestamp:'15/01/2024, 10:15:00', _demo:true },
   { id:'m003', firstName:'Yaw',    lastName:'Tetteh',  otherNames:'Kwame',  gender:'Male',   zone:'Zone B', partyId:'NDC-2024-003', voterId:'GH-V-003', phone:'0554003344', ward:'Denu Ward',     station:'Denu Polling Station',     stationCode:'PS-003', branch:'Denu Branch',     branchCode:'BR-002', officer:'officer2', officerName:'Data Entry Officer 2', timestamp:'16/01/2024, 08:45:00', _demo:true },
@@ -57,7 +57,7 @@ const DEMO_MEMBERS = [
 ];
 
 // ─── APP ─────────────────────────────────────────────────────
-const App = {
+var App = {
   currentUser:      null,
   currentPage:      'login',
   settings:         {},
@@ -1784,7 +1784,7 @@ const App = {
 };
 
 // ─── TOAST ───────────────────────────────────────────────────
-const Toast = {
+var Toast = {
   show(title, msg='', type='success', duration=4000) {
     const c = document.getElementById('toast-container');
     if (!c) return;
@@ -1799,7 +1799,7 @@ const Toast = {
   }
 };
 
-const Modal = {
+var Modal = {
   open(id)   { document.getElementById(id)?.classList.add('open'); },
   close(id)  { document.getElementById(id)?.classList.remove('open'); },
   closeAll() { document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open')); },
