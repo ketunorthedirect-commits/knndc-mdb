@@ -1,1 +1,1807 @@
+/* ============================================================
+   KNNDCmdb – Core Application Logic  v3.2.1.1
+   ============================================================ */
+'use strict';
 
+const CONFIG = {
+  SHEET_ID:      '',
+  API_KEY:       '',
+  SCRIPT_URL:    '',          // ← Fill this once before deploying: paste your Apps Script Web App URL here.
+                              //   Every new device will automatically inherit all settings from the Sheet.
+  APP_NAME:      'Ketu North NDC Members Database',
+  CONSTITUENCY:  'Ketu North',
+  VERSION:       '3.2.1',
+  INACTIVITY_MS: 10 * 60 * 1000,
+  DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
+  ADMIN_PASSWORD:   'admin123',    // default admin password
+};
+
+const LS = {
+  SESSION:        'knndc_session',
+  SETTINGS:       'knndc_settings',
+  OFFLINE_Q:      'knndc_offline_queue',
+  MEMBERS:        'knndc_members',
+  USERS:          'knndc_users',
+  AUDIT:          'knndc_audit',
+  ID_INDEX:       'knndc_id_index',   // lightweight partyId/voterId index for all enrolled members
+  LOCKOUT:        'knndc_lockout',
+  ATTEMPTS:       'knndc_attempts',
+  DEMO_CLEARED:   'knndc_demo_cleared',  // flag: admin has cleared demo
+};
+
+// ─── SYSTEM USERS (non-deletable admin + demo accounts) ──────
+const SYSTEM_USERS = [
+  { id:'u001', username:'admin',    password:CONFIG.ADMIN_PASSWORD,   name:'System Administrator',    role:'admin',   ward:'', station:'', branch:'', assignedStations:[], active:true, mustChangePassword:false, isSystem:true },
+  { id:'u002', username:'exec',     password:CONFIG.DEFAULT_PASSWORD, name:'Constituency Executive',  role:'exec',    ward:'', station:'', branch:'', assignedStations:[], active:true, mustChangePassword:true,  isSystem:true },
+  { id:'u003', username:'ward1',    password:CONFIG.DEFAULT_PASSWORD, name:'Ward Coordinator (Aflao)',role:'ward',    ward:'Aflao Ward', station:'PS-001', branch:'Aflao Branch', assignedStations:['PS-001','PS-002'], active:true, mustChangePassword:true, isSystem:false },
+  { id:'u004', username:'officer1', password:CONFIG.DEFAULT_PASSWORD, name:'Data Entry Officer 1',    role:'officer', ward:'Aflao Ward', station:'PS-001', branch:'Aflao Branch', assignedStations:['PS-001'], active:true, mustChangePassword:true, isSystem:false },
+  { id:'u005', username:'officer2', password:CONFIG.DEFAULT_PASSWORD, name:'Data Entry Officer 2',    role:'officer', ward:'Denu Ward',  station:'PS-003', branch:'Denu Branch',  assignedStations:['PS-003'], active:true, mustChangePassword:true, isSystem:false },
+];
+
+const DEMO_POLLING_STATIONS = [
+  { zone:'Zone A', ward:'Aflao Ward',    code:'PS-001', name:'Aflao A Polling Station',   branch:'Aflao Branch',    branchCode:'BR-001' },
+  { zone:'Zone A', ward:'Aflao Ward',    code:'PS-002', name:'Aflao B Polling Station',   branch:'Aflao Branch',    branchCode:'BR-001' },
+  { zone:'Zone B', ward:'Denu Ward',     code:'PS-003', name:'Denu Polling Station',      branch:'Denu Branch',     branchCode:'BR-002' },
+  { zone:'Zone B', ward:'Agbozume Ward', code:'PS-004', name:'Agbozume Polling Station',  branch:'Agbozume Branch', branchCode:'BR-003' },
+  { zone:'Zone C', ward:'Klikor Ward',   code:'PS-005', name:'Klikor Polling Station',    branch:'Klikor Branch',   branchCode:'BR-004' },
+  { zone:'Zone C', ward:'Adafienu Ward', code:'PS-006', name:'Adafienu Polling Station',  branch:'Adafienu Branch', branchCode:'BR-005' },
+];
+
+// Demo members — only present before admin clears demo data
+const DEMO_MEMBERS = [
+  { id:'m001', firstName:'Kofi',   lastName:'Mensah',  otherNames:'Agyei',  gender:'Male',   zone:'Zone A', partyId:'NDC-2024-001', voterId:'GH-V-001', phone:'0244001122', ward:'Aflao Ward',    station:'Aflao A Polling Station',  stationCode:'PS-001', branch:'Aflao Branch',    branchCode:'BR-001', officer:'officer1', officerName:'Data Entry Officer 1', timestamp:'15/01/2024, 09:30:00', _demo:true },
+  { id:'m002', firstName:'Abena',  lastName:'Korkor',  otherNames:'',       gender:'Female', zone:'Zone A', partyId:'NDC-2024-002', voterId:'GH-V-002', phone:'0244002233', ward:'Aflao Ward',    station:'Aflao A Polling Station',  stationCode:'PS-001', branch:'Aflao Branch',    branchCode:'BR-001', officer:'officer1', officerName:'Data Entry Officer 1', timestamp:'15/01/2024, 10:15:00', _demo:true },
+  { id:'m003', firstName:'Yaw',    lastName:'Tetteh',  otherNames:'Kwame',  gender:'Male',   zone:'Zone B', partyId:'NDC-2024-003', voterId:'GH-V-003', phone:'0554003344', ward:'Denu Ward',     station:'Denu Polling Station',     stationCode:'PS-003', branch:'Denu Branch',     branchCode:'BR-002', officer:'officer2', officerName:'Data Entry Officer 2', timestamp:'16/01/2024, 08:45:00', _demo:true },
+  { id:'m004', firstName:'Akosua', lastName:'Kporku',  otherNames:'',       gender:'Female', zone:'Zone A', partyId:'NDC-2024-004', voterId:'GH-V-004', phone:'0244004455', ward:'Aflao Ward',    station:'Aflao B Polling Station',  stationCode:'PS-002', branch:'Aflao Branch',    branchCode:'BR-001', officer:'officer1', officerName:'Data Entry Officer 1', timestamp:'16/01/2024, 11:20:00', _demo:true },
+  { id:'m005', firstName:'Efo',    lastName:'Dordor',  otherNames:'Selorm', gender:'Male',   zone:'Zone B', partyId:'NDC-2024-005', voterId:'GH-V-005', phone:'0504005566', ward:'Agbozume Ward', station:'Agbozume Polling Station', stationCode:'PS-004', branch:'Agbozume Branch', branchCode:'BR-003', officer:'officer1', officerName:'Data Entry Officer 1', timestamp:'17/01/2024, 09:00:00', _demo:true },
+];
+
+// ─── APP ─────────────────────────────────────────────────────
+const App = {
+  currentUser:      null,
+  currentPage:      'login',
+  settings:         {},
+  members:          [],
+  users:            [],
+  auditLog:         [],
+  pollingStations:  [],
+  offlineQueue:     [],
+  idIndex:          [],   // lightweight [{partyId,voterId,firstName,lastName,station}] from Sheet
+  isOnline:         navigator.onLine,
+  _inactivityTimer: null,
+  _syncInterval:    null,
+
+  init() {
+    App.loadSettings();
+    App.loadData();
+    App.applyAppName();
+    App.setupNetworkListeners();
+    App.checkSession();
+  },
+
+  // ── SETTINGS ──────────────────────────────────────────────
+  loadSettings() {
+    const saved = JSON.parse(localStorage.getItem(LS.SETTINGS) || '{}');
+    App.settings = {
+      sheetId:         saved.sheetId         || CONFIG.SHEET_ID,
+      apiKey:          saved.apiKey          || CONFIG.API_KEY,
+      // CONFIG.SCRIPT_URL is the baked-in fallback — lets fresh devices bootstrap without manual entry
+      scriptUrl:       saved.scriptUrl       || CONFIG.SCRIPT_URL,
+      appName:         saved.appName         || CONFIG.APP_NAME,
+      constituency:    saved.constituency    || CONFIG.CONSTITUENCY,
+      pollingStations: saved.pollingStations || DEMO_POLLING_STATIONS,
+    };
+    App.pollingStations = App.settings.pollingStations;
+  },
+  saveSettings() {
+    localStorage.setItem(LS.SETTINGS, JSON.stringify(App.settings));
+    // Defer settings push — never block UI
+    if (App.settings.scriptUrl) setTimeout(() => App._pushSettingsToSheet(), 0);
+  },
+
+  // Push settings to the Sheet's App Settings tab
+  _pushSettingsToSheet() {
+    if (!App.settings.scriptUrl) return;
+    App._xhrPost(App.settings.scriptUrl, {
+      action:          'saveSettings',
+      scriptUrl:       App.settings.scriptUrl,
+      appName:         App.settings.appName,
+      constituency:    App.settings.constituency,
+      sheetId:         App.settings.sheetId,
+      demoCleared:     localStorage.getItem(LS.DEMO_CLEARED) || '',
+      pollingStations: JSON.stringify(App.pollingStations || []),
+      updatedBy:       App.currentUser?.username || 'system',
+    });
+  },
+
+  // Fetch remote settings from the Sheet and apply them to App device
+  // Called on every login; safe to call without a scriptUrl (returns early)
+  async _fetchAndApplyRemoteSettings() {
+    if (!App.isOnline || !App.settings.scriptUrl) return false;
+    try {
+      const data = await App._xhrGet(App.settings.scriptUrl + '?action=getSettings&t=' + Date.now());
+      if (!data?.settings || !data.exists) return false;
+
+      const remote = data.settings;
+      let changed = false;
+
+      // Apply remote values — remote wins for everything except apiKey (never stored server-side)
+      const apply = (key, remoteKey) => {
+        const rv = remote[remoteKey || key];
+        if (rv && rv !== App.settings[key]) {
+          App.settings[key] = rv;
+          changed = true;
+        }
+      };
+
+      apply('scriptUrl');
+      apply('appName');
+      apply('constituency');
+      apply('sheetId');
+
+      // Sync pollingStations from remote settings if present and non-empty
+      if (Array.isArray(remote.pollingStations) && remote.pollingStations.length) {
+        const localStations  = App.settings.pollingStations || [];
+        const merged         = [...localStations];
+        let   stationsChanged = false;
+        remote.pollingStations.forEach(s => {
+          if (!s.code) return;
+          const idx = merged.findIndex(ps => ps.code === s.code);
+          if (idx >= 0) {
+            const before = JSON.stringify(merged[idx]);
+            merged[idx] = { ...merged[idx], ...s };
+            if (JSON.stringify(merged[idx]) !== before) stationsChanged = true;
+          } else {
+            merged.push(s);
+            stationsChanged = true;
+          }
+        });
+        if (stationsChanged || !localStations.length) {
+          App.settings.pollingStations = merged;
+          App.pollingStations = merged;
+          changed = true;
+        }
+      }
+
+      // Sync demoCleared flag across devices
+      if (remote.demoCleared === '1' && !localStorage.getItem(LS.DEMO_CLEARED)) {
+        localStorage.setItem(LS.DEMO_CLEARED, '1');
+        // Remove demo members on App device too
+        const local = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
+        const clean = local.filter(m => !m._demo);
+        if (clean.length !== local.length) {
+          localStorage.setItem(LS.MEMBERS, JSON.stringify(clean));
+          App.members = clean;
+        }
+        changed = true;
+      }
+
+      if (changed) {
+        localStorage.setItem(LS.SETTINGS, JSON.stringify(App.settings));
+        App.pollingStations = App.settings.pollingStations;
+        App.applyAppName();
+      }
+      return changed;
+    } catch(_) {
+      return false;
+    }
+  },
+
+  // ── DATA LOADING ──────────────────────────────────────────
+  loadData() {
+    const su = localStorage.getItem(LS.USERS);
+    const parsedUsers = su ? JSON.parse(su) : null;
+    if (parsedUsers && parsedUsers.length > 0) {
+      App.users = parsedUsers;
+    } else {
+      // No users in storage — seed with SYSTEM_USERS defaults
+      App.users = JSON.parse(JSON.stringify(SYSTEM_USERS));
+      localStorage.setItem(LS.USERS, JSON.stringify(App.users)); // write directly, no push to Sheet
+    }
+
+    const sm = localStorage.getItem(LS.MEMBERS);
+    const demoCleared = localStorage.getItem(LS.DEMO_CLEARED);
+    if (sm) {
+      App.members = JSON.parse(sm);
+    } else if (!demoCleared) {
+      App.members = JSON.parse(JSON.stringify(DEMO_MEMBERS));
+      App.saveMembers();
+    } else {
+      App.members = [];
+      App.saveMembers();
+    }
+
+    App.auditLog     = JSON.parse(localStorage.getItem(LS.AUDIT)    || '[]');
+    App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q)|| '[]');
+    App._loadIdIndex();
+  },
+
+  saveMembers() {
+    try {
+      localStorage.setItem(LS.MEMBERS, JSON.stringify(App.members));
+    } catch(e) {
+      if (e.name !== 'QuotaExceededError' && e.code !== 22) return; // unexpected error, ignore
+
+      const role = App.currentUser?.role;
+      const isFullViewRole = role === 'admin' || role === 'exec';
+
+      if (isFullViewRole) {
+        // Admin/exec: NEVER trim member records.
+        // Free space by clearing only the audit log (can be rebuilt from Sheet).
+        // NEVER clear the offline queue — it contains unsynced records.
+        try { localStorage.removeItem(LS.AUDIT); } catch(_) {}
+        // Try again after freeing audit space
+        try {
+          localStorage.setItem(LS.MEMBERS, JSON.stringify(App.members));
+          return; // success — no toast needed
+        } catch(_) {}
+        Toast.show(
+          '⚠️ Storage Full',
+          'This device\'s storage is full. Use 🔄 Pull All from Sheet on the Records page to reload data directly from Google Sheets.',
+          'warning', 12000
+        );
+        return;
+      }
+
+      // Officer / ward coordinator: trim oldest Sheet-confirmed records
+      const synced   = App.members.filter(m => m._fromSheet);
+      const unsynced = App.members.filter(m => !m._fromSheet);
+      let trimmed = [...unsynced, ...synced];
+      let saved = false;
+      while (trimmed.length > 100 && !saved) {
+        trimmed = trimmed.slice(0, Math.floor(trimmed.length * 0.8));
+        try { localStorage.setItem(LS.MEMBERS, JSON.stringify(trimmed)); saved = true; } catch(_) {}
+      }
+      if (!saved) {
+        try {
+          const emergency = App.members.slice(0, 500);
+          localStorage.setItem(LS.MEMBERS, JSON.stringify(emergency));
+          saved = true;
+        } catch(_) {}
+      }
+      App.members = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+      Toast.show(
+        '⚠️ Storage Full',
+        'This device is running low on storage. Push your records to Google Sheets now, then the oldest synced records will be cleared automatically.',
+        'warning', 10000
+      );
+      if (App.isOnline && App.settings.scriptUrl && App.currentUser) {
+        setTimeout(() => App.pushMyRecordsToSheet(), 1000);
+      }
+    }
+  },
+  saveAudit()     { localStorage.setItem(LS.AUDIT,     JSON.stringify(App.auditLog)); },
+  saveOfflineQ()  { localStorage.setItem(LS.OFFLINE_Q, JSON.stringify(App.offlineQueue)); },
+
+  // saveUsers: write to localStorage instantly, then push to Sheet in background
+  saveUsers(usersArray) {
+    const toSave = Array.isArray(usersArray) ? usersArray : (App.users || []);
+    // Never overwrite real users with an empty array
+    if (toSave.length === 0) return;
+    App.users = toSave;
+    localStorage.setItem(LS.USERS, JSON.stringify(toSave));
+    // Defer the network call entirely — UI never waits for it
+    const url = (JSON.parse(localStorage.getItem(LS.SETTINGS) || '{}')).scriptUrl || App.settings.scriptUrl;
+    if (url) setTimeout(() => App._pushUsersToSheet(toSave, url), 0);
+  },
+
+  // Background push — fire-and-forget, no-cors avoids redirect/CORS issues
+  _pushUsersToSheet(usersArray, scriptUrl) {
+    const url = scriptUrl || App.settings.scriptUrl;
+    if (!url) return;
+    App._xhrPost(url, { action: 'saveUsers', users: usersArray });
+  },
+
+  // Manual trigger — called from the ☁️ Push Users to Sheet button
+  async forcePushUsersToSheet() {
+    const url = App.settings.scriptUrl || JSON.parse(localStorage.getItem(LS.SETTINGS)||'{}').scriptUrl;
+    if (!url) {
+      Toast.show('No Script URL', 'Set the Apps Script URL in Settings → Google Sheets first.', 'error');
+      return;
+    }
+    const users = JSON.parse(localStorage.getItem(LS.USERS) || '[]');
+    if (!users.length) {
+      Toast.show('No Users', 'No user accounts found in local storage.', 'warning');
+      return;
+    }
+
+    const btns = document.querySelectorAll('[onclick*="forcePushUsersToSheet"]');
+    btns.forEach(b => { b.disabled = true; b.dataset._orig = b.textContent; b.textContent = '⏳ Pushing…'; });
+
+    Toast.show('Pushing Users…', `Sending ${users.length} account(s) to Google Sheets…`, 'info', 10000);
+
+    const body = JSON.stringify({ action: 'saveUsers', users });
+    const success = await new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+      xhr.timeout = 30000;
+      xhr.onload    = () => resolve(true);
+      xhr.onerror   = () => resolve(false);
+      xhr.ontimeout = () => resolve(false);
+      xhr.send(body);
+    });
+
+    btns.forEach(b => { b.disabled = false; b.textContent = b.dataset._orig || '☁️ Push Users to Sheet'; });
+
+    if (success) {
+      Toast.show('Users Pushed ✅', `${users.length} account(s) sent to Google Sheets. Open the Users tab to confirm.`, 'success', 7000);
+      App.logAudit('SYNC_USERS', `Pushed ${users.length} users to Google Sheets`, App.currentUser?.username || 'admin');
+    } else {
+      Toast.show('Push Failed', 'Apps Script did not respond. Verify the Script URL is correct and the Web App deployment is active, then try again.', 'error', 9000);
+    }
+  },
+
+  // Manual trigger — called from the ☁️ Push Stations to Sheet button in Settings
+  async forcePushStationsToSheet() {
+    const url = App.settings.scriptUrl || JSON.parse(localStorage.getItem(LS.SETTINGS)||'{}').scriptUrl;
+    if (!url) {
+      Toast.show('No Script URL', 'Set the Apps Script URL in Settings → Google Sheets first.', 'error');
+      return;
+    }
+    const stations = App.pollingStations || JSON.parse(localStorage.getItem(LS.SETTINGS)||'{}').pollingStations || [];
+    if (!stations.length) {
+      Toast.show('No Stations', 'No polling stations are configured locally. Add stations in Settings → Polling Stations first.', 'warning');
+      return;
+    }
+
+    const btns = document.querySelectorAll('[onclick*="forcePushStationsToSheet"]');
+    btns.forEach(b => { b.disabled = true; b.dataset._orig = b.textContent; b.textContent = '⏳ Pushing…'; });
+
+    Toast.show('Pushing Stations…', `Sending ${stations.length} station(s) to Google Sheets…`, 'info', 10000);
+
+    const body = JSON.stringify({ action: 'saveStations', stations });
+    const success = await new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true);
+      xhr.timeout   = 30000;
+      xhr.onload    = () => resolve(true);
+      xhr.onerror   = () => resolve(false);
+      xhr.ontimeout = () => resolve(false);
+      xhr.send(body);
+    });
+
+    btns.forEach(b => { b.disabled = false; b.textContent = b.dataset._orig || '☁️ Push Stations to Sheet'; });
+
+    if (success) {
+      Toast.show('Stations Pushed ✅', `${stations.length} station(s) sent to Google Sheets. Open the Polling Stations tab to confirm.`, 'success', 7000);
+      App.logAudit('PUSH_STATIONS', `Pushed ${stations.length} configured stations to Google Sheets`, App.currentUser?.username || 'admin');
+    } else {
+      Toast.show('Push Failed', 'Apps Script did not respond. Verify the Script URL is correct and the Web App deployment is active, then try again.', 'error', 9000);
+    }
+  },
+
+  // Pull users from the Sheet and MERGE safely into localStorage.
+  // Rules:
+  //  - Sheet adds new users that aren't local yet
+  //  - Sheet updates non-password fields (name, role, ward, station, assignedStations, active)
+  //  - Password in Sheet only wins if it is non-empty AND different from local
+  //  - Local admin record is ALWAYS preserved — it is never deleted by a Sheet fetch
+  async _fetchUsersFromSheet() {
+    if (!App.isOnline || !App.settings.scriptUrl) return false;
+    try {
+      const data = await App._xhrGet(App.settings.scriptUrl + '?action=getUsers&t=' + Date.now());
+      if (!data) return false;
+
+      if (!data?.users || !Array.isArray(data.users) || data.users.length === 0) {
+        return false; // Sheet empty — keep local users as-is
+      }
+
+      // Start from current local users as the base
+      const local  = JSON.parse(localStorage.getItem(LS.USERS) || '[]');
+      const merged = [...local];
+
+      data.users.forEach(sheetUser => {
+        if (!sheetUser.username && !sheetUser.id) return; // skip malformed rows
+        const idx = merged.findIndex(u =>
+          u.id === sheetUser.id || u.username === sheetUser.username
+        );
+        if (idx >= 0) {
+          // For the currently-logged-in user: keep local password (they know their own password)
+          // For all other users: sheet password wins (propagates password changes across devices)
+          const isCurrentUser = App.currentUser &&
+            (merged[idx].id === App.currentUser.id || merged[idx].username === App.currentUser.username);
+          const localPwd  = merged[idx].password;
+          const sheetPwd  = sheetUser.password?.trim();
+          merged[idx] = {
+            ...merged[idx],
+            ...sheetUser,
+            password: isCurrentUser ? (localPwd || sheetPwd) : (sheetPwd || localPwd),
+          };
+        } else {
+          // New user from Sheet — add only if they have a password
+          if (sheetUser.password?.trim()) {
+            merged.push(sheetUser);
+          }
+        }
+      });
+
+      // Safety net: ensure admin account is always present and has a password
+      const hasAdmin = merged.some(u => u.role === 'admin' && u.password && u.active !== false);
+      if (!hasAdmin) {
+        // Don't overwrite — abort App sync to protect login
+        return false;
+      }
+
+      // Only write back if we ended up with a valid set
+      if (!merged.length) return false;
+
+      localStorage.setItem(LS.USERS, JSON.stringify(merged));
+      App.users = merged;
+      return true;
+    } catch(_) {
+      return false;
+    }
+  },
+
+  applyAppName() {
+    const n = App.settings.appName || CONFIG.APP_NAME;
+    document.querySelectorAll('.app-title-text').forEach(el => el.textContent = n);
+    document.title = n;
+  },
+
+  // ── NETWORK ───────────────────────────────────────────────
+  setupNetworkListeners() {
+    window.addEventListener('online', () => {
+      App.isOnline = true;
+      App.updateOnlineStatus();
+      // Reload queue from localStorage — in-memory array may be stale after page reload
+      App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q) || '[]');
+      if (App.offlineQueue.length) App.flushOfflineQueue();
+    });
+    window.addEventListener('offline', () => { App.isOnline = false; App.updateOnlineStatus(); });
+    App.updateOnlineStatus();
+  },
+  updateOnlineStatus() {
+    document.getElementById('offline-banner')?.classList.toggle('show', !App.isOnline);
+    const dot = document.getElementById('conn-dot');
+    if (dot) dot.className = App.isOnline ? 'online-dot' : 'offline-dot';
+  },
+
+  // ── SESSION / INACTIVITY ──────────────────────────────────
+  checkSession() {
+    const s = sessionStorage.getItem(LS.SESSION);
+    if (s) {
+      try { App.currentUser = JSON.parse(s); App.showApp(); return; } catch(_) {}
+    }
+    App.showLogin();
+  },
+
+  resetInactivityTimer() {
+    if (App._inactivityTimer) clearTimeout(App._inactivityTimer);
+    App._inactivityTimer = setTimeout(() => {
+      if (!App.currentUser) return;
+      App.logAudit('AUTO_LOGOUT','Session expired — 10 min inactivity', App.currentUser.username);
+      Toast.show('Session Expired','Logged out after 10 minutes of inactivity.','warning', 5000);
+      setTimeout(() => App.logout(), 1800);
+    }, CONFIG.INACTIVITY_MS);
+  },
+  setupInactivityTracking() {
+    ['mousemove','keydown','mousedown','touchstart','scroll','click'].forEach(e =>
+      document.addEventListener(e, () => App.resetInactivityTimer(), { passive:true })
+    );
+    App.resetInactivityTimer();
+  },
+  stopInactivityTracking() {
+    if (App._inactivityTimer) clearTimeout(App._inactivityTimer);
+    App._inactivityTimer = null;
+  },
+
+  // ── AUTH ──────────────────────────────────────────────────
+  // NOTE: login() is synchronous so the lockout check stays fast.
+  // Users are fetched from the Sheet inside showApp() (after a successful
+  // login) and also every 2 minutes via the sync timer. On the very first
+  // login on a new device, if the Sheet has no users yet the local SYSTEM_USERS
+  // seed is used; the admin then creates real accounts which push to the Sheet,
+  // and subsequent logins on all devices pick them up automatically.
+  login(username, password) {
+    const MAX = 5, LOCK_MS = 2 * 60 * 1000;
+    const lockData = JSON.parse(localStorage.getItem(LS.LOCKOUT) || 'null');
+    if (lockData) {
+      const rem = lockData.until - Date.now();
+      if (rem > 0) return { locked:true, seconds:Math.ceil(rem/1000) };
+      localStorage.removeItem(LS.LOCKOUT);
+      localStorage.removeItem(LS.ATTEMPTS);
+    }
+
+    // Read users from localStorage; treat missing OR empty array as "use defaults"
+    const storedUsers = JSON.parse(localStorage.getItem(LS.USERS) || 'null');
+    App.users = (storedUsers && storedUsers.length > 0) ? storedUsers : JSON.parse(JSON.stringify(SYSTEM_USERS));
+    const user = App.users.find(u => u.username === username && u.password === password && u.active);
+
+    if (!user) {
+      const n = (parseInt(localStorage.getItem(LS.ATTEMPTS)||'0')) + 1;
+      localStorage.setItem(LS.ATTEMPTS, n);
+      if (n >= MAX) {
+        localStorage.setItem(LS.LOCKOUT, JSON.stringify({ until: Date.now() + LOCK_MS }));
+        localStorage.removeItem(LS.ATTEMPTS);
+        App.logAudit('LOCKOUT', `Locked after ${MAX} failed attempts for: ${username}`, 'system');
+        return { locked:true, seconds: LOCK_MS/1000 };
+      }
+      return { failed:true, attemptsLeft: MAX - n };
+    }
+
+    localStorage.removeItem(LS.ATTEMPTS);
+    localStorage.removeItem(LS.LOCKOUT);
+    App.currentUser = user;
+    sessionStorage.setItem(LS.SESSION, JSON.stringify(user));
+    App.logAudit('LOGIN','Logged in successfully', user.username);
+
+    // Force password change on first login
+    if (user.mustChangePassword) return { success:true, mustChangePassword:true };
+    return { success:true };
+  },
+
+  // ── DEMO DATA CLEAR (admin trigger) ───────────────────────
+  clearDemoData() {
+    App.members = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]').filter(m => !m._demo);
+    App.saveMembers();
+    localStorage.setItem(LS.DEMO_CLEARED, '1');
+    App.logAudit('CLEAR_DEMO','Administrator cleared all demo data', App.currentUser?.username || 'admin');
+    Toast.show('Demo Data Cleared','All sample data has been removed. Only real records remain.','success', 5000);
+    // Push the cleared flag to the Sheet so other devices skip demo data too
+    if (App.isOnline && App.settings.scriptUrl) {
+      App._pushSettingsToSheet().catch(() => {});
+    }
+  },
+
+  // ── PASSWORD MANAGEMENT ───────────────────────────────────
+  changePassword(userId, newPassword) {
+    const stored = localStorage.getItem(LS.USERS);
+    App.users = (stored ? JSON.parse(stored) : null) || JSON.parse(JSON.stringify(SYSTEM_USERS));
+    const u = App.users.find(x => x.id === userId);
+    if (!u) return false;
+    u.password = newPassword;
+    u.mustChangePassword = false;
+    if (App.currentUser?.id === userId) {
+      App.currentUser = { ...App.currentUser, password:newPassword, mustChangePassword:false };
+      sessionStorage.setItem(LS.SESSION, JSON.stringify(App.currentUser));
+    }
+    App.saveUsers(App.users);
+    App.logAudit('PASSWORD_CHANGE', `Password changed for user: ${u.username}`, u.username);
+    return true;
+  },
+
+  // resetPasswordToDefault: admin account resets to ADMIN_PASSWORD; others reset to DEFAULT_PASSWORD
+  resetPasswordToDefault(userId) {
+    const stored = localStorage.getItem(LS.USERS);
+    App.users = (stored ? JSON.parse(stored) : null) || JSON.parse(JSON.stringify(SYSTEM_USERS));
+    const u = App.users.find(x => x.id === userId);
+    if (!u) return false;
+    u.password = (u.role === 'admin') ? CONFIG.ADMIN_PASSWORD : CONFIG.DEFAULT_PASSWORD;
+    u.mustChangePassword = true;
+    App.saveUsers(App.users);
+    App.logAudit('PASSWORD_RESET', `Password reset to default for: ${u.username}`, App.currentUser.username);
+    Toast.show('Password Reset', `${u.name}'s password reset to default. They must change it on next login.`, 'success');
+    return true;
+  },
+
+  logout() {
+    App.logAudit('LOGOUT','User logged out', App.currentUser?.username);
+    App.stopInactivityTracking();
+    if (App._syncInterval) { clearInterval(App._syncInterval); App._syncInterval = null; }
+    App.currentUser = null;
+    sessionStorage.removeItem(LS.SESSION);
+    App.showLogin();
+  },
+
+  showLogin() {
+    document.getElementById('app-shell').style.display    = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+    App.stopInactivityTracking();
+  },
+
+  showApp() {
+    // Check if admin needs to see demo-clear prompt
+    const demoCleared = localStorage.getItem(LS.DEMO_CLEARED);
+    if (App.currentUser?.role === 'admin' && !demoCleared) {
+      const hasDemo = (JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]')).some(m => m._demo);
+      if (hasDemo) {
+        setTimeout(() => Modal.open('modal-demo-clear'), 800);
+      }
+    }
+
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-shell').style.display    = 'flex';
+    document.getElementById('app-shell').style.flexDirection = 'column';
+    App.renderNav();
+    App.renderUserHeader();
+    App.setupInactivityTracking();
+    App.navigate('dashboard');
+    // Show the no-script-url banner if this device has no Sheet connection
+    if (typeof _updateNoScriptBanner === 'function') _updateNoScriptBanner();
+
+    // Flush any queued offline records now that the user is logged in
+    // Reload from localStorage first — in-memory array may be stale after a page reload
+    App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q) || '[]');
+    if (App.isOnline && App.settings.scriptUrl && App.offlineQueue.length) {
+      setTimeout(() => App.flushOfflineQueue(), 1500); // slight delay so UI settles first
+    }
+
+    if (App.isOnline && App.settings.scriptUrl) {
+      // Fetch settings, users, and ID index in parallel on every login
+      Promise.all([
+        App._fetchAndApplyRemoteSettings(),
+        App._fetchUsersFromSheet(),
+        App._fetchIdIndex(),
+      ]).then(([settingsChanged]) => {
+        if (settingsChanged) {
+          App.applyAppName();
+          App.renderUserHeader();
+          if (App.currentPage === 'settings') PageRenderers.settings();
+          Toast.show('Settings Synced','App settings updated from Google Sheets.','info',3000);
+        }
+        // Re-validate session against freshly fetched users
+        App._revalidateSession();
+        App._startSyncTimer();
+      });
+    } else {
+      App._startSyncTimer();
+    }
+  },
+
+  // After fetching users from Sheet, check the current session is still valid.
+  // Propagates any assignment changes (ward, stations, branch, role) to the live session
+  // without requiring a re-login.
+  _revalidateSession() {
+    if (!App.currentUser) return;
+    const fresh = App.users.find(u => u.id === App.currentUser.id || u.username === App.currentUser.username);
+    if (!fresh) return; // user not in merged set — don't touch session
+
+    // Force logout if the account has been deactivated
+    if (fresh.active === false) {
+      Toast.show('Account Disabled','Your account has been deactivated. Contact your administrator.','error', 8000);
+      setTimeout(() => App.logout(), 2500);
+      return;
+    }
+
+    // Snapshot fields that affect data access and UI before overwrite
+    const prev = {
+      stations: JSON.stringify(App.currentUser.assignedStations || []),
+      ward:     App.currentUser.ward     || '',
+      station:  App.currentUser.station  || '',
+      branch:   App.currentUser.branch   || '',
+      role:     App.currentUser.role     || '',
+    };
+
+    // Update session — never overwrite password from a Sheet fetch
+    App.currentUser = {
+      ...fresh,
+      password: App.currentUser.password,
+    };
+    sessionStorage.setItem(LS.SESSION, JSON.stringify(App.currentUser));
+
+    // Detect what changed
+    const now = {
+      stations: JSON.stringify(App.currentUser.assignedStations || []),
+      ward:     App.currentUser.ward     || '',
+      station:  App.currentUser.station  || '',
+      branch:   App.currentUser.branch   || '',
+      role:     App.currentUser.role     || '',
+    };
+
+    const stationsChanged = prev.stations !== now.stations;
+    const wardChanged     = prev.ward     !== now.ward;
+    const branchChanged   = prev.branch   !== now.branch;
+    const roleChanged     = prev.role     !== now.role;
+    const anyChanged      = stationsChanged || wardChanged || branchChanged || roleChanged;
+
+    if (!anyChanged) return;
+
+    // Re-render nav (role may have changed) and header (ward/role display)
+    App.renderNav();
+    App.renderUserHeader();
+
+    // Re-render the active page if it uses assignment data
+    const pagesAffected = ['entry','my-records','records','dashboard','reports','analytics'];
+    if (pagesAffected.includes(App.currentPage)) {
+      PageRenderers[App.currentPage]?.();
+    }
+
+    // Build a meaningful toast message listing what changed
+    const parts = [];
+    if (stationsChanged) {
+      const count = (App.currentUser.assignedStations || []).length;
+      parts.push(`${count} polling station${count !== 1 ? 's' : ''}`);
+    }
+    if (wardChanged && now.ward)   parts.push(`ward: ${now.ward}`);
+    if (branchChanged && now.branch) parts.push(`branch: ${now.branch}`);
+    if (roleChanged)               parts.push(`role: ${now.role}`);
+
+    if (parts.length) {
+      Toast.show(
+        'Assignments Updated',
+        `Your account has been updated — ${parts.join(', ')}.`,
+        'info', 5000
+      );
+    }
+  },
+
+  _startSyncTimer() {
+    if (App._syncInterval) clearInterval(App._syncInterval);
+    if (App.settings.scriptUrl) {
+      // Every 2 minutes: sync members, users, and ID index
+      App._syncInterval = setInterval(async () => {
+        await App.fetchFromSheets();
+        App._fetchIdIndex();
+        const changed = await App._fetchUsersFromSheet();
+        if (changed !== false) App._revalidateSession();
+      }, 2 * 60 * 1000);
+      // Immediate fetch on login — re-render current page when done
+      App.fetchFromSheets().then(() => {
+        App._memberFetchPending = false;
+        const pg = App.currentPage;
+        if (['records','my-records','reports','analytics','dashboard'].includes(pg)) {
+          try { PageRenderers[pg]?.(); } catch(_) {}
+        }
+      }).catch(() => { App._memberFetchPending = false; });
+    }
+  },
+
+  // ── FETCH FROM GOOGLE SHEETS (bidirectional sync) ─────────
+  async fetchFromSheets() {
+    if (!App.isOnline || !App.settings.scriptUrl) return;
+    try {
+      // Build station filter for officer/ward — only fetch records they can see
+      const u = App.currentUser;
+      let stationParam = '';
+      if (u && u.role !== 'admin' && u.role !== 'exec') {
+        const codes = (u.assignedStations||[]).length ? u.assignedStations
+          : (u.station ? [u.station] : []);
+        if (codes.length) stationParam = '&stations=' + encodeURIComponent(codes.join(','));
+      }
+      const url = App.settings.scriptUrl + '?action=getMembers&t=' + Date.now() + stationParam;
+      const data = await App._xhrGet(url);
+      if (!data?.members?.length) return;
+
+      // Merge sheet records with local records — sheet is source of truth
+      const local = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+      const localIds = new Set(local.map(m => m.id || m['Record ID']));
+      const demoCleared = localStorage.getItem(LS.DEMO_CLEARED);
+
+      let merged = [...local.filter(m => !m._demo || !demoCleared)];
+      let added = 0;
+
+      data.members.forEach(sheetRow => {
+        // Normalise sheet columns to app field names
+        const norm = App._normaliseSheetRow(sheetRow);
+        if (!norm.id) return;
+        if (!localIds.has(norm.id)) {
+          merged.unshift(norm);
+          added++;
+        } else {
+          // Update existing from sheet (sheet wins)
+          const idx = merged.findIndex(m => m.id === norm.id);
+          if (idx >= 0) merged[idx] = { ...merged[idx], ...norm };
+        }
+      });
+
+      const localCount = local.filter(m => !m._demo || !demoCleared).length;
+
+      if (added > 0 || merged.length > localCount) {
+        merged.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+        App.members = merged;
+        App.saveMembers();
+        if (added > 0) {
+          Toast.show('Synced from Sheets', `${added} new record(s) pulled from Google Sheets.`, 'info', 3000);
+        }
+        // Refresh current page
+        if (['dashboard','records','my-records','reports','analytics'].includes(App.currentPage)) {
+          PageRenderers[App.currentPage]?.();
+        }
+      }
+
+      // ── Auto-trim: mark Sheet-confirmed records and free local storage ──────
+      // After a successful sync, records confirmed in the Sheet are safe server-side.
+      // Mark them as _fromSheet=true. If local storage is >80% full, drop the oldest
+      // Sheet-sourced records to free space for new entries — they remain in the Sheet.
+      App._autoTrimMembers(data.members);
+
+      // Also fetch polling stations from sheet — update existing + add new
+      const stationsData = await App._xhrGet(App.settings.scriptUrl + '?action=getStations&t=' + Date.now());
+      if (stationsData?.stations?.length) {
+        const local = [...App.pollingStations];
+        let changed = false;
+        stationsData.stations.forEach(s => {
+          if (!s.code) return;
+          const idx = local.findIndex(ps => ps.code === s.code);
+          if (idx >= 0) {
+            // Update existing — sheet wins for zone/ward/name/branch
+            const before = JSON.stringify(local[idx]);
+            local[idx] = { ...local[idx], ...s };
+            if (JSON.stringify(local[idx]) !== before) changed = true;
+          } else {
+            local.push(s);
+            changed = true;
+          }
+        });
+        if (changed) {
+          App.pollingStations = local;
+          App.settings.pollingStations = local;
+          App.saveSettings();
+        }
+      }
+    } catch(e) {
+      App._memberFetchPending = false;
+      // Only show toast when user is on a data page and store is empty
+      const pg = App.currentPage;
+      if (['records','reports','analytics','dashboard'].includes(pg) &&
+          !JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]').length) {
+        Toast.show('Could not load data',
+          'Google Sheets connection failed. Check the Script URL in Settings and ensure a new deployment is active.',
+          'warning', 8000);
+      }
+    }
+  },
+
+  _normaliseSheetRow(row) {
+    // Handle both named-column objects from Apps Script and raw arrays
+    const g = (keys) => {
+      for (const k of keys) {
+        const val = row[k];
+        if (val !== undefined && val !== null && val !== '') return String(val).trim();
+      }
+      return '';
+    };
+    return {
+      id:          g(['Record ID','id','ID']),
+      firstName:   g(['First Name','firstName']),
+      lastName:    g(['Surname','lastName','Last Name']),
+      otherNames:  g(['Other Names','otherNames']),
+      gender:      g(['Gender','gender']),
+      zone:        g(['Zone','zone']),
+      partyId:     g(['Party ID Number','partyId']),
+      voterId:     g(['Voter ID Number','voterId']),
+      phone:       g(['Telephone Number','phone']),
+      ward:        g(['Ward Name','ward']),
+      station:     g(['Polling Station','station']),
+      stationCode: g(['Station Code','stationCode']),
+      branch:      g(['Branch Name','branch']),
+      branchCode:  g(['Branch Code','branchCode']),
+      officer:     g(['Officer ID','officer']),
+      officerName: g(['Officer Name','officerName']),
+      timestamp:   g(['Date/Time Added','timestamp']),
+      _fromSheet:  true,
+    };
+  },
+
+  // ── ROLE ACCESS ───────────────────────────────────────────
+  ROLE_PAGES: {
+    officer: ['dashboard','entry','my-records','records'],
+    ward:    ['dashboard','records','reports'],
+    exec:    ['dashboard','records','reports','analytics'],
+    admin:   ['dashboard','entry','records','reports','analytics','audit','users','settings'],
+  },
+  canAccess(page) { return (App.ROLE_PAGES[App.currentUser?.role]||[]).includes(page); },
+
+  navigate(page) {
+    if (!App.canAccess(page)) {
+      console.warn('[KNNDCmdb] navigate blocked:', page, '| user role:', App.currentUser?.role, '| allowed:', App.ROLE_PAGES[App.currentUser?.role]);
+      Toast.show('Access Denied','You do not have permission to view this page.','error');
+      return;
+    }
+    App.currentPage = page;
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    const el = document.getElementById('page-' + page);
+    if (el) {
+      el.classList.add('active');
+      try { PageRenderers[page]?.(); }
+      catch(e) {
+        console.error('[KNNDCmdb] Page render error on', page, e);
+        Toast.show('Page Error', 'Could not load ' + page + '. Try refreshing.', 'error', 5000);
+      }
+    } else {
+      console.error('[KNNDCmdb] Page div not found: page-' + page);
+    }
+    document.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('active', a.dataset.page === page));
+    window.scrollTo(0, 0);
+  },
+
+  renderNav() {
+    const nav = document.getElementById('main-nav');
+    if (!nav || !App.currentUser) return;
+    const pages = [
+      { id:'dashboard', icon:'📊', label:'Dashboard'  },
+      { id:'entry',     icon:'✍️',  label:'Data Entry'  },
+      { id:'my-records',icon:'📋', label:'My Records'  },
+      { id:'records',   icon:'🗃️',  label:'All Records' },
+      { id:'reports',   icon:'📈', label:'Reports'     },
+      { id:'analytics', icon:'🔬', label:'Analytics'   },
+      { id:'audit',     icon:'🛡️',  label:'Audit Log'   },
+      { id:'users',     icon:'👥', label:'User Mgmt'   },
+      { id:'settings',  icon:'⚙️',  label:'Settings'    },
+    ];
+    nav.innerHTML = pages.filter(p => App.canAccess(p.id)).map(p =>
+      `<a class="nav-link" data-page="${p.id}" onclick="App.navigate('${p.id}')">
+         <span class="nav-icon">${p.icon}</span>${p.label}
+       </a>`
+    ).join('');
+  },
+
+  renderUserHeader() {
+    const u = App.currentUser;
+    if (!u) return;
+    const initials = u.name.split(' ').map(n=>n[0]).slice(0,2).join('');
+    const rl = {officer:'Data Entry Officer',ward:'Ward Coordinator',exec:'Constituency Executive',admin:'System Administrator'}[u.role]||u.role;
+    document.getElementById('user-avatar').textContent   = initials;
+    document.getElementById('user-name-hdr').textContent = u.name;
+    document.getElementById('user-role-hdr').textContent = rl;
+  },
+
+  // ── MEMBER CRUD ───────────────────────────────────────────
+  addMember(data) {
+    // ── DUPLICATE PREVENTION ──────────────────────────────────────────────────
+    // Check order:
+    //   1. idIndex  — covers every member confirmed in the Sheet (all devices)
+    //   2. LS.MEMBERS — covers records entered on this device not yet flushed
+    // This combination prevents duplicates even when localStorage has been
+    // pruned and even when other officers have enrolled the same person.
+    App.members = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+    const local = App.members.filter(m => !m._demo);
+
+    // 1. Party ID — mandatory and must be globally unique
+    const pid = (data.partyId || '').trim().toLowerCase();
+    if (!pid) {
+      Toast.show('Party ID Required', 'Party ID is required and must be unique for every member.', 'error', 6000);
+      return null;
+    }
+    // Check Sheet-wide index first
+    const idxPid = App._lookupIdIndex('partyId', pid);
+    if (idxPid) {
+      Toast.show('Duplicate Blocked — Party ID',
+        `Party ID "${data.partyId}" is already registered to ${idxPid.firstName} ${idxPid.lastName} at ${idxPid.station}.`,
+        'error', 8000);
+      App.logAudit('DUPLICATE_BLOCKED', `Party ID duplicate (index): ${data.partyId} — ${idxPid.firstName} ${idxPid.lastName}`, App.currentUser.username);
+      return null;
+    }
+    // Check unsynced local records not yet in index
+    const localPid = local.find(m => (m.partyId || '').trim().toLowerCase() === pid);
+    if (localPid) {
+      Toast.show('Duplicate Blocked — Party ID',
+        `Party ID "${data.partyId}" is already registered to ${localPid.firstName} ${localPid.lastName} at ${localPid.station}.`,
+        'error', 8000);
+      App.logAudit('DUPLICATE_BLOCKED', `Party ID duplicate (local): ${data.partyId} — ${localPid.firstName} ${localPid.lastName}`, App.currentUser.username);
+      return null;
+    }
+
+    // 2. Voter ID — unique if provided
+    const vid = (data.voterId || '').trim().toLowerCase();
+    if (vid) {
+      const idxVid = App._lookupIdIndex('voterId', vid);
+      if (idxVid) {
+        Toast.show('Duplicate Blocked — Voter ID',
+          `Voter ID "${data.voterId}" is already registered to ${idxVid.firstName} ${idxVid.lastName} at ${idxVid.station}.`,
+          'error', 8000);
+        App.logAudit('DUPLICATE_BLOCKED', `Voter ID duplicate (index): ${data.voterId} — ${idxVid.firstName} ${idxVid.lastName}`, App.currentUser.username);
+        return null;
+      }
+      const localVid = local.find(m => (m.voterId || '').trim().toLowerCase() === vid);
+      if (localVid) {
+        Toast.show('Duplicate Blocked — Voter ID',
+          `Voter ID "${data.voterId}" is already registered to ${localVid.firstName} ${localVid.lastName} at ${localVid.station}.`,
+          'error', 8000);
+        App.logAudit('DUPLICATE_BLOCKED', `Voter ID duplicate (local): ${data.voterId} — ${localVid.firstName} ${localVid.lastName}`, App.currentUser.username);
+        return null;
+      }
+    }
+
+    // 3. Name + station combo — warning only (two people can share a name)
+    const fname = (data.firstName || '').trim().toLowerCase();
+    const lname = (data.lastName  || '').trim().toLowerCase();
+    const scode = (data.stationCode || '').trim();
+    if (fname && lname && scode) {
+      const idxName = App.idIndex.find(e =>
+        (e.firstName  || '').toLowerCase() === fname &&
+        (e.lastName   || '').toLowerCase() === lname &&
+        (e.stationCode|| '')               === scode
+      );
+      const localName = local.find(m =>
+        (m.firstName  || '').toLowerCase() === fname &&
+        (m.lastName   || '').toLowerCase() === lname &&
+        (m.stationCode|| '')               === scode
+      );
+      const nameMatch = idxName || localName;
+      if (nameMatch) {
+        Toast.show('Possible Duplicate — Same Name & Station',
+          `${data.firstName} ${data.lastName} at this station already has a record (Party ID: ${nameMatch.partyId || '—'}). Check before saving.`,
+          'warning', 10000);
+        App.logAudit('DUPLICATE_WARNING', `Name+station match: ${data.firstName} ${data.lastName} at ${scode}`, App.currentUser.username);
+      }
+    }
+
+    const member = {
+      id: 'm' + Date.now(),
+      ...data,
+      officer:      App.currentUser.username,
+      officerName:  App.currentUser.name,
+      timestamp:    new Date().toLocaleString('en-GH'),
+      isoDate:      App._todayISO()
+    };
+    App.members.unshift(member);
+    App.saveMembers();
+    App._addToIdIndex(member); // update local index immediately for next duplicate check
+    App.logAudit('ADD_MEMBER', `Added: ${data.firstName} ${data.lastName} (${data.partyId}) — ${data.station}`, App.currentUser.username);
+
+    if (App.settings.scriptUrl) {
+      if (App.isOnline) {
+        // Try direct Sheet write — fastest path when online.
+        // If it fails, fall back to queue so nothing is lost.
+        App._xhrPostWithFallback(
+          { action: 'upsertMember', ...member },
+          { type: 'add', data: member }
+        );
+      } else {
+        // Offline — queue for sync when connection returns
+        App.offlineQueue.push({ type: 'add', data: member });
+        App.saveOfflineQ();
+        Toast.show('Saved Offline', 'Record saved locally. Will sync to Google Sheets when back online.', 'warning', 4000);
+      }
+    }
+    return member;
+  },
+
+  // ── PERMISSION CHECK — can App user edit/delete App record? ──
+  // canEditMember — can this user EDIT this record?
+  // exec (Constituency Executive) can edit any record; ward/officer are station-scoped.
+  canEditMember(m) {
+    const u = App.currentUser;
+    if (!u) return false;
+    if (u.role === 'admin') return true;
+    if (u.role === 'exec')  return true;   // exec can edit (but not delete)
+    const codes = (u.assignedStations||[]).length ? u.assignedStations : (u.station ? [u.station] : []);
+    if (u.role === 'ward') {
+      return codes.includes(m.stationCode) || m.ward === u.ward || m.branch === u.branch;
+    }
+    if (u.role === 'officer') {
+      return m.officer === u.username && codes.includes(m.stationCode);
+    }
+    return false;
+  },
+
+  // canDeleteMember — can this user DELETE this record?
+  // exec is explicitly blocked from deletion (view + edit only).
+  canDeleteMember(m) {
+    const u = App.currentUser;
+    if (!u) return false;
+    if (u.role === 'admin') return true;
+    if (u.role === 'exec')  return false;  // exec cannot delete
+    const codes = (u.assignedStations||[]).length ? u.assignedStations : (u.station ? [u.station] : []);
+    if (u.role === 'ward') {
+      return codes.includes(m.stationCode) || m.ward === u.ward || m.branch === u.branch;
+    }
+    if (u.role === 'officer') {
+      return m.officer === u.username && codes.includes(m.stationCode);
+    }
+    return false;
+  },
+
+  // canModifyMember — legacy alias used by deleteMember(); maps to canDeleteMember
+  canModifyMember(m) { return App.canDeleteMember(m); },
+
+  updateMember(id, updates, reason) {
+    App.members = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
+    const idx = App.members.findIndex(m=>m.id===id);
+    if (idx<0) return false;
+    // Permission check — use canEditMember (exec can edit; officer scoped to own records)
+    if (!App.canEditMember(App.members[idx])) {
+      Toast.show('Permission Denied','You can only edit records from your assigned stations.','error');
+      App.logAudit('EDIT_DENIED',`Blocked edit attempt on record ${id} by ${App.currentUser.username}`,App.currentUser.username);
+      return false;
+    }
+    const before = {...App.members[idx]};
+    App.members[idx] = {...App.members[idx],...updates, lastModified:new Date().toLocaleString('en-GH'), modifiedBy:App.currentUser.username};
+    App.saveMembers();
+    App.logAudit('EDIT_MEMBER',`Edited: ${before.firstName} ${before.lastName}. Reason: ${reason}`, App.currentUser.username, {before, after:App.members[idx], reason});
+    if (App.settings.scriptUrl) {
+      const payload = {...App.members[idx], action:'updateMember', reason};
+      if (App.isOnline) {
+        App._xhrPostWithFallback(payload, { type:'update', data: payload });
+      } else {
+        App.offlineQueue.push({ type:'update', data: payload });
+        App.saveOfflineQ();
+        Toast.show('Edit Queued','Changes saved locally and will sync when online.','warning');
+      }
+    }
+    return true;
+  },
+
+  deleteMember(id, reason) {
+    App.members = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
+    const m = App.members.find(m=>m.id===id);
+    if (!m) return false;
+    // Permission check
+    if (!App.canModifyMember(m)) {
+      Toast.show('Permission Denied','You can only delete records from your assigned stations.','error');
+      App.logAudit('DELETE_DENIED',`Blocked delete attempt on record ${id} by ${App.currentUser.username}`,App.currentUser.username);
+      return false;
+    }
+    App.members = App.members.filter(mx=>mx.id!==id);
+    App.saveMembers();
+    App.logAudit('DELETE_MEMBER',`Deleted: ${m.firstName} ${m.lastName} (${m.partyId}). Reason: ${reason}`, App.currentUser.username);
+    if (App.settings.scriptUrl) {
+      const payload = {id, action:'deleteMember', reason};
+      if (App.isOnline) {
+        App._xhrPostWithFallback(payload, { type:'delete', data: payload });
+      } else {
+        App.offlineQueue.push({ type:'delete', data: payload });
+        App.saveOfflineQ();
+        Toast.show('Delete Queued','Record removed locally and will sync when online.','warning');
+      }
+    }
+    return true;
+  },
+
+  getMembersForUser() {
+    // ── Pure synchronous read — exactly as in v2.x ──────────────
+    // Never triggers async work here. Fetches are driven by the
+    // sync timer and the manual pull button. This keeps all page
+    // renderers fast and predictable.
+    const all = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
+    App.members = all;
+    const u = App.currentUser;
+    if (!u) return [];
+    if (u.role==='admin'||u.role==='exec') return all;
+    const codes = (u.assignedStations||[]).length ? u.assignedStations
+      : (u.station ? [u.station] : []);
+    if (u.role==='ward')    return all.filter(m => codes.includes(m.stationCode) || m.ward === u.ward);
+    if (u.role==='officer') return all.filter(m => codes.includes(m.stationCode));
+    return [];
+  },
+
+  logAudit(action, details, user, extra={}) {
+    const entry = {id:'a'+Date.now(),action,details,user:user||'system',timestamp:new Date().toLocaleString('en-GH'),...extra};
+    App.auditLog = JSON.parse(localStorage.getItem(LS.AUDIT)||'[]');
+    App.auditLog.unshift(entry);
+    if (App.auditLog.length>10000) App.auditLog=App.auditLog.slice(0,10000);
+    localStorage.setItem(LS.AUDIT, JSON.stringify(App.auditLog));
+    // Defer audit sheet sync — never block UI
+    if (App.settings.scriptUrl) setTimeout(() => App._syncAuditEntry(entry), 0);
+  },
+
+  _syncAuditEntry(entry) {
+    if (!App.settings.scriptUrl) return;
+    App._xhrPost(App.settings.scriptUrl, {
+      action:      'logAudit',
+      auditAction: entry.action,
+      timestamp:   entry.timestamp,
+      user:        entry.user,
+      details:     entry.details,
+      extra:       entry.reason || '',
+    });
+  },
+
+  // Pull audit entries from the Sheet and merge with local log.
+  // Called when admin navigates to the Audit Log page and Sheet is configured.
+  // Returns true if new entries were found, false otherwise.
+  async _fetchAuditFromSheet() {
+    if (!App.isOnline || !App.settings.scriptUrl) return false;
+    try {
+      const data = await App._xhrGet(App.settings.scriptUrl + '?action=getAudit&t=' + Date.now());
+      if (!data?.entries) return false;
+      if (!data?.entries?.length) return false;
+
+      // Build a dedup key: timestamp + action + user (Sheet has no id field)
+      const local  = JSON.parse(localStorage.getItem(LS.AUDIT) || '[]');
+      const seenKeys = new Set(local.map(e => `${e.timestamp}|${e.action}|${e.user}`));
+
+      const newEntries = data.entries
+        .filter(e => {
+          const k = `${e.timestamp}|${e.action}|${e.user}`;
+          return !seenKeys.has(k);
+        })
+        .map(e => ({
+          id:        'a_sheet_' + Math.random().toString(36).slice(2),
+          action:    e.action,
+          details:   e.details,
+          user:      e.user,
+          timestamp: e.timestamp,
+          reason:    e.extra || '',
+          _fromSheet: true,
+        }));
+
+      if (!newEntries.length) return false;
+
+      // Merge: combine local + sheet entries, sort newest-first, cap at 10 000
+      const merged = [...local, ...newEntries]
+        .sort((a, b) => {
+          // Sort by id timestamp where available, else lexicographic on timestamp string
+          const ta = a.id?.startsWith('a') && !a._fromSheet ? parseInt(a.id.slice(1)) : 0;
+          const tb = b.id?.startsWith('a') && !b._fromSheet ? parseInt(b.id.slice(1)) : 0;
+          return tb - ta || b.timestamp.localeCompare(a.timestamp);
+        })
+        .slice(0, 10000);
+
+      App.auditLog = merged;
+      localStorage.setItem(LS.AUDIT, JSON.stringify(merged));
+      return true;
+    } catch(_) {
+      return false;
+    }
+  },
+
+  syncToSheets(data) {
+    if (!App.settings.scriptUrl) return;
+    // Use upsertMember as default: if record already exists in Sheet it updates in-place,
+    // preventing duplicate rows when records sync more than once (e.g. after offline/online cycle).
+    const payload = data.action ? data : {...data, action:'upsertMember'};
+    setTimeout(() => App._xhrPost(App.settings.scriptUrl, payload), 0);
+  },
+
+  // ── SYNC WORKER ───────────────────────────────────────────────
+  // Manages a Web Worker that handles all Sheet XHR communication on a
+  // separate thread so the data entry UI is never blocked.
+  // Falls back to the main-thread batch method if Workers are unavailable.
+  _syncWorker: null,
+
+  _getWorker() {
+    if (!window.Worker) return null;
+    if (!App._syncWorker || App._syncWorker._dead) {
+      try {
+        App._syncWorker = new Worker('js/sync-worker.js');
+        App._syncWorker._dead = false;
+        App._syncWorker.onerror = () => { App._syncWorker._dead = true; };
+      } catch(_) { return null; }
+    }
+    return App._syncWorker;
+  },
+
+  // Run a sync job on the worker. Returns a Promise that resolves to
+  // { uploaded, failed } when the worker reports 'done'.
+  // onProgress(uploaded, total) is called after each batch.
+  _runWorker(msg, onProgress) {
+    return new Promise((resolve, reject) => {
+      const worker = App._getWorker();
+      if (!worker) { resolve(null); return; } // caller falls back to main thread
+
+      const handler = (e) => {
+        const d = e.data;
+        if (d.type === 'progress') {
+          if (onProgress) onProgress(d.uploaded, d.total);
+        } else if (d.type === 'done') {
+          worker.removeEventListener('message', handler);
+          resolve({ uploaded: d.uploaded, failed: d.failed });
+        } else if (d.type === 'error') {
+          worker.removeEventListener('message', handler);
+          reject(new Error(d.message));
+        }
+      };
+      worker.addEventListener('message', handler);
+      worker.postMessage(msg);
+    });
+  },
+
+  // Direct Sheet write with automatic queue fallback.
+  // Sends payload immediately; if the XHR fails (network drop, timeout, Apps Script
+  // error) the queueItem is saved to the offline queue so nothing is lost.
+  _xhrPostWithFallback(payload, queueItem) {
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', App.settings.scriptUrl, true);
+      xhr.timeout = 25000;
+      xhr.onload  = () => {}; // success — Sheet has the record
+      xhr.onerror = xhr.ontimeout = () => {
+        // Direct write failed — queue for retry
+        App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q) || '[]');
+        App.offlineQueue.push(queueItem);
+        App.saveOfflineQ();
+      };
+      xhr.send(JSON.stringify(payload));
+    } catch(_) {
+      App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q) || '[]');
+      App.offlineQueue.push(queueItem);
+      App.saveOfflineQ();
+    }
+  },
+
+  // Reliable fire-and-forget POST using XHR — handles Apps Script redirects correctly
+  _xhrPost(url, data) {
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url, true); // async
+      xhr.timeout = 20000;
+      xhr.send(JSON.stringify(data));
+      // No response handling — fire and forget
+    } catch(_) {}
+  },
+
+  // ── ID INDEX — lightweight duplicate detection ────────────────
+  // Stores only partyId + voterId + minimal display info for every enrolled
+  // member. ~60 bytes per entry vs ~480 for a full record. An enrolment of
+  // 10,000 members costs ~600KB — safe on any device including entry phones.
+  // Officer devices use this index instead of caching full member records,
+  // keeping LS.MEMBERS permanently small (only unsynced local entries).
+
+  // Load index from localStorage into memory
+  _loadIdIndex() {
+    try {
+      const raw = localStorage.getItem(LS.ID_INDEX);
+      App.idIndex = raw ? JSON.parse(raw) : [];
+    } catch(_) { App.idIndex = []; }
+  },
+
+  // Persist index to localStorage
+  _saveIdIndex() {
+    try { localStorage.setItem(LS.ID_INDEX, JSON.stringify(App.idIndex)); } catch(_) {}
+  },
+
+  // Add a single new entry to the in-memory index and persist
+  _addToIdIndex(member) {
+    if (!member.partyId && !member.voterId) return;
+    // Remove any existing entry for this record id first
+    App.idIndex = App.idIndex.filter(e => e.id !== member.id);
+    App.idIndex.push({
+      id:          member.id          || '',
+      partyId:     (member.partyId    || '').trim(),
+      voterId:     (member.voterId    || '').trim(),
+      firstName:   (member.firstName  || '').trim(),
+      lastName:    (member.lastName   || '').trim(),
+      station:     (member.station    || '').trim(),
+      stationCode: (member.stationCode|| '').trim(),
+    });
+    App._saveIdIndex();
+  },
+
+  // Look up a value in the index. Returns the matching entry or null.
+  // field: 'partyId' | 'voterId'
+  _lookupIdIndex(field, value) {
+    if (!value) return null;
+    const v = value.trim().toLowerCase();
+    return App.idIndex.find(e => (e[field] || '').toLowerCase() === v) || null;
+  },
+
+  // Fetch the full ID index from Google Sheets in the background.
+  // Called on login and every sync cycle. Does NOT block the UI.
+  async _fetchIdIndex() {
+    if (!App.settings.scriptUrl) return;
+    const data = await App._xhrGet(
+      App.settings.scriptUrl + '?action=getIdIndex&t=' + Date.now()
+    );
+    if (!data?.index?.length) return;
+    App.idIndex = data.index;
+    App._saveIdIndex();
+  },
+
+  // After a successful flush, remove synced records from LS.MEMBERS on
+  // officer/ward devices (they're now in the Sheet and in the index).
+  // Admin/exec keep full LS.MEMBERS — this method exits early for them.
+  _pruneSyncedLocalMembers(syncedIds) {
+    const role = App.currentUser?.role;
+    if (role === 'admin' || role === 'exec') return; // admin keeps everything
+    if (!syncedIds?.length) return;
+
+    const idSet  = new Set(syncedIds);
+    const local  = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+    const pruned = local.filter(m => !idSet.has(m.id)); // keep only unsynced
+    if (pruned.length < local.length) {
+      App.members = pruned;
+      try { localStorage.setItem(LS.MEMBERS, JSON.stringify(pruned)); } catch(_) {}
+    }
+  },
+
+  // JSONP-based data reader — the only reliably cross-origin read method for Apps Script.
+  // XHR and fetch() both fail because Apps Script's 302 redirect response lacks
+  // Access-Control-Allow-Origin headers. JSONP sidesteps this entirely:
+  // a <script> tag is injected with ?callback=fnName; Apps Script wraps the JSON
+  // in fnName({...}) and the browser executes it as JS — no CORS check applies.
+  _xhrGet(url) {
+    return new Promise((resolve) => {
+      // Build a unique callback name
+      const cbName = '_kncb_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
+      const timeout = setTimeout(() => {
+        delete window[cbName];
+        if (script.parentNode) script.parentNode.removeChild(script);
+        resolve(null);
+      }, 20000);
+
+      window[cbName] = (data) => {
+        clearTimeout(timeout);
+        delete window[cbName];
+        if (script.parentNode) script.parentNode.removeChild(script);
+        resolve(data);
+      };
+
+      // Append callback param to the URL
+      const sep   = url.includes('?') ? '&' : '?';
+      const src   = url + sep + 'callback=' + cbName;
+      const script = document.createElement('script');
+      script.src   = src;
+      script.onerror = () => {
+        clearTimeout(timeout);
+        delete window[cbName];
+        resolve(null);
+      };
+      document.head.appendChild(script);
+    });
+  },
+
+  // Force a complete re-pull from Sheet for admin/exec.
+  // Clears the local member cache first so fetchFromSheets re-downloads everything,
+  // not just the delta. Used when admin notices local count < Sheet count.
+  async _pullAllFromSheet() {
+    if (!App.settings.scriptUrl) {
+      Toast.show('No Script URL', 'Configure the Apps Script URL in Settings → Google Sheets.', 'error');
+      return;
+    }
+    const btn = document.getElementById('records-pull-btn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Pulling…'; }
+    Toast.show('Pulling from Sheet', 'Downloading all records from Google Sheets…', 'info', 8000);
+
+    try {
+      const url  = App.settings.scriptUrl + '?action=getMembers&t=' + Date.now();
+      const data = await App._xhrGet(url);
+
+      if (!data?.members?.length) {
+        Toast.show('No Records', 'The Google Sheet returned no records. Check the Sheet has data.', 'warning');
+        if (btn) { btn.disabled = false; btn.textContent = '🔄 Pull All from Sheet'; }
+        return;
+      }
+
+      // Keep any locally-entered records that haven't been pushed to Sheet yet
+      const local       = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+      const sheetIds    = new Set(data.members.map(m => m.id).filter(Boolean));
+      const localOnly   = local.filter(m => m.id && !sheetIds.has(m.id) && !m._demo);
+
+      // Build fresh set: all Sheet records + any local-only unsynced records
+      const sheetNormed = data.members.map(r => ({ ...App._normaliseSheetRow(r), _fromSheet: true }));
+      const merged      = [...localOnly, ...sheetNormed]
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      // Free up space from non-critical keys before writing the full member set
+      // NEVER clear LS.OFFLINE_Q — it contains unsynced records
+      try { localStorage.removeItem(LS.AUDIT); } catch(_) {}
+
+      App.members = merged;
+      App.saveMembers(); // uses quota-aware handler
+
+      Toast.show('Pull Complete ✅',
+        `${data.members.length} record(s) loaded from Google Sheets${localOnly.length ? ` + ${localOnly.length} local unsynced` : ''}.`,
+        'success', 6000);
+      App.logAudit('PULL_ALL_SHEET', `Admin force-pulled ${data.members.length} records from Google Sheets`, App.currentUser?.username);
+
+      // Refresh all relevant pages
+      if (['records','dashboard','reports','analytics'].includes(App.currentPage)) {
+        PageRenderers[App.currentPage]?.();
+      }
+    } catch(e) {
+      Toast.show('Pull Failed', 'Could not reach Google Sheets. Check your connection and Script URL.', 'error');
+    }
+
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Pull All from Sheet'; }
+  },
+  // Called after every Sheet sync. Marks records confirmed in the Sheet as
+  // _fromSheet:true, then checks storage usage on officer/ward devices only.
+  // Admin and exec devices are NEVER trimmed — they need the full dataset visible.
+  // Only locally-entered unsynced records are always preserved.
+  _autoTrimMembers(sheetMembers) {
+    if (!sheetMembers?.length) return;
+
+    // Never trim admin or exec — they need full visibility
+    const role = App.currentUser?.role;
+    const isFullViewRole = role === 'admin' || role === 'exec';
+
+    const sheetIds = new Set(sheetMembers.map(m => m.id).filter(Boolean));
+    const local    = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]');
+
+    // Mark confirmed records as _fromSheet
+    let changed = false;
+    local.forEach(m => {
+      if (sheetIds.has(m.id) && !m._fromSheet) {
+        m._fromSheet = true;
+        changed = true;
+      }
+    });
+    if (changed) {
+      App.members = local;
+      try { localStorage.setItem(LS.MEMBERS, JSON.stringify(local)); } catch(_) {}
+    }
+
+    // Admin and exec: stop here — no trimming ever
+    if (isFullViewRole) return;
+
+    // Officer/ward: check storage and trim oldest synced records if needed
+    const raw = localStorage.getItem(LS.MEMBERS) || '[]';
+    const sizeKB = (raw.length * 2) / 1024;
+    const THRESHOLD_KB = 3500;
+
+    if (sizeKB < THRESHOLD_KB) return;
+
+    const unsynced = local.filter(m => !m._fromSheet);
+    const synced   = local.filter(m =>  m._fromSheet);
+
+    synced.sort((a, b) => {
+      const da = a.isoDate || App._isoDate(a.timestamp) || '0000';
+      const db = b.isoDate || App._isoDate(b.timestamp) || '0000';
+      return da.localeCompare(db);
+    });
+
+    let trimmed = [...unsynced, ...synced];
+    while (trimmed.length > unsynced.length) {
+      trimmed.shift();
+      const testSize = (JSON.stringify(trimmed).length * 2) / 1024;
+      if (testSize < THRESHOLD_KB) break;
+    }
+
+    if (trimmed.length < local.length) {
+      const freed = local.length - trimmed.length;
+      App.members = trimmed;
+      try {
+        localStorage.setItem(LS.MEMBERS, JSON.stringify(trimmed));
+        App.logAudit('STORAGE_TRIM', `Auto-trimmed ${freed} synced record(s) from local storage to free space. All records remain in Google Sheets.`, 'system');
+      } catch(_) {}
+    }
+  },
+  // Returns 'YYYY-MM-DD' from any stored timestamp string, locale-independent.
+  // Handles en-GH 'D/M/YYYY, ...' and en-US 'M/D/YYYY, ...' fallback formats.
+  _isoDate(timestamp) {
+    if (!timestamp) return '';
+    // If already ISO format
+    if (/^\d{4}-\d{2}-\d{2}/.test(timestamp)) return timestamp.slice(0, 10);
+    // Try native Date parse first (works for M/D/YYYY = en-US)
+    const d = new Date(timestamp);
+    if (!isNaN(d)) return d.toISOString().slice(0, 10);
+    // Manual parse for D/M/YYYY (en-GH): extract day, month, year
+    const m = timestamp.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (m) {
+      const [, day, month, year] = m;
+      const forced = new Date(`${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}`);
+      if (!isNaN(forced)) return forced.toISOString().slice(0, 10);
+    }
+    return '';
+  },
+
+  // Returns today's date as 'YYYY-MM-DD' in local time (immune to locale and timezone drift)
+  _todayISO() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  },
+
+  // Returns 'YYYY-MM-DD' for a date N days ago
+  _daysAgoISO(n) {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  },
+
+  getStats() {
+    const all   = App.getMembersForUser();
+    const todayISO = App._todayISO();
+    const byStation={}, byDay={}, byGender={Male:0,Female:0,Other:0}, byZone={};
+    all.forEach(m => {
+      byStation[m.station] = (byStation[m.station]||0)+1;
+      const g = m.gender==='Male'?'Male':m.gender==='Female'?'Female':'Other';
+      byGender[g]++;
+      if (m.zone) byZone[m.zone] = (byZone[m.zone]||0)+1;
+    });
+    // Build 7-day trend using ISO date keys — locale-independent
+    for (let i=6;i>=0;i--) {
+      const key = App._daysAgoISO(i);
+      byDay[key] = all.filter(m => (m.isoDate || App._isoDate(m.timestamp)) === key).length;
+    }
+    const todayCount = all.filter(m => (m.isoDate || App._isoDate(m.timestamp)) === todayISO).length;
+    return { total:all.length, today:todayCount, byStation, byDay, stations:Object.keys(byStation).length, byGender, byZone };
+  },
+
+  async flushOfflineQueue() {
+    App.offlineQueue = JSON.parse(localStorage.getItem(LS.OFFLINE_Q) || '[]');
+    if (!App.offlineQueue.length || !App.settings.scriptUrl) return;
+
+    const total = App.offlineQueue.length;
+    Toast.show('Syncing', `Uploading ${total} queued operation(s) in background…`, 'info', 5000);
+
+    // Try worker first — keeps the UI fully unblocked
+    const result = await App._runWorker(
+      { cmd: 'flush', queue: App.offlineQueue, scriptUrl: App.settings.scriptUrl },
+      (uploaded, tot) => {
+        const pct = Math.round((uploaded / tot) * 100);
+        // Update any visible queue counter without touching the form
+        const badge = document.getElementById('offline-queue-count');
+        if (badge) badge.textContent = tot - uploaded;
+      }
+    ).catch(() => null);
+
+    if (result) {
+      // Worker succeeded — update state from worker result
+      App.offlineQueue = result.failed;
+      App.saveOfflineQ();
+
+      // On officer/ward devices: remove successfully sent records from LS.MEMBERS.
+      // We only remove the EXACT records that were in this queue and confirmed sent.
+      // Never touch records that came from Sheet pulls (fetchFromSheets) — those
+      // are needed for the All Records / My Records views.
+      if (result.uploaded > 0) {
+        const failedIds = new Set(result.failed.map(item => item.data?.id).filter(Boolean));
+        const sentIds = queue
+          .map(item => item.data?.id)
+          .filter(id => id && !failedIds.has(id));
+        App._pruneSyncedLocalMembers(sentIds);
+      }
+
+      if (!result.failed.length) {
+        Toast.show('Sync Complete ✅', `${result.uploaded} queued operation(s) uploaded.`, 'success', 5000);
+      } else {
+        Toast.show('Partial Sync', `${result.uploaded} uploaded, ${result.failed.length} still pending.`, 'warning', 6000);
+      }
+    } else {
+      // Worker unavailable — fall back to main-thread batching
+      const BATCH = 5;
+      const sendOne = (payload) => new Promise(resolve => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', App.settings.scriptUrl, true);
+        xhr.timeout = 25000;
+        xhr.onload = () => resolve(true);
+        xhr.onerror = () => resolve(false);
+        xhr.ontimeout = () => resolve(false);
+        xhr.send(JSON.stringify(payload));
+      });
+      const failed = []; let uploaded = 0;
+      const queue  = App.offlineQueue;
+      for (let i = 0; i < queue.length; i += BATCH) {
+        const batch    = queue.slice(i, i + BATCH);
+        const payloads = batch.map(item => {
+          if (item.type === 'delete') return { action: 'deleteMember', ...item.data };
+          if (item.type === 'update') return { action: 'updateMember', ...item.data };
+          return { action: 'upsertMember', ...item.data };
+        });
+        const results = await Promise.all(payloads.map(sendOne));
+        results.forEach((ok, j) => ok ? uploaded++ : failed.push(batch[j]));
+        await new Promise(r => setTimeout(r, 0));
+      }
+      App.offlineQueue = failed;
+      App.saveOfflineQ();
+      // Prune only the records that were actually sent successfully
+      if (uploaded > 0) {
+        const failedSet = new Set(failed.map(item => item.data?.id).filter(Boolean));
+        const sentIds = queue
+          .map(item => item.data?.id)
+          .filter(id => id && !failedSet.has(id));
+        App._pruneSyncedLocalMembers(sentIds);
+      }
+      if (!failed.length) Toast.show('Sync Complete ✅', `${uploaded} queued operation(s) uploaded.`, 'success', 5000);
+      else Toast.show('Partial Sync', `${uploaded} uploaded, ${failed.length} still pending.`, 'warning', 6000);
+    }
+
+    if (App.currentUser && App.currentPage === 'dashboard') PageRenderers.dashboard();
+  },
+
+  // Push ALL local members to Sheet (for records entered before Sheets was configured)
+  // Uses upsertMember — safe to run multiple times: existing rows are updated, new rows appended.
+  // Sends in parallel batches of 5 to avoid hanging the browser.
+  async bulkPushToSheets() {
+    if (!App.settings.scriptUrl) {
+      Toast.show('No Script URL', 'Configure the Apps Script URL in Settings → Google Sheets.', 'error');
+      return;
+    }
+    const all = JSON.parse(localStorage.getItem(LS.MEMBERS) || '[]').filter(m => !m._demo);
+    if (!all.length) { Toast.show('No Records', 'There are no real member records to push.', 'warning'); return; }
+
+    const btn = document.querySelector('[onclick*="bulkPushToSheets"]');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Pushing…'; }
+
+    const BATCH = 5;
+    let ok = 0, fail = 0;
+    const total = all.length;
+
+    const sendOne = (m) => new Promise(resolve => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', App.settings.scriptUrl, true);
+      xhr.timeout   = 25000;
+      xhr.onload    = () => resolve(true);
+      xhr.onerror   = () => resolve(false);
+      xhr.ontimeout = () => resolve(false);
+      xhr.send(JSON.stringify({ action: 'upsertMember', ...m }));
+    });
+
+    for (let i = 0; i < total; i += BATCH) {
+      const batch   = all.slice(i, i + BATCH);
+      const results = await Promise.all(batch.map(sendOne));
+      results.forEach(sent => sent ? ok++ : fail++);
+
+      const pct = Math.round(((i + batch.length) / total) * 100);
+      if (btn) btn.textContent = `⏳ ${pct}% (${ok}/${total})`;
+
+      await new Promise(r => setTimeout(r, 0));
+    }
+
+    if (btn) { btn.disabled = false; btn.textContent = '☁️ Push All Records to Sheet'; }
+
+    if (fail === 0) Toast.show('Push Complete ✅', `All ${ok} record(s) uploaded to Google Sheets.`, 'success', 6000);
+    else            Toast.show('Partial Upload', `${ok} uploaded, ${fail} failed. Try again.`, 'warning', 6000);
+    App.logAudit('BULK_PUSH', `Bulk pushed ${ok}/${total} records to Google Sheets`, App.currentUser?.username || 'admin');
+  },
+
+  // Push records visible to the current user to Google Sheet.
+  // Used from the Data Entry page — scoped by role and assigned stations.
+  // Sends in parallel batches of 5 to avoid hanging the browser.
+  // Push records visible to the current user to Google Sheet.
+  // Runs on the Web Worker thread — the entry form stays fully responsive.
+  async pushMyRecordsToSheet() {
+    if (!App.settings.scriptUrl) {
+      Toast.show('No Script URL', 'Configure the Apps Script URL in Settings → Google Sheets first.', 'error');
+      return;
+    }
+    const records = App.getMembersForUser().filter(m => !m._demo);
+    if (!records.length) {
+      Toast.show('No Records', 'No records found for your assigned station(s).', 'warning');
+      return;
+    }
+
+    const total = records.length;
+    const btns  = document.querySelectorAll('[onclick*="pushMyRecordsToSheet"]');
+    btns.forEach(b => { b.disabled = true; b.dataset._orig = b.textContent; b.textContent = `⏳ 0/${total}`; });
+
+    const onProgress = (uploaded, tot) => {
+      const pct = Math.round((uploaded / tot) * 100);
+      btns.forEach(b => { b.textContent = `⏳ ${pct}% (${uploaded}/${tot})`; });
+    };
+
+    const result = await App._runWorker(
+      { cmd: 'push', records, scriptUrl: App.settings.scriptUrl },
+      onProgress
+    ).catch(() => null);
+
+    let ok = 0, fail = 0;
+
+    if (result) {
+      ok   = result.uploaded;
+      fail = result.failed.length;
+    } else {
+      // Worker unavailable — fall back to main-thread batching
+      const BATCH = 5;
+      const sendOne = (m) => new Promise(resolve => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', App.settings.scriptUrl, true);
+        xhr.timeout = 25000;
+        xhr.onload = () => resolve(true);
+        xhr.onerror = () => resolve(false);
+        xhr.ontimeout = () => resolve(false);
+        xhr.send(JSON.stringify({ action: 'upsertMember', ...m }));
+      });
+      for (let i = 0; i < total; i += BATCH) {
+        const batch   = records.slice(i, i + BATCH);
+        const results = await Promise.all(batch.map(sendOne));
+        results.forEach(sent => sent ? ok++ : fail++);
+        const pct = Math.round(((i + batch.length) / total) * 100);
+        btns.forEach(b => { b.textContent = `⏳ ${pct}% (${ok}/${total})`; });
+        await new Promise(r => setTimeout(r, 0));
+      }
+    }
+
+    btns.forEach(b => { b.disabled = false; b.textContent = b.dataset._orig || '☁️ Push Records to Sheet'; });
+
+    if (fail === 0) {
+      Toast.show('Push Complete ✅', `All ${ok} record(s) uploaded to Google Sheets.`, 'success', 6000);
+      App.logAudit('PUSH_MY_RECORDS', `Pushed ${ok}/${total} records to Google Sheets`, App.currentUser?.username);
+    } else {
+      Toast.show('Partial Upload', `${ok} uploaded, ${fail} failed. Try again to retry.`, 'warning', 7000);
+    }
+    if (App.currentPage === 'entry') PageRenderers.entry();
+  },
+};
+
+// ─── TOAST ───────────────────────────────────────────────────
+const Toast = {
+  show(title, msg='', type='success', duration=4000) {
+    const c = document.getElementById('toast-container');
+    if (!c) return;
+    const icons={success:'✅',error:'❌',warning:'⚠️',info:'ℹ️'};
+    const t=document.createElement('div');
+    t.className=`toast ${type}`;
+    t.innerHTML=`<span class="toast-icon">${icons[type]||'✅'}</span>
+      <div class="toast-content"><div class="toast-title">${title}</div>${msg?`<div class="toast-msg">${msg}</div>`:''}</div>
+      <button class="toast-close" onclick="App.parentElement.remove()">✕</button>`;
+    c.appendChild(t);
+    setTimeout(()=>{t.classList.add('hiding');setTimeout(()=>t.remove(),300);},duration);
+  }
+};
+
+const Modal = {
+  open(id)   { document.getElementById(id)?.classList.add('open'); },
+  close(id)  { document.getElementById(id)?.classList.remove('open'); },
+  closeAll() { document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open')); },
+};
+document.addEventListener('click',e=>{ if(e.target.classList.contains('modal-overlay')) Modal.closeAll(); });
