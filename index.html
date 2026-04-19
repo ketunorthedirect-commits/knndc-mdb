@@ -200,44 +200,44 @@
             <div style="font-size:12px;font-weight:600;color:var(--ndc-green-dk);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">🔍 Station Lookup — Search by Branch Code</div>
             <div style="font-size:12px;color:var(--gray-500);margin-bottom:14px">Type a Branch Code, Station Name, Zone or Ward. All station fields will fill automatically.</div>
             <div class="form-group" style="margin-bottom:14px">
-              <label>Branch Code <span class="required">*</span> <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--ndc-green-dk)">— start typing to search</span></label>
+              <label for="f-branch-code">Branch Code <span class="required">*</span> <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--ndc-green-dk)">— start typing to search</span></label>
               <div class="search-dropdown-wrap">
                 <input type="text" id="f-branch-code" placeholder="e.g. BR-001 or Aflao…" autocomplete="off">
                 <div id="branch-code-dropdown" class="search-dropdown"></div>
               </div>
             </div>
             <div class="form-grid">
-              <div class="form-group"><label>Zone</label><input type="text" id="f-zone" readonly class="auto-filled" placeholder="Auto-filled"></div>
-              <div class="form-group"><label>Ward Name</label><input type="text" id="f-ward-name" readonly class="auto-filled" placeholder="Auto-filled"></div>
-              <div class="form-group"><label>Polling Station Name</label><input type="text" id="f-station-name" readonly class="auto-filled" placeholder="Auto-filled"></div>
-              <div class="form-group"><label>Branch Name</label><input type="text" id="f-branch-name" readonly class="auto-filled" placeholder="Auto-filled"></div>
-              <div class="form-group"><label>Polling Station Code</label><input type="text" id="f-station-code" readonly class="auto-filled" placeholder="Auto-filled"></div>
+              <div class="form-group"><label for="f-zone">Zone</label><input type="text" id="f-zone" readonly class="auto-filled" placeholder="Auto-filled"></div>
+              <div class="form-group"><label for="f-ward-name">Ward Name</label><input type="text" id="f-ward-name" readonly class="auto-filled" placeholder="Auto-filled"></div>
+              <div class="form-group"><label for="f-station-name">Polling Station Name</label><input type="text" id="f-station-name" readonly class="auto-filled" placeholder="Auto-filled"></div>
+              <div class="form-group"><label for="f-branch-name">Branch Name</label><input type="text" id="f-branch-name" readonly class="auto-filled" placeholder="Auto-filled"></div>
+              <div class="form-group"><label for="f-station-code">Polling Station Code</label><input type="text" id="f-station-code" readonly class="auto-filled" placeholder="Auto-filled"></div>
             </div>
           </div>
 
           <!-- Member Details -->
           <div class="form-grid">
-            <div class="form-group"><label>Last Name / Surname <span class="required">*</span></label><input type="text" id="f-last-name" placeholder="e.g. Mensah"></div>
-            <div class="form-group"><label>First Name <span class="required">*</span></label><input type="text" id="f-first-name" placeholder="e.g. Kofi"></div>
-            <div class="form-group"><label>Other Names</label><input type="text" id="f-other-names" placeholder="e.g. Agyei"></div>
+            <div class="form-group"><label for="f-last-name">Last Name / Surname <span class="required">*</span></label><input type="text" id="f-last-name" placeholder="e.g. Mensah"></div>
+            <div class="form-group"><label for="f-first-name">First Name <span class="required">*</span></label><input type="text" id="f-first-name" placeholder="e.g. Kofi"></div>
+            <div class="form-group"><label for="f-other-names">Other Names</label><input type="text" id="f-other-names" placeholder="e.g. Agyei"></div>
             <div class="form-group">
-              <label>Gender <span class="required">*</span></label>
+              <label for="f-gender">Gender <span class="required">*</span></label>
               <select id="f-gender">
                 <option value="">— Select Gender —</option>
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
               </select>
             </div>
-            <div class="form-group"><label>Party ID Number <span class="required">*</span></label>
+            <div class="form-group"><label for="f-party-id">Party ID Number <span class="required">*</span></label>
               <input type="text" id="f-party-id" placeholder="e.g. NDC-2024-001"
                 oninput="PageRenderers._checkDuplicateField('partyId','f-party-id','f-pid-warn')">
               <div id="f-pid-warn" style="display:none;margin-top:4px;padding:6px 10px;background:var(--color-background-danger);color:var(--color-text-danger);border-radius:6px;font-size:12px;font-weight:500"></div>
             </div>
-            <div class="form-group"><label>Voter ID Number</label>
+            <div class="form-group"><label for="f-voter-id">Voter ID Number</label>
               <input type="text" id="f-voter-id" placeholder="e.g. GH-V-001234"
                 oninput="PageRenderers._checkDuplicateField('voterId','f-voter-id','f-vid-warn')">
               <div id="f-vid-warn" style="display:none;margin-top:4px;padding:6px 10px;background:var(--color-background-danger);color:var(--color-text-danger);border-radius:6px;font-size:12px;font-weight:500"></div>
-            <div class="form-group"><label>Telephone Number</label><input type="tel" id="f-phone" placeholder="e.g. 0244001122"></div>
+            <div class="form-group"><label for="f-phone">Telephone Number</label><input type="tel" id="f-phone" placeholder="e.g. 0244001122"></div>
           </div>
 
           <hr class="divider">
@@ -290,7 +290,7 @@
       <div class="search-bar">
         <div class="search-input-wrap" style="flex:2;min-width:200px">
           <span class="search-ico">🔍</span>
-          <input type="text" placeholder="Search name, ID, phone, station, zone…" oninput="PageRenderers._allState={...PageRenderers._allState,q:this.value,page:1};PageRenderers._renderAllRecords()">
+          <input type="text" id="records-search" name="records-search" placeholder="Search name, ID, phone, station, zone…" oninput="PageRenderers._allState={...PageRenderers._allState,q:this.value,page:1};PageRenderers._renderAllRecords()" autocomplete="off">
         </div>
         <select id="filter-zone"    onchange="PageRenderers._allState={...PageRenderers._allState,zone:this.value,page:1};PageRenderers._renderAllRecords()" style="width:auto"><option value="">All Zones</option></select>
         <select id="filter-ward"    onchange="PageRenderers._allState={...PageRenderers._allState,ward:this.value,page:1};PageRenderers._renderAllRecords()" style="width:auto"><option value="">All Wards</option></select>
@@ -336,7 +336,7 @@
         <select id="rep-filter-ward"    onchange="PageRenderers._repState={...PageRenderers._repState,ward:this.value};PageRenderers._renderReports()" style="width:auto"><option value="">All Wards</option></select>
         <select id="rep-filter-station" onchange="PageRenderers._repState={...PageRenderers._repState,station:this.value};PageRenderers._renderReports()" style="width:auto"><option value="">All Stations</option></select>
         <select id="rep-filter-branch"  onchange="PageRenderers._repState={...PageRenderers._repState,branch:this.value};PageRenderers._renderReports()" style="width:auto"><option value="">All Branches</option></select>
-        <select onchange="PageRenderers._repState={...PageRenderers._repState,gender:this.value};PageRenderers._renderReports()" style="width:auto">
+        <select id="rep-filter-gender" name="rep-filter-gender" onchange="PageRenderers._repState={...PageRenderers._repState,gender:this.value};PageRenderers._renderReports()" style="width:auto">
           <option value="">All Genders</option><option value="Male">Male</option><option value="Female">Female</option>
         </select>
       </div>
@@ -398,7 +398,7 @@
         <select id="ana-filter-ward"    onchange="PageRenderers._anaState={...PageRenderers._anaState,ward:this.value};PageRenderers._renderAnalytics()" style="width:auto"><option value="">All Wards</option></select>
         <select id="ana-filter-station" onchange="PageRenderers._anaState={...PageRenderers._anaState,station:this.value};PageRenderers._renderAnalytics()" style="width:auto"><option value="">All Stations</option></select>
         <select id="ana-filter-branch"  onchange="PageRenderers._anaState={...PageRenderers._anaState,branch:this.value};PageRenderers._renderAnalytics()" style="width:auto"><option value="">All Branches</option></select>
-        <select onchange="PageRenderers._anaState={...PageRenderers._anaState,gender:this.value};PageRenderers._renderAnalytics()" style="width:auto">
+        <select id="ana-filter-gender" name="ana-filter-gender" onchange="PageRenderers._anaState={...PageRenderers._anaState,gender:this.value};PageRenderers._renderAnalytics()" style="width:auto">
           <option value="">All Genders</option><option value="Male">Male</option><option value="Female">Female</option>
         </select>
       </div>
@@ -644,7 +644,7 @@
               <div class="card-header"><div class="card-icon blue">ℹ️</div><h3>About KNNDCmdb</h3></div>
               <div class="card-body" style="text-align:center;padding:40px">
                 <img src="assets/ndc-logo.png" style="width:80px;margin-bottom:16px">
-                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v3.2.0</div>
+                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v3.2.1</div>
                 <div style="color:var(--gray-500);margin-top:8px">Ketu North NDC Members Database</div>
                 <div style="color:var(--gray-400);font-size:13px;margin-top:4px">Elections & IT Directorate, 2026</div>
               </div>
@@ -656,7 +656,7 @@
 
   </main>
 
-  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v3.2.0</footer>
+  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v3.2.1</footer>
 </div>
 
 <div id="toast-container"></div>
@@ -834,8 +834,8 @@
   </div>
 </div>
 
-<script src="js/app.js?v=3.2.0"></script>
-<script src="js/pages.js?v=3.2.0"></script>
+<script src="js/app.js?v=3.2.1"></script>
+<script src="js/pages.js?v=3.2.1"></script>
 <script>
 // ── PASSWORD TOGGLE ──────────────────────────────────────────
 function togglePassword() {

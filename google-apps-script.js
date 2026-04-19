@@ -315,31 +315,37 @@ function doGet(e) {
   const callback = e?.parameter?.callback || '';
   try {
     let data;
-    if (action==='getMembers')  data = _getMembers(e?.parameter?.stations || '');
+    if      (action==='getMembers')  data = _getMembers(e?.parameter?.stations || '');
     else if (action==='getIdIndex')  data = _getIdIndex();
     else if (action==='getStations') data = _getPollingStations();
     else if (action==='getSettings') data = _getAppSettings();
     else if (action==='getUsers')    data = _getUsers();
     else if (action==='getAudit')    data = _getAuditLog();
-    else if (action==='ping')        data = {status:'ok',app:'KNNDCmdb',version:'3.1'};
+    else if (action==='ping')        data = {status:'ok',app:'KNNDCmdb',version:'3.2'};
     else data = {error:'Unknown action'};
 
-    // JSONP: wrap in callback if requested — bypasses CORS for cross-origin reads
+    // JSONP via HtmlService — served from script.googleusercontent.com (no redirect).
+    // ContentService triggers a 302 redirect whose response is CORB-blocked by Chrome.
+    // HtmlService responses are served directly from the execution origin, so the
+    // browser executes the embedded <script> without any CORS/CORB check.
     if (callback) {
-      return ContentService
-        .createTextOutput(callback + '(' + JSON.stringify(data) + ')')
-        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      const js   = callback + '(' + JSON.stringify(data) + ')';
+      const html = '<!DOCTYPE html><html><head></head><body><script>' + js + '<\/script></body></html>';
+      return HtmlService.createHtmlOutput(html)
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
     return _jsonCors(data);
   } catch(err) {
     if (callback) {
-      return ContentService
-        .createTextOutput(callback + '(' + JSON.stringify({error:err.message}) + ')')
-        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      const js   = callback + '(' + JSON.stringify({error: err.message}) + ')';
+      const html = '<!DOCTYPE html><html><head></head><body><script>' + js + '<\/script></body></html>';
+      return HtmlService.createHtmlOutput(html)
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
-    return _jsonCors({error:err.message});
+    return _jsonCors({error: err.message});
   }
 }
+
 
 function doPost(e) {
   try {
