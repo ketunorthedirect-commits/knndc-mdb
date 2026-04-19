@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Core Application Logic  v3.1.5.1
+   KNNDCmdb – Core Application Logic  v3.2.0.1
    ============================================================ */
 'use strict';
 
@@ -10,7 +10,7 @@ const CONFIG = {
                               //   Every new device will automatically inherit all settings from the Sheet.
   APP_NAME:      'Ketu North NDC Members Database',
   CONSTITUENCY:  'Ketu North',
-  VERSION:       '3.1.5',
+  VERSION:       '3.2.0',
   INACTIVITY_MS: 10 * 60 * 1000,
   DEFAULT_PASSWORD: 'Ketu@2026',   // reset-to default for non-admin accounts
   ADMIN_PASSWORD:   'admin123',    // default admin password
@@ -721,14 +721,19 @@ const App = {
     if (App.settings.scriptUrl) {
       // Every 2 minutes: sync members, users, and ID index
       App._syncInterval = setInterval(async () => {
-        App.fetchFromSheets();
-        App._fetchIdIndex(); // refresh duplicate-check index in background
+        await App.fetchFromSheets();
+        App._fetchIdIndex();
         const changed = await App._fetchUsersFromSheet();
-        // Always re-validate so live assignment changes (ward, stations, role)
-        // are applied to the active session without requiring a re-login
         if (changed !== false) App._revalidateSession();
       }, 2 * 60 * 1000);
-      App.fetchFromSheets(); // immediate member sync on login
+      // Immediate fetch on login — re-render current page when done
+      App.fetchFromSheets().then(() => {
+        App._memberFetchPending = false;
+        const pg = App.currentPage;
+        if (['records','my-records','reports','analytics','dashboard'].includes(pg)) {
+          try { PageRenderers[pg]?.(); } catch(_) {}
+        }
+      }).catch(() => { App._memberFetchPending = false; });
     }
   },
 
@@ -869,7 +874,11 @@ const App = {
   canAccess(page) { return (App.ROLE_PAGES[App.currentUser?.role]||[]).includes(page); },
 
   navigate(page) {
-    if (!App.canAccess(page)) { Toast.show('Access Denied','You do not have permission.','error'); return; }
+    if (!App.canAccess(page)) {
+      console.warn('[KNNDCmdb] navigate blocked:', page, '| user role:', App.currentUser?.role, '| allowed:', App.ROLE_PAGES[App.currentUser?.role]);
+      Toast.show('Access Denied','You do not have permission to view this page.','error');
+      return;
+    }
     App.currentPage = page;
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     const el = document.getElementById('page-' + page);
@@ -877,9 +886,11 @@ const App = {
       el.classList.add('active');
       try { PageRenderers[page]?.(); }
       catch(e) {
-        console.error('Page render error on', page, e);
+        console.error('[KNNDCmdb] Page render error on', page, e);
         Toast.show('Page Error', 'Could not load ' + page + '. Try refreshing.', 'error', 5000);
       }
+    } else {
+      console.error('[KNNDCmdb] Page div not found: page-' + page);
     }
     document.querySelectorAll('.nav-link').forEach(a => a.classList.toggle('active', a.dataset.page === page));
     window.scrollTo(0, 0);
@@ -1120,41 +1131,19 @@ const App = {
   },
 
   getMembersForUser() {
+    // ── Pure synchronous read — exactly as in v2.x ──────────────
+    // Never triggers async work here. Fetches are driven by the
+    // sync timer and the manual pull button. This keeps all page
+    // renderers fast and predictable.
     const all = JSON.parse(localStorage.getItem(LS.MEMBERS)||'[]');
     App.members = all;
     const u = App.currentUser;
     if (!u) return [];
-
-    // If local store is empty, trigger a background re-fetch.
-    // Retry after 30s so a failed JSONP request doesn't block forever.
-    const now = Date.now();
-    if (!all.length && App.settings.scriptUrl && App.isOnline &&
-        (!App._memberFetchPending || now - (App._memberFetchTime||0) > 30000)) {
-      App._memberFetchPending = true;
-      App._memberFetchTime    = now;
-      const countEl = document.getElementById('records-count') ||
-                      document.getElementById('my-records-count');
-      if (countEl) countEl.textContent = 'Loading from Google Sheets…';
-      App.fetchFromSheets()
-        .then(() => {
-          App._memberFetchPending = false;
-          const pg = App.currentPage;
-          if (['records','my-records','reports','analytics','dashboard'].includes(pg)) {
-            PageRenderers[pg]?.();
-          }
-        })
-        .catch(() => { App._memberFetchPending = false; });
-    }
-
     if (u.role==='admin'||u.role==='exec') return all;
     const codes = (u.assignedStations||[]).length ? u.assignedStations
       : (u.station ? [u.station] : []);
-    if (u.role==='ward') {
-      return all.filter(m => codes.includes(m.stationCode) || m.ward === u.ward);
-    }
-    if (u.role==='officer') {
-      return all.filter(m => codes.includes(m.stationCode));
-    }
+    if (u.role==='ward')    return all.filter(m => codes.includes(m.stationCode) || m.ward === u.ward);
+    if (u.role==='officer') return all.filter(m => codes.includes(m.stationCode));
     return [];
   },
 

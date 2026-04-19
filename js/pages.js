@@ -477,24 +477,6 @@ const PageRenderers = {
       pullBtn.style.display = (App.currentUser?.role === 'admin' && App.settings.scriptUrl) ? '' : 'none';
     }
 
-    // If members is empty, show a loading/pull indicator in the tbody
-    const members = App.getMembersForUser();
-    if (!members.length && App.settings.scriptUrl) {
-      const tbody = document.getElementById('records-tbody');
-      if (tbody) {
-        tbody.innerHTML = `<tr><td colspan="12">
-          <div class="empty-state">
-            <div class="empty-icon">☁️</div>
-            <div class="empty-title">Loading records from Google Sheets…</div>
-            <div class="empty-subtitle" style="margin-top:8px">
-              <button class="btn btn-primary btn-sm" onclick="App._pullAllFromSheet()">🔄 Pull All from Sheet</button>
-            </div>
-          </div></td></tr>`;
-      }
-      document.getElementById('records-count').textContent = '';
-      return;
-    }
-
     // Admin: trigger a background Sheet sync every time they visit this page
     // so the count stays current without manual intervention
     if (App.currentUser?.role === 'admin' && App.isOnline && App.settings.scriptUrl) {
@@ -750,11 +732,6 @@ const PageRenderers = {
   // ══════════════════════════════════════════════════════════
   reports() {
     PageRenderers._repState = PageRenderers._repState || { zone:'', ward:'', station:'', branch:'', gender:'' };
-    if (!App.getMembersForUser().length && App.settings.scriptUrl) {
-      const el = document.getElementById('reports-content') || document.querySelector('#page-reports .card');
-      if (el) el.innerHTML = `<div class="empty-state" style="padding:40px"><div class="empty-icon">☁️</div><div class="empty-title">Loading data…</div><div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="App.fetchFromSheets().then(()=>PageRenderers.reports())">🔄 Refresh</button></div></div>`;
-      return;
-    }
     this._populateReportFilters();
     this._renderReports();
   },
@@ -861,11 +838,6 @@ const PageRenderers = {
   // ══════════════════════════════════════════════════════════
   analytics() {
     PageRenderers._anaState = PageRenderers._anaState || { zone:'', ward:'', station:'', branch:'', gender:'' };
-    if (!App.getMembersForUser().length && App.settings.scriptUrl) {
-      const el = document.querySelector('#page-analytics .card');
-      if (el) el.innerHTML = `<div class="empty-state" style="padding:40px"><div class="empty-icon">☁️</div><div class="empty-title">Loading data…</div><div style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="App.fetchFromSheets().then(()=>PageRenderers.analytics())">🔄 Refresh</button></div></div>`;
-      return;
-    }
     this._populateAnaFilters();
     this._renderAnalytics();
   },
