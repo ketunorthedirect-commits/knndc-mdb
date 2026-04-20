@@ -1,5 +1,5 @@
 // ============================================================
-// KNNDCmdb  app.js  v3.0.1
+// KNNDCmdb  app.js  v3.0.2
 // Elections & IT Directorate · Ketu North NDC · 2026
 //
 // Changes from v2.4.0 → v3.0:
@@ -17,7 +17,7 @@ var App = (() => {
   'use strict';
 
   // ── Version ───────────────────────────────────────────────
-  const VERSION = '3.0.1';
+  const VERSION = '3.0.2';
 
   // ── localStorage keys ─────────────────────────────────────
   const LS = {
@@ -34,10 +34,10 @@ var App = (() => {
 
   // ── Role page access ──────────────────────────────────────
   const ROLE_PAGES = {
-    admin:   ['dashboard', 'entry', 'records', 'reports', 'analytics', 'users', 'settings'],
+    admin:   ['dashboard', 'entry', 'records', 'reports', 'analytics', 'users', 'audit', 'settings'],
     exec:    ['dashboard', 'records', 'reports', 'analytics'],
-    ward:    ['dashboard', 'records', 'reports'],
-    officer: ['dashboard', 'entry', 'records'],
+    ward:    ['dashboard', 'entry', 'records', 'reports'],
+    officer: ['dashboard', 'entry', 'my-records', 'records'],
   };
 
   // ── State ─────────────────────────────────────────────────
@@ -299,13 +299,17 @@ var App = (() => {
   function getMembersForUser(allMembers) {
     if (!currentUser) return [];
     const role = currentUser.role;
-    if (role === 'admin' || role === 'exec') return allMembers;
+    if (role === 'admin') return allMembers;
+    if (role === 'exec') return allMembers;
     if (role === 'ward') {
       return allMembers.filter(m => m.ward === currentUser.ward);
     }
     if (role === 'officer') {
       const assigned = currentUser.assignedStations || [];
-      return allMembers.filter(m => assigned.includes(m.stationCode));
+      return allMembers.filter(m => {
+        const sc = m.stationCode || m.station_code || '';
+        return assigned.includes(sc);
+      });
     }
     return [];
   }
@@ -317,7 +321,8 @@ var App = (() => {
     if (role === 'exec') return false;
     if (role === 'ward') return member.ward === currentUser.ward;
     if (role === 'officer') {
-      return (currentUser.assignedStations || []).includes(member.stationCode);
+      const sc = member.stationCode || member.station_code || '';
+      return (currentUser.assignedStations || []).includes(sc);
     }
     return false;
   }
@@ -329,7 +334,7 @@ var App = (() => {
     if (role === 'ward') return pollingStations.filter(s => s.ward === currentUser.ward);
     if (role === 'officer') {
       const assigned = currentUser.assignedStations || [];
-      return pollingStations.filter(s => assigned.includes(s.code));
+      return pollingStations.filter(s => assigned.includes(s.code || s.station_code || ''));
     }
     return [];
   }
