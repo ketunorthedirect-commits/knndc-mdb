@@ -2,7 +2,6 @@
    KNNDCmdb – Page Renderers  v3.0
    MySQL REST API backend edition
    ============================================================ */
-'use strict';
 
 // ── Compatibility shims for v3.0 API ─────────────────────────
 // Bridges pages.js audit calls to the new REST API + localStorage
