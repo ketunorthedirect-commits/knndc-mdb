@@ -1,5 +1,5 @@
 // ============================================================
-// KNNDCmdb  app.js  v3.0
+// KNNDCmdb  app.js  v3.0.1
 // Elections & IT Directorate · Ketu North NDC · 2026
 //
 // Changes from v2.4.0 → v3.0:
@@ -17,7 +17,7 @@ var App = (() => {
   'use strict';
 
   // ── Version ───────────────────────────────────────────────
-  const VERSION = '3.0.0';
+  const VERSION = '3.0.1';
 
   // ── localStorage keys ─────────────────────────────────────
   const LS = {
@@ -181,7 +181,7 @@ var App = (() => {
   async function login(username, password) {
     const base = getApiBase();
 
-    // ── Online path: authenticate against the API ──────────
+    // ── API login (required when API URL is configured) ────────
     if (base) {
       try {
         const xhr = new XMLHttpRequest();
@@ -212,7 +212,7 @@ var App = (() => {
           user.mustChangePassword = !!user.must_change_password;
           user.active = !!user.active;
 
-          // Store in session and local users list
+          // Store in session and update local users cache
           sessionStorage.setItem(LS.SESSION, JSON.stringify(user));
           const users = lsGet(LS.USERS, []);
           const idx = users.findIndex(u => u.id === user.id);
@@ -223,25 +223,27 @@ var App = (() => {
           currentUser = user;
           return { success: true, user };
         }
-        // If API returned an error, fall through to offline check
-        if (result.error && result.error !== 'Network error' && result.error !== 'Timeout') {
-          return { success: false, error: result.error };
-        }
-      } catch {}
+
+        // API returned a definitive error — reject immediately, no fallback
+        return {
+          success: false,
+          error: result.error || 'Invalid credentials',
+        };
+
+      } catch {
+        // Network completely unreachable
+        return { success: false, error: 'Cannot reach the server. Check your internet connection.' };
+      }
     }
 
-    // ── Offline fallback: check localStorage ───────────────
+    // ── Offline-only mode (no API URL configured at all) ───────
+    // Only reached when the app has never been connected to an API.
+    // Once an API URL is set, ALL authentication goes through the API above.
     const users = lsGet(LS.USERS, []);
-    const user  = users.find(u =>
-      u.username === username && u.active !== false
-    );
+    const user  = users.find(u => u.username === username && u.active !== false);
     if (!user) return { success: false, error: 'Invalid credentials' };
-
-    // Compare plain password (offline mode — pre-migration)
     if (user.password && user.password !== password)
       return { success: false, error: 'Invalid credentials' };
-
-    // Set empty JWT for offline mode
     setJwt('');
     sessionStorage.setItem(LS.SESSION, JSON.stringify(user));
     currentUser = user;
