@@ -33,7 +33,8 @@ const PageRenderers = {
       byGender: _myM.filter(m=>!m._demo).reduce((a,m)=>{ a[m.gender]=(a[m.gender]||0)+1; return a; },{}),
       byZone:   _myM.filter(m=>!m._demo).reduce((a,m)=>{ if(m.zone)a[m.zone]=(a[m.zone]||0)+1; return a; },{}),
     };
-    const u = App.currentUser;
+    const u = App.getCurrentUser() || App.currentUser;
+    if (!u) return; // session not ready yet — will be called again after login
     const rl = {officer:'Data Entry Officer',ward:'Ward Coordinator',exec:'Constituency Executive',admin:'System Administrator'}[u.role]||u.role;
     document.getElementById('dash-welcome').textContent  = `Welcome back, ${u.name.split(' ')[0]}`;
     document.getElementById('dash-role').textContent     = rl;

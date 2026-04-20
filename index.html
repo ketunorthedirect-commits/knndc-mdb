@@ -853,9 +853,12 @@ async function doLogin() {
       document.getElementById('login-screen').style.display='none';
       document.getElementById('app-shell').style.display='flex';
       document.getElementById('app-shell').style.flexDirection='column';
-      App.syncAfterLogin();
-      App.startSyncTimer();
-      if(typeof PageRenderers!=='undefined') PageRenderers.dashboard();
+      // Small delay ensures session is written to storage before dashboard reads it
+      setTimeout(() => {
+        if(typeof PageRenderers!=='undefined') PageRenderers.dashboard();
+        App.syncAfterLogin();
+        App.startSyncTimer();
+      }, 50);
     }
   } else if(result.locked) {
     startLockoutCountdown(result.seconds);
