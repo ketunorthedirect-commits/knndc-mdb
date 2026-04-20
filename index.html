@@ -950,9 +950,9 @@ async function quickConnect() {
 
   try {
     const [settingsRes, usersRes, stationsRes] = await Promise.allSettled([
-      App.apiGet(url + '/settings),
-      App.apiGet(url + '/users&t='    + Date.now()),
-      App.apiGet(url + '/stations),
+      App.apiGet('/settings'),
+      App.apiGet('/users'),
+      App.apiGet('/stations',
     ]);
 
     // Persist the Script URL immediately so all subsequent fetches work
