@@ -547,7 +547,7 @@
                 <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
                   <button class="btn btn-primary" onclick="PageRenderers.saveGeneralSettings()">💾 Save & Sync to Sheet</button>
                   <button class="btn btn-secondary" onclick="App.fetchFromApi().then(()=>Toast.show('Synced','Members refreshed.','success'))">🔄 Pull Members from Sheet</button>
-                  <button class="btn btn-secondary" onclick="App.apiGet('/users').then(r=>Promise.resolve(r.success)).then(ok=>{ if(ok){if(App.currentPage==='users')PageRenderers.users();Toast.show('Users Synced','User accounts pulled from Google Sheets.','success');}else{Toast.show('No Users Found','The Users sheet is empty or the Script URL is not configured.','warning');}})">👥 Pull Users from Sheet</button>
+                  <button class="btn btn-secondary" onclick="App.apiGet('/users').then(r=>{ if(r.success&&r.users?.length){localStorage.setItem('knndc_users',JSON.stringify(r.users));if(typeof PageRenderers!=='undefined')PageRenderers.users();Toast.show('Users Synced','Accounts refreshed from API.','success');}else{Toast.show('No Users','API returned no users.','warning');}})">👥 Pull Users from Sheet</button>
                   <button class="btn btn-secondary" onclick="App.forcePushUsersToApi()">☁️ Push Users to Sheet</button>
                   <button class="btn btn-secondary" onclick="App.flushOfflineQueue()">📤 Upload Offline Queue</button>
                   <button class="btn btn-outline" onclick="App.bulkPushToApi()" title="Push all local records to Google Sheets">
@@ -830,11 +830,14 @@ function startLockoutCountdown(seconds) {
 }
 
 // ── LOGIN ────────────────────────────────────────────────────
-function doLogin() {
+async function doLogin() {
   const u=document.getElementById('login-username').value.trim();
   const p=document.getElementById('login-password').value;
   if(!u||!p){Toast.show('Error','Please enter username and password.','error');return;}
-  const result=App.login(u,p);
+  const btn=document.getElementById('login-btn');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Signing in…';}
+  const result=await App.login(u,p);
+  if(btn){btn.disabled=false;btn.textContent='🔐 Sign In';}
   if(result.success) {
     document.getElementById('attempt-warning').style.display='none';
     document.getElementById('lockout-banner').style.display='none';
@@ -844,10 +847,15 @@ function doLogin() {
       document.getElementById('login-screen').style.display='none';
       document.getElementById('app-shell').style.display='flex';
       document.getElementById('app-shell').style.flexDirection='column';
-      App.renderNav(); App.renderUserHeader();
+      // App.renderNav(); // App.renderUserHeader();
       Modal.open('modal-change-password');
     } else {
-      App.showApp();
+      document.getElementById('login-screen').style.display='none';
+      document.getElementById('app-shell').style.display='flex';
+      document.getElementById('app-shell').style.flexDirection='column';
+      App.syncAfterLogin();
+      App.startSyncTimer();
+      if(typeof PageRenderers!=='undefined') PageRenderers.dashboard();
     }
   } else if(result.locked) {
     startLockoutCountdown(result.seconds);
@@ -990,7 +998,7 @@ async function quickConnect() {
     App.settings.constituency    = stored.constituency    || CONFIG.CONSTITUENCY;
     App.settings.pollingStations = stored.pollingStations || App.pollingStations;
     App.pollingStations          = App.settings.pollingStations;
-    ((App.applyAppName?.()));
+    (App.applyAppName?.());
 
     // Apply remote users
     if (usersRes.status === 'fulfilled' && usersRes.value?.users?.length) {
@@ -1047,7 +1055,7 @@ App.init();
   if (!hasLocalUsers && banner) banner.style.display = 'block';
 
   // ── Fetch settings, users, and stations in parallel ───────
-  await App.prefetchOnLoad();
+  const [settingsResult, usersResult, stationsResult] = await Promise.allSettled([
     App.apiGet('/settings'),
     App.apiGet('/users'),
     App.apiGet('/stations'),
@@ -1100,7 +1108,7 @@ App.init();
           App.settings.pollingStations = stored.pollingStations;
           App.pollingStations          = stored.pollingStations;
         }
-        (App.applyAppName?.());
+        App.applyAppName?.();
       }
     }
   }
