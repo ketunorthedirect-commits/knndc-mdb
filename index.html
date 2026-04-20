@@ -883,7 +883,7 @@ async function syncStationsFromSheet() {
   }
   Toast.show('Importing…','Fetching polling stations from Google Sheet.','info');
   try {
-    const data = await App.apiGet(App.settings.scriptUrl + '/stations);
+    const data = await App.apiGet('/stations');
     if (!data?.stations?.length) {
       Toast.show('No Stations Found','The Polling Stations sheet appears to be empty.','warning');
       return;
@@ -1048,9 +1048,9 @@ App.init();
 
   // ── Fetch settings, users, and stations in parallel ───────
   await App.prefetchOnLoad();
-    App.apiGet(scriptUrl + '/settings),
-    App.apiGet(scriptUrl + '/users&t='    + Date.now()),
-    App.apiGet(scriptUrl + '/stations),
+    App.apiGet('/settings'),
+    App.apiGet('/users'),
+    App.apiGet('/stations'),
   ]);
 
   if (banner) banner.style.display = 'none';
