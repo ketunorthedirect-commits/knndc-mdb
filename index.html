@@ -883,7 +883,7 @@ async function syncStationsFromSheet() {
   }
   Toast.show('Importing…','Fetching polling stations from Google Sheet.','info');
   try {
-    const data = await App._xhrGet(App.settings.scriptUrl + '?action=getStations&t=' + Date.now());
+    const data = await App.apiGet(App.settings.scriptUrl + '/stations);
     if (!data?.stations?.length) {
       Toast.show('No Stations Found','The Polling Stations sheet appears to be empty.','warning');
       return;
@@ -950,9 +950,9 @@ async function quickConnect() {
 
   try {
     const [settingsRes, usersRes, stationsRes] = await Promise.allSettled([
-      App._xhrGet(url + '?action=getSettings&t=' + Date.now()),
-      App._xhrGet(url + '?action=getUsers&t='    + Date.now()),
-      App._xhrGet(url + '?action=getStations&t=' + Date.now()),
+      App.apiGet(url + '/settings),
+      App.apiGet(url + '/users&t='    + Date.now()),
+      App.apiGet(url + '/stations),
     ]);
 
     // Persist the Script URL immediately so all subsequent fetches work
@@ -1047,10 +1047,10 @@ App.init();
   if (!hasLocalUsers && banner) banner.style.display = 'block';
 
   // ── Fetch settings, users, and stations in parallel ───────
-  const [settingsResult, usersResult, stationsResult] = await Promise.allSettled([
-    App._xhrGet(scriptUrl + '?action=getSettings&t=' + Date.now()),
-    App._xhrGet(scriptUrl + '?action=getUsers&t='    + Date.now()),
-    App._xhrGet(scriptUrl + '?action=getStations&t=' + Date.now()),
+  await App.prefetchOnLoad();
+    App.apiGet(scriptUrl + '/settings),
+    App.apiGet(scriptUrl + '/users&t='    + Date.now()),
+    App.apiGet(scriptUrl + '/stations),
   ]);
 
   if (banner) banner.style.display = 'none';
