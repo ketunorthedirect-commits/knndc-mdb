@@ -86,7 +86,7 @@
         <span class="app-name">KNNDCmdb · Members Registration Portal</span>
       </div>
       <div class="header-actions">
-        <button class="btn-icon" title="Sync from Google Sheets" onclick="App.fetchFromSheets().then(()=>Toast.show('Synced','Data refreshed from Google Sheets.','success'))">🔄</button>
+        <button class="btn-icon" title="Sync from Google Sheets" onclick="App.fetchFromApi().then(()=>Toast.show('Synced','Data refreshed from Google Sheets.','success'))">🔄</button>
         <span id="conn-dot" class="online-dot"></span>
         <div class="header-user" onclick="App.logout()" title="Logout">
           <div class="user-avatar" id="user-avatar">--</div>
@@ -461,7 +461,7 @@
       <div class="section-header">
         <div><div class="section-title">User Management</div><div class="section-subtitle">Manage accounts, roles and station assignments</div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-secondary" onclick="App.forcePushUsersToSheet()" title="Save all user accounts to Google Sheets">☁️ Push Users to Sheet</button>
+          <button class="btn btn-secondary" onclick="App.forcePushUsersToApi()" title="Save all user accounts to Google Sheets">☁️ Push Users to Sheet</button>
           <button class="btn btn-primary" onclick="PageRenderers.openAddUser()">➕ Add New User</button>
         </div>
       </div>
@@ -546,11 +546,11 @@
                 </div>
                 <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
                   <button class="btn btn-primary" onclick="PageRenderers.saveGeneralSettings()">💾 Save & Sync to Sheet</button>
-                  <button class="btn btn-secondary" onclick="App.fetchFromSheets().then(()=>Toast.show('Synced','Members refreshed.','success'))">🔄 Pull Members from Sheet</button>
-                  <button class="btn btn-secondary" onclick="App._fetchUsersFromSheet().then(ok=>{ if(ok){if(App.currentPage==='users')PageRenderers.users();Toast.show('Users Synced','User accounts pulled from Google Sheets.','success');}else{Toast.show('No Users Found','The Users sheet is empty or the Script URL is not configured.','warning');}})">👥 Pull Users from Sheet</button>
-                  <button class="btn btn-secondary" onclick="App.forcePushUsersToSheet()">☁️ Push Users to Sheet</button>
+                  <button class="btn btn-secondary" onclick="App.fetchFromApi().then(()=>Toast.show('Synced','Members refreshed.','success'))">🔄 Pull Members from Sheet</button>
+                  <button class="btn btn-secondary" onclick="App.apiGet('/users').then(r=>Promise.resolve(r.success)).then(ok=>{ if(ok){if(App.currentPage==='users')PageRenderers.users();Toast.show('Users Synced','User accounts pulled from Google Sheets.','success');}else{Toast.show('No Users Found','The Users sheet is empty or the Script URL is not configured.','warning');}})">👥 Pull Users from Sheet</button>
+                  <button class="btn btn-secondary" onclick="App.forcePushUsersToApi()">☁️ Push Users to Sheet</button>
                   <button class="btn btn-secondary" onclick="App.flushOfflineQueue()">📤 Upload Offline Queue</button>
-                  <button class="btn btn-outline" onclick="App.bulkPushToSheets()" title="Push all local records to Google Sheets">
+                  <button class="btn btn-outline" onclick="App.bulkPushToApi()" title="Push all local records to Google Sheets">
                     ☁️ Push All Records to Sheet
                   </button>
                 </div>
@@ -586,7 +586,7 @@
                     </div>
                   </div>
                   <button class="btn btn-secondary" id="push-stations-btn"
-                    onclick="App.forcePushStationsToSheet()"
+                    onclick="App.forcePushStationsToApi()"
                     title="Send all configured polling stations to the Google Sheets Polling Stations tab">
                     ☁️ Push Stations to Sheet
                   </button>
@@ -990,12 +990,12 @@ async function quickConnect() {
     App.settings.constituency    = stored.constituency    || CONFIG.CONSTITUENCY;
     App.settings.pollingStations = stored.pollingStations || App.pollingStations;
     App.pollingStations          = App.settings.pollingStations;
-    App.applyAppName();
+    ((App.applyAppName?.()));
 
     // Apply remote users
     if (usersRes.status === 'fulfilled' && usersRes.value?.users?.length) {
       localStorage.setItem('knndc_users', JSON.stringify(usersRes.value.users));
-      App.users = usersRes.value.users;
+      // App.users = usersRes.value.users;
     }
 
     // Hide panel, show success
@@ -1100,7 +1100,7 @@ App.init();
           App.settings.pollingStations = stored.pollingStations;
           App.pollingStations          = stored.pollingStations;
         }
-        App.applyAppName?.();
+        (App.applyAppName?.());
       }
     }
   }
