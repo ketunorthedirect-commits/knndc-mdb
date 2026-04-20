@@ -29,19 +29,21 @@ window._currentPage = 'dashboard';
 
 // Helper: get members from new API (returns from localStorage)
 function _getMyMembers() {
-  return App.getMembersForUser(App.getMembers());
+  const all = App.getMembers() || [];
+  if (!Array.isArray(all) || !all.length) return [];
+  return App.getMembersForUser(all) || [];
 }
 
 // Helper: compute stats inline (replaces old App.getStats())
 function _computeStats() {
-  const all  = App.getMembers();
-  const my   = App.getMembersForUser(all).filter(m => !m._demo);
+  const all  = App.getMembers() || [];
+  const my   = (App.getMembersForUser(all) || []).filter(m => !m._demo);
   const today = new Date().toISOString().slice(0, 10);
   const byDay = {};
   for (let i = 6; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i);
     const k = d.toISOString().slice(0, 10);
-    byDay[k] = my.filter(m => (m.isoDate || m.iso_date || '') === k).length;
+    byDay[k] = (Array.isArray(my) ? my : []).filter(m => (m.isoDate || m.iso_date || '') === k).length;
   }
   return {
     total:    my.length,
@@ -210,6 +212,7 @@ const PageRenderers = {
   // ══════════════════════════════════════════════════════════
   entry() {
     const u = App.getCurrentUser() || App.currentUser;
+    if (!u) return;
     const assigned = u.assignedStations || [];
     if (assigned.length === 1) {
       const s = App.getPollingStations().find(ps => ps.code === assigned[0]);
@@ -242,6 +245,7 @@ const PageRenderers = {
     const dropdown = document.getElementById('branch-code-dropdown');
     if (!input || !dropdown) return;
     const u = App.getCurrentUser() || App.currentUser;
+    if (!u) return;
     const assigned = u.assignedStations || [];
     const isLocked = assigned.length === 1;
     if (isLocked) { input.setAttribute('readonly', true); input.classList.add('auto-filled'); return; }
@@ -780,7 +784,8 @@ const PageRenderers = {
     const tbody = document.getElementById('users-tbody'); if (!tbody) return;
     const rLabels = { officer:'Data Entry Officer', ward:'Ward Coordinator', exec:'Constituency Exec', admin:'System Admin' };
     const rBadge  = { officer:'badge-green', ward:'badge-amber', exec:'badge-blue', admin:'badge-red' };
-    const users = App.getUsers();
+    const users = App.getUsers() || [];
+    if (!users.length) { tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--gray-400)">No users found</td></tr>'; return; }
     tbody.innerHTML = users.map(u => `
       <tr>
         <td><div style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:var(--ndc-green);color:white;font-weight:700;font-size:12px;font-family:var(--font-head)">${u.name.split(' ').map(n=>n[0]).slice(0,2).join('')}</div></td>
@@ -806,7 +811,7 @@ const PageRenderers = {
   },
 
   resetPassword(userId) {
-    const u = App.getUsers().find(x => x.id === userId); if (!u) return;
+    const u = (App.getUsers()||[]).find(x => x.id === userId); if (!u) return;
     if (!confirm(`Reset ${u.name}'s password?\n\nThey will need a new password set by the admin.`)) return;
     Toast.show('Info', 'Use the Edit button to set a new password for this user.', 'info');
   },
@@ -820,7 +825,7 @@ const PageRenderers = {
   },
 
   openEditUser(id) {
-    const u = App.getUsers().find(x => x.id === id); if (!u) return;
+    const u = (App.getUsers()||[]).find(x => x.id === id); if (!u) return;
     document.getElementById('user-modal-title').textContent = 'Edit User';
     document.getElementById('edit-user-id').value  = id;
     document.getElementById('u-name').value        = u.name;
@@ -849,7 +854,7 @@ const PageRenderers = {
     };
     if (!data.name || !data.username) { Toast.show('Error','Name and username are required.','error'); return; }
     if (!id && !data.password) { Toast.show('Error','Password is required for new users.','error'); return; }
-    const users = App.getUsers();
+    const users = App.getUsers() || [];
     const cu = App.getCurrentUser() || App.currentUser;
     if (id) {
       const idx = users.findIndex(u => u.id === id);
@@ -871,7 +876,7 @@ const PageRenderers = {
   },
 
   toggleUser(id) {
-    const users = App.getUsers();
+    const users = App.getUsers() || [];
     const u = users.find(x => x.id === id); if (!u) return;
     u.active = !u.active;
     App.saveUser(u);
@@ -882,7 +887,7 @@ const PageRenderers = {
   },
 
   openAssignModal(userId) {
-    const u = App.getUsers().find(x => x.id === userId); if (!u) return;
+    const u = (App.getUsers()||[]).find(x => x.id === userId); if (!u) return;
     document.getElementById('assign-user-id').value  = userId;
     document.getElementById('assign-user-name').textContent = u.name;
     const roleLabel = u.role === 'ward' ? 'Ward Coordinator' : 'Data Entry Officer';
@@ -891,7 +896,7 @@ const PageRenderers = {
     if (modalTitle) modalTitle.textContent = u.role==='ward' ? 'Assign Ward & Polling Stations' : 'Assign Polling Stations';
     const assigned = u.assignedStations || [];
     const byWard = {};
-    App.getPollingStations().forEach(s => { if (!byWard[s.ward]) byWard[s.ward]=[]; byWard[s.ward].push(s); });
+    (App.getPollingStations()||[]).forEach(s => { if (!byWard[s.ward]) byWard[s.ward]=[]; byWard[s.ward].push(s); });
     document.getElementById('assign-stations-container').innerHTML = Object.entries(byWard).map(([ward, sts]) => `
       <div style="margin-bottom:18px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
@@ -922,12 +927,12 @@ const PageRenderers = {
   submitAssignment() {
     const userId   = document.getElementById('assign-user-id').value;
     const selected = [...document.querySelectorAll('.station-check:checked')].map(cb => cb.value);
-    const users    = App.getUsers();
+    const users    = App.getUsers() || [];
     const u        = users.find(x => x.id === userId); if (!u) return;
     const prev     = u.assignedStations || [];
     u.assignedStations = selected;
     if (selected.length > 0) {
-      const p = App.getPollingStations().find(s => s.code === selected[0]);
+      const p = (App.getPollingStations()||[]).find(s => s.code === selected[0]);
       if (p) { u.station = p.code; u.branch = p.branch; u.ward = p.ward; }
     }
     App.saveUser(u);
@@ -942,7 +947,7 @@ const PageRenderers = {
   // SETTINGS
   // ══════════════════════════════════════════════════════════
   settings() {
-    const s = App.getSettings();
+    const s = App.getSettings() || {};
     const map = { 'set-app-name':s.appName, 'set-constituency':s.constituency, 'set-sheet-id':s.sheetId||'', 'set-api-key':s.apiKey||'', 'set-script-url':s.scriptUrl };
     Object.entries(map).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.value = val || ''; });
     const banner = document.getElementById('bootstrap-banner');
@@ -951,7 +956,7 @@ const PageRenderers = {
   },
 
   saveGeneralSettings() {
-    const s = App.getSettings();
+    const s = App.getSettings() || {};
     s.appName      = document.getElementById('set-app-name').value.trim()      || s.appName;
     s.constituency = document.getElementById('set-constituency').value.trim()   || s.constituency;
     s.sheetId      = document.getElementById('set-sheet-id').value.trim();
@@ -972,7 +977,7 @@ const PageRenderers = {
 
   _renderStationsList() {
     const c = document.getElementById('stations-list'); if (!c) return;
-    const ps = App.getPollingStations();
+    const ps = App.getPollingStations() || [];
     const sc = document.getElementById('station-count'); if (sc) sc.textContent = ps.length;
     const pc = document.getElementById('push-station-count'); if (pc) pc.textContent = ps.length;
     if (!ps.length) { c.innerHTML = '<div class="empty-state"><div class="empty-icon">🏢</div><div class="empty-title">No stations configured</div><div class="empty-text">Add manually or use "Import from Sheet" above.</div></div>'; return; }
@@ -995,7 +1000,7 @@ const PageRenderers = {
     const g = id => document.getElementById(id)?.value.trim() || '';
     const zone=g('st-zone'),ward=g('st-ward'),name=g('st-name'),code=g('st-code'),branch=g('st-branch'),bCode=g('st-bcode');
     if (!zone||!ward||!name||!code||!branch||!bCode) { Toast.show('Error','All 6 fields are required.','error'); return; }
-    const ps = App.getPollingStations();
+    const ps = App.getPollingStations() || [];
     if (ps.find(s => s.code === code)) { Toast.show('Duplicate','Station Code already exists.','error'); return; }
     ps.push({ zone, ward, name, code, branch, branchCode: bCode });
     App.saveSettings({ pollingStations: ps });
@@ -1007,8 +1012,8 @@ const PageRenderers = {
   },
 
   removeStation(i) {
-    const ps = App.getPollingStations();
-    const s = ps[i];
+    const ps = App.getPollingStations() || [];
+    const s = ps[i]; if (!s) return;
     ps.splice(i, 1);
     App.saveSettings({ pollingStations: ps });
     this._renderStationsList();
