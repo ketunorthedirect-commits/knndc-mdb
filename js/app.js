@@ -116,7 +116,7 @@ const App = (() => {
       const xhr = new XMLHttpRequest();
       xhr.open('GET', base + path, true);
       xhr.timeout = 15000;
-      xhr.setRequestHeader('Authorization', 'Bearer ' + jwt);
+      xhr.setRequestHeader('Authorization', 'Bearer ' + (jwt || lsGet(LS.JWT,'') || ''));
       xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.onload = () => {
         try { resolve(JSON.parse(xhr.responseText)); }
@@ -136,7 +136,7 @@ const App = (() => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', base + path, true);
       xhr.timeout = 20000;
-      xhr.setRequestHeader('Authorization', 'Bearer ' + jwt);
+      xhr.setRequestHeader('Authorization', 'Bearer ' + (jwt || lsGet(LS.JWT,'') || ''));
       xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.onload = () => {
         try { resolve(JSON.parse(xhr.responseText)); }
@@ -156,7 +156,7 @@ const App = (() => {
       const xhr = new XMLHttpRequest();
       xhr.open('DELETE', base + path, true);
       xhr.timeout = 10000;
-      xhr.setRequestHeader('Authorization', 'Bearer ' + jwt);
+      xhr.setRequestHeader('Authorization', 'Bearer ' + (jwt || lsGet(LS.JWT,'') || ''));
       xhr.onload = () => {
         try { resolve(JSON.parse(xhr.responseText)); }
         catch { resolve({ success: false, error: 'Invalid JSON response' }); }
@@ -688,7 +688,7 @@ const App = (() => {
     getApiBase, isJwtExpired,
 
     // Init / session
-    init, loadSettings, saveSettings,
+    init, loadSettings, saveSettings, loadJwt,
     login, logout, restoreSession, changePassword,
     prefetchOnLoad, syncAfterLogin,
     startSyncTimer, stopSyncTimer,
