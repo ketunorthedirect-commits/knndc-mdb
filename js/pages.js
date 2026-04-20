@@ -59,7 +59,7 @@ function _todayISO() { return new Date().toISOString().slice(0, 10); }
 function _daysAgoISO(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
 function _isoOf(m) { return m.isoDate || m.iso_date || ''; }
 
-const PageRenderers = {
+var PageRenderers = {
 
   // ══════════════════════════════════════════════════════════
   // DASHBOARD

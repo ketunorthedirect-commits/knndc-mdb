@@ -13,7 +13,7 @@
 //   - All localStorage auth logic retained as offline fallback
 // ============================================================
 
-const App = (() => {
+var App = (() => {
   'use strict';
 
   // ── Version ───────────────────────────────────────────────
