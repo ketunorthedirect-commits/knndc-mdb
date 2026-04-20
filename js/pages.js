@@ -1,7 +1,21 @@
 /* ============================================================
-   KNNDCmdb – Page Renderers  v1.3
+   KNNDCmdb – Page Renderers  v3.0
    ============================================================ */
 'use strict';
+
+// ── v3.0 compatibility shims ─────────────────────────────────
+// _logAuditPublic: bridges pages.js audit calls to the new API
+App._logAuditPublic = function(action, details, user) {
+  const entry = { action, details, user: user || App.getCurrentUser()?.username || 'system',
+                  timestamp: new Date().toISOString() };
+  const log = App.getAuditLog();
+  log.unshift(entry);
+  try { localStorage.setItem('knndc_audit', JSON.stringify(log.slice(0,500))); } catch {}
+  if (App.getApiBase() && !App.isJwtExpired()) App.apiPost('/audit', entry);
+};
+
+// _currentPage: track active page for post-edit refresh
+window._currentPage = 'dashboard';
 
 const PageRenderers = {
 
@@ -9,7 +23,16 @@ const PageRenderers = {
   // DASHBOARD — with gender + zone distribution
   // ══════════════════════════════════════════════════════════
   dashboard() {
-    const s = App.getStats();
+    const _allM = App.getMembers();
+    const _myM  = App.getMembersForUser(_allM);
+    const _today = new Date().toISOString().slice(0,10);
+    const s = {
+      total:    _myM.filter(m=>!m._demo).length,
+      today:    _myM.filter(m=>m.isoDate===_today&&!m._demo).length,
+      stations: [...new Set(_myM.map(m=>m.stationCode).filter(Boolean))].length,
+      byGender: _myM.filter(m=>!m._demo).reduce((a,m)=>{ a[m.gender]=(a[m.gender]||0)+1; return a; },{}),
+      byZone:   _myM.filter(m=>!m._demo).reduce((a,m)=>{ if(m.zone)a[m.zone]=(a[m.zone]||0)+1; return a; },{}),
+    };
     const u = App.currentUser;
     const rl = {officer:'Data Entry Officer',ward:'Ward Coordinator',exec:'Constituency Executive',admin:'System Administrator'}[u.role]||u.role;
     document.getElementById('dash-welcome').textContent  = `Welcome back, ${u.name.split(' ')[0]}`;
@@ -17,7 +40,7 @@ const PageRenderers = {
     document.getElementById('dash-total').textContent    = s.total.toLocaleString();
     document.getElementById('dash-today').textContent    = s.today;
     document.getElementById('dash-stations').textContent = s.stations;
-    document.getElementById('dash-offline').textContent  = App.offlineQueue.length;
+    document.getElementById('dash-offline').textContent  = App.getOfflineQueueCount();
 
     // Gender stats
     const male = s.byGender?.Male||0, female = s.byGender?.Female||0;
@@ -328,8 +351,8 @@ const PageRenderers = {
 
     // Admin: trigger a background Sheet sync every time they visit this page
     // so the count stays current without manual intervention
-    if (App.currentUser?.role === 'admin' && App.isOnline && App.settings.scriptUrl) {
-      App.fetchFromSheets();
+    if (App.currentUser?.role === 'admin' && navigator.onLine && App.settings.scriptUrl) {
+      App.fetchFromApi();
     }
 
     this._populateRecordFilters();
@@ -404,7 +427,7 @@ const PageRenderers = {
   },
 
   openEdit(id) {
-    const m = App.members.find(x=>x.id===id); if (!m) return;
+    const m = App.getMembers().find(x=>x.id===id); if (!m) return;
     // Permission guard — use canEditMember (exec can edit; officer scoped to own records)
     if (!App.canEditMember(m)) {
       Toast.show('Permission Denied','You can only edit records from your assigned stations.','error');
@@ -529,13 +552,13 @@ const PageRenderers = {
     Modal.close('modal-edit');
     Toast.show('Record Updated','Changes saved and synced.','success');
     // Refresh whichever records page the user was on
-    const page = App.currentPage;
+    const page = window._currentPage;
     if (page === 'my-records') PageRenderers['my-records']();
     else PageRenderers.records();
   },
 
   confirmDelete(id) {
-    const m=App.members.find(x=>x.id===id);
+    const m=App.getMembers().find(x=>x.id===id);
     if (!m) return;
     // Permission guard — re-check before opening the modal
     if (!App.canModifyMember(m)) {
@@ -660,10 +683,10 @@ const PageRenderers = {
     XLSX.utils.book_append_sheet(wb,wsSummary,'Summary');
     XLSX.writeFile(wb,`KNNDCmdb_${new Date().toISOString().slice(0,10)}.xlsx`);
     Toast.show('Export Ready',`${members.length} records exported.`,'success');
-    App.logAudit('EXPORT_EXCEL',`Exported ${members.length} records`,App.currentUser.username);
+    App._logAuditPublic('EXPORT_EXCEL',`Exported ${members.length} records`,App.currentUser.username);
   },
 
-  exportPDF() { window.print(); App.logAudit('EXPORT_PDF','Printed/exported as PDF',App.currentUser.username); },
+  exportPDF() { window.print(); App._logAuditPublic('EXPORT_PDF','Printed/exported as PDF',App.currentUser.username); },
 
   // ══════════════════════════════════════════════════════════
   // ANALYTICS — with gender distribution and filters
@@ -757,12 +780,12 @@ const PageRenderers = {
   audit() {
     // Admin: pull latest entries from Sheet first (non-blocking)
     // so the log shows activity from ALL devices, not just this one.
-    if (App.currentUser?.role === 'admin' && App.isOnline && App.settings.scriptUrl) {
+    if (App.currentUser?.role === 'admin' && navigator.onLine && App.settings.scriptUrl) {
       const banner = document.getElementById('audit-sync-banner');
       if (banner) banner.style.display = 'flex';
-      App._fetchAuditFromSheet().then(hasNew => {
+      App.fetchAuditFromApi().then(entries => {
         if (banner) banner.style.display = 'none';
-        if (hasNew) PageRenderers._renderAuditEntries(); // re-render with fresh data
+        PageRenderers._renderAuditEntries();
       });
     }
     PageRenderers._renderAuditEntries();
@@ -890,14 +913,14 @@ const PageRenderers = {
       const idx = App.users.findIndex(u => u.id === id);
       if (idx < 0) { Toast.show('Error','User not found — refresh and try again.','error'); return; }
       App.users[idx] = { ...App.users[idx], ...data };
-      App.logAudit('EDIT_USER', `Edited user: ${data.username} (${data.role})`, App.currentUser.username);
+      App._logAuditPublic('EDIT_USER', `Edited user: ${data.username} (${data.role})`, App.currentUser.username);
       Toast.show('User Updated','Changes saved.','success');
     } else {
       if (App.users.find(u => u.username === data.username)) {
         Toast.show('Error','Username already exists.','error'); return;
       }
       App.users.push({ id:'u'+Date.now(), ...data, assignedStations:[], mustChangePassword:true });
-      App.logAudit('ADD_USER', `Created: ${data.username} (${data.role})`, App.currentUser.username);
+      App._logAuditPublic('ADD_USER', `Created: ${data.username} (${data.role})`, App.currentUser.username);
       Toast.show('User Created','New user added. They must change password on first login.','success');
     }
     App.saveUsers(App.users);
@@ -911,7 +934,7 @@ const PageRenderers = {
     const u = App.users.find(x => x.id === id); if (!u) return;
     u.active = !u.active;
     App.saveUsers(App.users);
-    App.logAudit(u.active?'ENABLE_USER':'DISABLE_USER', `${u.active?'Enabled':'Disabled'}: ${u.username}`, App.currentUser.username);
+    App._logAuditPublic(u.active?'ENABLE_USER':'DISABLE_USER', `${u.active?'Enabled':'Disabled'}: ${u.username}`, App.currentUser.username);
     Toast.show('Status Updated', `${u.name} is now ${u.active?'active':'inactive'}.`, u.active?'success':'warning');
     PageRenderers.users();
   },
@@ -976,7 +999,7 @@ const PageRenderers = {
       }
     }
     App.saveUsers(App.users);
-    App.logAudit('ASSIGN_STATIONS', `Assigned ${selected.length} station(s) to ${u.username} (${u.role}): [${selected.join(', ')}]. Prev: [${prev.join(', ')}]`, App.currentUser.username);
+    App._logAuditPublic('ASSIGN_STATIONS', `Assigned ${selected.length} station(s) to ${u.username} (${u.role}): [${selected.join(', ')}]. Prev: [${prev.join(', ')}]`, App.currentUser.username);
     Modal.close('modal-assign');
     Toast.show('Assignment Saved', `${u.name} assigned to ${selected.length} station${selected.length!==1?'s':''}.`, 'success');
     PageRenderers.users();
@@ -1004,17 +1027,16 @@ const PageRenderers = {
     App.settings.apiKey       = document.getElementById('set-api-key').value.trim();
     App.settings.scriptUrl    = document.getElementById('set-script-url').value.trim();
     App.saveSettings();      // saves to localStorage AND pushes to Sheet
-    App.applyAppName();
-    App.logAudit('SETTINGS_CHANGE','Updated and pushed settings to Google Sheets', App.currentUser.username);
+    // App.applyAppName() - handled by app shell
+    App._logAuditPublic('SETTINGS_CHANGE','Updated and pushed settings to Google Sheets', App.currentUser.username);
     Toast.show('Settings Saved','Configuration saved locally and syncing to Google Sheets…','success');
-    App._startSyncTimer();   // restart timer with possibly new script URL
+    App.startSyncTimer();   // restart timer with possibly new script URL
 
     // Show confirmation once push completes
-    if (App.isOnline && App.settings.scriptUrl) {
-      App._pushSettingsToSheet().then(() => {
-        Toast.show('Settings Synced ☁️','Settings saved to Google Sheets — all future logins on any device will use these settings.','success', 6000);
-      }).catch(() => {
-        Toast.show('Sheet Sync Warning','Settings saved locally but could not reach Google Sheets. Check your Script URL.','warning', 6000);
+    if (navigator.onLine && App.settings.scriptUrl) {
+      App.apiPost('/settings', App.settings).then(r => {
+        if (r.success) Toast.show('Settings Synced ☁️','Settings saved to API — all devices will use these settings.','success', 6000);
+        else Toast.show('Sync Warning','Settings saved locally but could not reach API.','warning', 6000);
       });
     }
   },
@@ -1052,7 +1074,7 @@ const PageRenderers = {
     ['st-zone','st-ward','st-name','st-code','st-branch','st-bcode'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     this._renderStationsList();
     Toast.show('Station Added',`${name} (${code}) saved.`,'success');
-    App.logAudit('ADD_STATION',`Added: ${name} (${code}), Zone: ${zone}, Ward: ${ward}`,App.currentUser.username);
+    App._logAuditPublic('ADD_STATION',`Added: ${name} (${code}), Zone: ${zone}, Ward: ${ward}`,App.currentUser.username);
   },
 
   removeStation(i) {
@@ -1060,6 +1082,6 @@ const PageRenderers = {
     App.pollingStations.splice(i,1);App.settings.pollingStations=App.pollingStations;App.saveSettings();
     this._renderStationsList();
     Toast.show('Station Removed',`${s.name} removed.`,'warning');
-    App.logAudit('REMOVE_STATION',`Removed: ${s.name} (${s.code})`,App.currentUser.username);
+    App._logAuditPublic('REMOVE_STATION',`Removed: ${s.name} (${s.code})`,App.currentUser.username);
   },
 };
