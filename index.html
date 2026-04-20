@@ -803,10 +803,10 @@
   </div>
 </div>
 
-<script src="js/app.js?v=3.0.3"></script>
-<script src="js/pages.js?v=3.0.3"></script>
-<script src="js/app.js?v=3.0.3"></script>
-<script src="js/pages.js?v=3.0.3"></script>
+<script src="js/app.js?v=3.0.4"></script>
+<script src="js/pages.js?v=3.0.4"></script>
+<script src="js/app.js?v=3.0.4"></script>
+<script src="js/pages.js?v=3.0.4"></script>
 <script>
 // ── CONFIG ────────────────────────────────────────────────────
 const CONFIG = {
@@ -1080,6 +1080,23 @@ document.getElementById('current-date').textContent=new Date().toLocaleDateStrin
 
 // Check lockout on page load
 (()=>{const l=JSON.parse(localStorage.getItem('knndc_lockout')||'null');if(l&&l.until){const r=Math.ceil((l.until-Date.now())/1000);if(r>0)startLockoutCountdown(r);}})();
+
+// ── Auto cache-clear on version change ───────────────────────
+// If the app version stored in localStorage doesn't match the
+// current version, wipe stale cached users and session so all
+// devices always load fresh data after an update.
+(()=>{
+  const CURRENT = '3.0.3';
+  const stored  = localStorage.getItem('knndc_app_version');
+  if (stored !== CURRENT) {
+    localStorage.removeItem('knndc_users');
+    localStorage.removeItem('knndc_session');
+    localStorage.removeItem('knndc_jwt');
+    localStorage.removeItem('knndc_lockout');
+    sessionStorage.clear();
+    localStorage.setItem('knndc_app_version', CURRENT);
+  }
+})();
 
 App.init();
 _updateConnStatus();

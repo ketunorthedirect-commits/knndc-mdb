@@ -1,5 +1,5 @@
 // ============================================================
-// KNNDCmdb  app.js  v3.0.2
+// KNNDCmdb  app.js  v3.0.3
 // Elections & IT Directorate · Ketu North NDC · 2026
 //
 // Changes from v2.4.0 → v3.0:
@@ -17,7 +17,7 @@ var App = (() => {
   'use strict';
 
   // ── Version ───────────────────────────────────────────────
-  const VERSION = '3.0.2';
+  const VERSION = '3.0.3';
 
   // ── localStorage keys ─────────────────────────────────────
   const LS = {
@@ -45,6 +45,7 @@ var App = (() => {
   let settings       = {};
   let pollingStations = [];
   let jwt            = '';          // ← active JWT token
+  let _membersCache  = null;        // ← in-memory members (avoids 5MB localStorage limit)
 
   // ── Getters ───────────────────────────────────────────────
   function getVersion()         { return VERSION; }
@@ -340,34 +341,60 @@ var App = (() => {
   }
 
   // ── Members ───────────────────────────────────────────────
-  function getMembers() { return lsGet(LS.MEMBERS, []); }
+  function getMembers() {
+    // Use in-memory cache if available (set by fetchFromApi after login)
+    if (_membersCache !== null) return _membersCache;
+    // Fall back to localStorage (scoped records saved for non-admin users,
+    // or offline-added records before first sync)
+    const stored = lsGet(LS.MEMBERS, []);
+    if (stored.length) {
+      _membersCache = stored; // warm the cache
+      return stored;
+    }
+    return [];
+  }
 
-  function saveMembers(members) { lsSet(LS.MEMBERS, members); }
+  function saveMembers(members) {
+    _membersCache = members;
+    // Only write to localStorage if dataset is small enough (< 3MB)
+    try {
+      const json = JSON.stringify(members);
+      if (json.length < 3 * 1024 * 1024) {
+        localStorage.setItem(LS.MEMBERS, json);
+      } else {
+        // Dataset too large for localStorage — memory only
+        localStorage.removeItem(LS.MEMBERS);
+      }
+    } catch {}
+  }
 
   function addMember(member) {
-    const members = getMembers();
-    members.push(member);
-    saveMembers(members);
+    // Add to memory cache immediately so UI updates without waiting for sync
+    if (_membersCache === null) _membersCache = getMembers();
+    _membersCache.push(member);
+    saveMembers(_membersCache);
     _pushMemberToApi(member, 'add');
     _logAudit('ADD_MEMBER', `Added ${member.firstName} ${member.lastName}`, member.id);
   }
 
   function updateMember(updated) {
-    const members = getMembers();
-    const idx = members.findIndex(m => m.id === updated.id);
-    if (idx >= 0) { members[idx] = updated; saveMembers(members); }
-    _pushMemberToApi(updated, 'update');
-    _logAudit('UPDATE_MEMBER', `Updated ${updated.firstName} ${updated.lastName}`, updated.id);
+    if (_membersCache === null) _membersCache = getMembers();
+    const idx = _membersCache.findIndex(m => m.id === (updated.id || updated));
+    const u   = typeof updated === 'string' ? { id: updated } : updated;
+    if (idx >= 0) { _membersCache[idx] = { ..._membersCache[idx], ...u }; }
+    saveMembers(_membersCache);
+    _pushMemberToApi(u, 'update');
+    _logAudit('UPDATE_MEMBER', `Updated ${u.firstName||''} ${u.lastName||''}`, u.id);
   }
 
   function deleteMember(id, reason) {
-    const members = getMembers();
-    const found   = members.find(m => m.id === id);
-    const filtered = members.filter(m => m.id !== id);
-    saveMembers(filtered);
+    if (_membersCache === null) _membersCache = getMembers();
+    const found   = _membersCache.find(m => m.id === id);
+    _membersCache = _membersCache.filter(m => m.id !== id);
+    saveMembers(_membersCache);
     if (found) {
       _deleteMemberFromApi(id);
-      _logAudit('DELETE_MEMBER', `Deleted ${found.firstName} ${found.lastName}`, id, reason);
+      _logAudit('DELETE_MEMBER', `Deleted ${found.firstName||found.first_name||''} ${found.lastName||found.last_name||''}`, id, reason);
     }
   }
 
@@ -421,16 +448,37 @@ var App = (() => {
     if (!getApiBase() || isJwtExpired()) return false;
 
     try {
+      // Fetch members and stations in parallel
+      // For large datasets (admin sees all 12k+ records), only cache in memory
+      // For scoped users (ward/officer), the dataset is small enough for localStorage
       const [mRes, sRes] = await Promise.all([
         apiGet('/members'),
         apiGet('/stations'),
       ]);
 
       if (mRes.success && Array.isArray(mRes.members)) {
-        // Merge: API is source of truth; preserve any locally-queued items not yet in API
         const apiIds    = new Set(mRes.members.map(m => m.id));
-        const localOnly = getMembers().filter(m => !apiIds.has(m.id));
-        saveMembers([...mRes.members, ...localOnly]);
+        const queue     = lsGet(LS.OFFLINE_QUEUE, []);
+        const queueIds  = new Set(queue.map(m => m.id));
+        const localOnly = (_membersCache || []).filter(m => !apiIds.has(m.id) && queueIds.has(m.id));
+        const allMembers = [...mRes.members, ...localOnly];
+
+        // For non-admin users, also save scoped subset to localStorage
+        // so data survives a page refresh without another API call
+        if (currentUser && currentUser.role !== 'admin') {
+          const scoped = getMembersForUser(allMembers);
+          try {
+            const json = JSON.stringify(scoped);
+            if (json.length < 4 * 1024 * 1024) {
+              localStorage.setItem(LS.MEMBERS, json);
+            }
+          } catch {}
+        } else {
+          // Admin: memory only (too large for localStorage)
+          localStorage.removeItem(LS.MEMBERS);
+        }
+
+        _membersCache = allMembers;
       }
 
       if (sRes.success && Array.isArray(sRes.stations)) {
