@@ -32,16 +32,16 @@
     </div>
     <!-- User sync indicator — shown on new devices while fetching accounts from Sheet -->
     <div id="user-sync-banner" style="display:none;background:var(--ndc-green-pale);border:1px solid var(--ndc-green-lt);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ndc-green-dk);text-align:center">
-      🔄 Fetching user accounts from Google Sheets…
+      🔄 Fetching accounts from API…
     </div>
 
     <!-- Quick Connect — shown only on devices with no Script URL configured -->
     <div id="quick-connect-panel" style="display:none;background:var(--ndc-green-pale);border:1px solid var(--ndc-green);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px">
       <div style="font-weight:700;color:var(--ndc-green-dk);margin-bottom:4px;font-size:13px">🔗 First-time setup — Connect to Google Sheets</div>
-      <div style="font-size:12px;color:var(--gray-600);margin-bottom:10px">Paste the Apps Script Web App URL below. All settings, accounts and stations will be downloaded automatically.</div>
+      <div style="font-size:12px;color:var(--gray-600);margin-bottom:10px">Paste the API base URL below (e.g. https://knndc-api-production.up.railway.app). All settings, accounts and stations will be downloaded automatically.</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input type="text" id="qc-script-url"
-          placeholder="https://script.google.com/macros/s/…/exec"
+          placeholder="https://knndc-api-production.up.railway.app"
           style="flex:1;min-width:0;font-size:12px;padding:8px 10px;border:1px solid var(--ndc-green);border-radius:var(--radius);outline:none"
           autocomplete="off">
         <button id="qc-connect-btn" onclick="quickConnect()"
@@ -86,7 +86,7 @@
         <span class="app-name">KNNDCmdb · Members Registration Portal</span>
       </div>
       <div class="header-actions">
-        <button class="btn-icon" title="Sync from Google Sheets" onclick="App.fetchFromApi().then(()=>Toast.show('Synced','Data refreshed from Google Sheets.','success'))">🔄</button>
+        <button class="btn-icon" title="Sync from APIs" onclick="App.fetchFromApi().then(()=>Toast.show('Synced','Data refreshed from API.','success'))">🔄</button>
         <span id="conn-dot" class="online-dot"></span>
         <div class="header-user" onclick="App.logout()" title="Logout">
           <div class="user-avatar" id="user-avatar">--</div>
@@ -171,7 +171,7 @@
     <div id="page-entry" class="page">
       <div class="section-header">
         <div><div class="section-title">New Member Registration</div><div class="section-subtitle">Complete all required fields</div></div>
-        <button class="btn btn-outline" id="entry-push-btn" onclick="App.pushMyRecordsToSheet()"
+        <button class="btn btn-outline" id="entry-push-btn" onclick="App.bulkPushToApi().then(r=>Toast.show(r.success?'Pushed':'Failed',r.success?'Records uploaded':r.error||'Error',r.success?'success':'error'))"
           title="Force-upload all your station records to Google Sheets">
           ☁️ Push Records to Sheet
         </button>
@@ -222,7 +222,7 @@
           <div class="btn-group">
             <button class="btn btn-primary btn-lg" onclick="PageRenderers.submitEntry()">✅ Save Member Record</button>
             <button class="btn btn-secondary" onclick="PageRenderers.entry()">🔄 Reset</button>
-            <button class="btn btn-outline" onclick="App.pushMyRecordsToSheet()"
+            <button class="btn btn-outline" onclick="App.bulkPushToApi().then(r=>Toast.show(r.success?'Pushed':'Failed',r.success?'Records uploaded':r.error||'Error',r.success?'success':'error'))"
               title="Force-upload all your station records to Google Sheets">
               ☁️ Push Records to Sheet
             </button>
@@ -257,7 +257,7 @@
         <div class="btn-group">
           <button id="records-pull-btn" class="btn btn-secondary"
             style="display:none"
-            onclick="App._pullAllFromSheet()"
+            onclick="App.fetchFromApi().then(()=>{PageRenderers.records();Toast.show('Synced','Records refreshed.','success');})"
             title="Force a full re-sync from Google Sheets — use if local count is lower than expected">
             🔄 Pull All from Sheet
           </button>
@@ -431,7 +431,7 @@
       <!-- Sync banner — shown briefly while fetching from Sheet -->
       <div id="audit-sync-banner" style="display:none;align-items:center;gap:10px;background:var(--ndc-green-pale);border:1px solid var(--ndc-green-lt);border-radius:var(--radius);padding:10px 16px;margin-bottom:12px;font-size:13px;color:var(--ndc-green-dk)">
         <span style="animation:spin 1s linear infinite;display:inline-block">🔄</span>
-        Fetching latest activity from Google Sheets…
+        Fetching latest activity from API…
       </div>
 
       <div class="search-bar" style="flex-wrap:wrap;gap:8px">
@@ -451,7 +451,7 @@
           <option value="">All Users</option>
         </select>
         <button class="btn btn-outline btn-sm" onclick="PageRenderers.audit()" title="Refresh from Google Sheets">🔄 Refresh</button>
-        <button class="btn btn-danger btn-sm" onclick="if(confirm('Clear ALL local audit logs on this device?')){App.auditLog=[];App.saveAudit();PageRenderers.audit();Toast.show('Log Cleared','','warning');}">🗑️ Clear</button>
+        <button class="btn btn-danger btn-sm" onclick="if(confirm('Clear ALL local audit logs on this device?')){localStorage.removeItem('knndc_audit');document.getElementById('audit-user-filter').dataset.populated='';PageRenderers.audit();Toast.show('Log Cleared','','warning');}">🗑️ Clear</button>
       </div>
       <div id="audit-entries"></div>
     </div>
@@ -461,7 +461,7 @@
       <div class="section-header">
         <div><div class="section-title">User Management</div><div class="section-subtitle">Manage accounts, roles and station assignments</div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-secondary" onclick="App.forcePushUsersToApi()" title="Save all user accounts to Google Sheets">☁️ Push Users to Sheet</button>
+          <button class="btn btn-secondary" onclick="App.forcePushUsersToApi().then(r=>Toast.show(r.success?'Users Pushed':'Failed',`${r.pushed||0} user(s) pushed`,r.success?'success':'error'))" title="Save all user accounts to Google Sheets">☁️ Push Users to Sheet</button>
           <button class="btn btn-primary" onclick="PageRenderers.openAddUser()">➕ Add New User</button>
         </div>
       </div>
@@ -517,7 +517,7 @@
                 <div id="bootstrap-banner" style="display:none;background:var(--ndc-green-pale);border:1px solid var(--ndc-green);border-radius:var(--radius);padding:16px;margin-bottom:20px">
                   <div style="font-weight:700;color:var(--ndc-green-dk);margin-bottom:6px">🔗 Connect this device to Google Sheets</div>
                   <div style="font-size:13px;color:var(--gray-600)">
-                    This device is not yet connected to the Google Sheet. Enter the <strong>Apps Script Web App URL</strong> below and click
+                    This device is not yet connected to the Google Sheet. Enter the <strong>API Base URL</strong> below and click
                     <strong>💾 Save</strong>. The app will automatically download all settings, member data, and polling stations from the Sheet.
                   </div>
                 </div>
@@ -540,17 +540,17 @@
                   </div>
                   <div class="form-group full-width">
                     <label>Apps Script Web App URL <span class="required">*</span></label>
-                    <input type="text" id="set-script-url" placeholder="https://script.google.com/macros/s/…/exec">
+                    <input type="text" id="set-script-url" placeholder="https://knndc-api-production.up.railway.app">
                     <span class="input-hint">From Apps Script → Deploy → New Deployment → Web App. This URL unlocks settings sync across all devices.</span>
                   </div>
                 </div>
                 <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
                   <button class="btn btn-primary" onclick="PageRenderers.saveGeneralSettings()">💾 Save & Sync to Sheet</button>
-                  <button class="btn btn-secondary" onclick="App.fetchFromApi().then(()=>Toast.show('Synced','Members refreshed.','success'))">🔄 Pull Members from Sheet</button>
-                  <button class="btn btn-secondary" onclick="App.apiGet('/users').then(r=>{ if(r.success&&r.users?.length){localStorage.setItem('knndc_users',JSON.stringify(r.users));if(typeof PageRenderers!=='undefined')PageRenderers.users();Toast.show('Users Synced','Accounts refreshed from API.','success');}else{Toast.show('No Users','API returned no users.','warning');}})">👥 Pull Users from Sheet</button>
-                  <button class="btn btn-secondary" onclick="App.forcePushUsersToApi()">☁️ Push Users to Sheet</button>
+                  <button class="btn btn-secondary" onclick="App.fetchFromApi().then(()=>{Toast.show('Synced','Members refreshed.','success');})">🔄 Pull Members from Sheet</button>
+                  <button class="btn btn-secondary" onclick="App.apiGet('/users').then(r=>{if(r.success&&r.users?.length){localStorage.setItem('knndc_users',JSON.stringify(r.users));PageRenderers.users();Toast.show('Users Synced','Accounts refreshed from API.','success');}else{Toast.show('No Users','API returned no users.','warning');}})">👥 Pull Users from Sheet</button>
+                  <button class="btn btn-secondary" onclick="App.forcePushUsersToApi().then(r=>Toast.show(r.success?'Users Pushed':'Failed',`${r.pushed||0} user(s) pushed`,r.success?'success':'error'))">☁️ Push Users to Sheet</button>
                   <button class="btn btn-secondary" onclick="App.flushOfflineQueue()">📤 Upload Offline Queue</button>
-                  <button class="btn btn-outline" onclick="App.bulkPushToApi()" title="Push all local records to Google Sheets">
+                  <button class="btn btn-outline" onclick="App.bulkPushToApi().then(r=>Toast.show(r.success?'All Records Pushed':'Failed',r.success?`${r.saved||0} record(s) pushed`:r.error||'Error',r.success?'success':'error'))" title="Push all local records to Google Sheets">
                     ☁️ Push All Records to Sheet
                   </button>
                 </div>
@@ -564,10 +564,10 @@
               <div class="card-body" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
                 <div style="font-size:28px">☁️</div>
                 <div style="flex:1">
-                  <div style="font-weight:700;color:var(--ndc-green-dk)">Sync from Google Sheet</div>
-                  <div style="font-size:12px;color:var(--gray-500);margin-top:2px">Pull the latest Polling Stations list from your Google Sheet — overrides local data. Requires Script URL to be set.</div>
+                  <div style="font-weight:700;color:var(--ndc-green-dk)">Sync from API</div>
+                  <div style="font-size:12px;color:var(--gray-500);margin-top:2px">Pull the latest Polling Stations list from the API — overrides local data. Requires API URL to be set.</div>
                 </div>
-                <button class="btn btn-primary" onclick="syncStationsFromSheet()">🔄 Import from Sheet</button>
+                <button class="btn btn-primary" onclick="syncStationsFromApi()">🔄 Import from Sheet</button>
               </div>
             </div>
 
@@ -586,7 +586,7 @@
                     </div>
                   </div>
                   <button class="btn btn-secondary" id="push-stations-btn"
-                    onclick="App.forcePushStationsToApi()"
+                    onclick="App.forcePushStationsToApi().then(r=>Toast.show(r.success?'Stations Pushed':'Failed',r.success?`${r.saved||0} station(s) pushed`:r.error||'Error',r.success?'success':'error'))"
                     title="Send all configured polling stations to the Google Sheets Polling Stations tab">
                     ☁️ Push Stations to Sheet
                   </button>
@@ -805,15 +805,79 @@
 
 <script src="js/app.js?v=3.0.0"></script>
 <script src="js/pages.js?v=3.0.0"></script>
+<script src="js/app.js?v=3.0.0"></script>
+<script src="js/pages.js?v=3.0.0"></script>
 <script>
-// ── PASSWORD TOGGLE ──────────────────────────────────────────
+// ── CONFIG ────────────────────────────────────────────────────
+const CONFIG = {
+  VERSION:      '3.0.0',
+  APP_NAME:     'KNNDCmdb',
+  CONSTITUENCY: 'Ketu North',
+  SCRIPT_URL:   '',     // set via Quick Connect or Settings
+};
+
+// ── TOAST ─────────────────────────────────────────────────────
+const Toast = {
+  show(title, msg, type='info', duration=4000) {
+    const c=document.getElementById('toast-container'); if(!c) return;
+    const t=document.createElement('div'); t.className=`toast toast-${type}`;
+    t.innerHTML=`<div class="toast-title">${title}</div>${msg?`<div class="toast-msg">${msg}</div>`:''}`;
+    c.appendChild(t); setTimeout(()=>t.classList.add('show'),10);
+    setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),300); }, duration);
+  }
+};
+window._showToast = (msg, type) => Toast.show(msg, '', type);
+
+// ── MODAL ─────────────────────────────────────────────────────
+const Modal = {
+  open(id)  { const m=document.getElementById(id); if(m){m.classList.add('open');document.body.style.overflow='hidden';} },
+  close(id) { const m=document.getElementById(id); if(m){m.classList.remove('open');document.body.style.overflow='';} }
+};
+document.addEventListener('keydown', e => { if(e.key==='Escape') document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open')); });
+
+// ── NAVIGATION ────────────────────────────────────────────────
+function navigateTo(page) {
+  window._currentPage = page;
+  document.querySelectorAll('.page').forEach(p => p.style.display='none');
+  const target = document.getElementById('page-'+page);
+  if (target) target.style.display='block';
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.toggle('active', l.dataset.page===page));
+  if (typeof PageRenderers[page] === 'function') PageRenderers[page]();
+  window.scrollTo(0,0);
+}
+
+function _renderNav() {
+  const u = App.getCurrentUser() || App.currentUser;
+  if (!u) return;
+  const pages = App.ROLE_PAGES[u.role] || [];
+  const labels = { dashboard:'🏠 Dashboard', entry:'✍️ Data Entry', 'my-records':'📋 My Records', records:'📊 All Records', reports:'📄 Reports', analytics:'📈 Analytics', audit:'🛡️ Audit Log', users:'👥 Users', settings:'⚙️ Settings' };
+  const nav = document.getElementById('main-nav');
+  if (nav) nav.innerHTML = pages.map(p => `<a class="nav-link${window._currentPage===p?' active':''}" href="#" data-page="${p}" onclick="navigateTo('${p}');return false">${labels[p]||p}</a>`).join('');
+}
+
+function _renderHeader() {
+  const u = App.getCurrentUser() || App.currentUser;
+  if (!u) return;
+  const av = document.getElementById('user-avatar');
+  const nm = document.getElementById('user-name-hdr');
+  const rl = document.getElementById('user-role-hdr');
+  if (av) av.textContent = u.name.split(' ').map(n=>n[0]).slice(0,2).join('');
+  if (nm) nm.textContent = u.name;
+  if (rl) rl.textContent = { officer:'Data Entry Officer', ward:'Ward Coordinator', exec:'Constituency Executive', admin:'System Administrator' }[u.role] || u.role;
+}
+
+// Wire up the stubs in app.js
+window._renderNav    = _renderNav;
+window._renderHeader = _renderHeader;
+
+// ── PASSWORD TOGGLE ───────────────────────────────────────────
 function togglePassword() {
   const p=document.getElementById('login-password'), c=document.getElementById('show-pwd-check');
   const show=p.type==='password'; p.type=show?'text':'password'; if(c) c.checked=show;
 }
 
-// ── LOCKOUT COUNTDOWN ────────────────────────────────────────
-let _lockTimer=null;
+// ── LOCKOUT COUNTDOWN ─────────────────────────────────────────
+let _lockTimer = null;
 function startLockoutCountdown(seconds) {
   const banner=document.getElementById('lockout-banner'), timer=document.getElementById('lockout-timer');
   const btn=document.getElementById('login-btn'), aw=document.getElementById('attempt-warning');
@@ -829,355 +893,240 @@ function startLockoutCountdown(seconds) {
   },1000);
 }
 
-// ── LOGIN ────────────────────────────────────────────────────
+// ── LOGIN ─────────────────────────────────────────────────────
 async function doLogin() {
   const u=document.getElementById('login-username').value.trim();
   const p=document.getElementById('login-password').value;
   if(!u||!p){Toast.show('Error','Please enter username and password.','error');return;}
+  if(App.isLockedOut()){Toast.show('Locked','Account locked. Please wait.','error');return;}
   const btn=document.getElementById('login-btn');
   if(btn){btn.disabled=true;btn.textContent='⏳ Signing in…';}
-  const result=await App.login(u,p);
+  const result = await App.login(u,p);
   if(btn){btn.disabled=false;btn.textContent='🔐 Sign In';}
+
   if(result.success) {
     document.getElementById('attempt-warning').style.display='none';
     document.getElementById('lockout-banner').style.display='none';
     if(_lockTimer) clearInterval(_lockTimer);
-    if(result.mustChangePassword) {
-      // Show change-password modal before entering app
-      document.getElementById('login-screen').style.display='none';
-      document.getElementById('app-shell').style.display='flex';
-      document.getElementById('app-shell').style.flexDirection='column';
-      // App.renderNav(); // App.renderUserHeader();
+    App.clearLockout();
+    App._logAuditPublic('LOGIN', `User logged in: ${u}`, u);
+
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app-shell').style.display='flex';
+    document.getElementById('app-shell').style.flexDirection='column';
+    _renderNav();
+    _renderHeader();
+
+    if(result.user?.mustChangePassword || result.user?.must_change_password) {
       Modal.open('modal-change-password');
     } else {
-      document.getElementById('login-screen').style.display='none';
-      document.getElementById('app-shell').style.display='flex';
-      document.getElementById('app-shell').style.flexDirection='column';
-      // Small delay ensures session is written to storage before dashboard reads it
-      setTimeout(() => {
-        if(typeof PageRenderers!=='undefined') PageRenderers.dashboard();
+      setTimeout(()=>{
+        navigateTo('dashboard');
         App.syncAfterLogin();
         App.startSyncTimer();
       }, 50);
     }
-  } else if(result.locked) {
-    startLockoutCountdown(result.seconds);
-    Toast.show('Locked',`Wait ${Math.ceil(result.seconds/60)} minute(s).`,'error',6000);
-  } else if(result.failed) {
-    const w=document.getElementById('attempt-warning'),al=document.getElementById('attempts-left');
-    if(w) w.style.display='block'; if(al) al.textContent=result.attemptsLeft;
-    Toast.show('Login Failed',`${result.attemptsLeft} attempt(s) left.`,'error');
-    document.getElementById('login-password').value='';
-    document.getElementById('login-password').focus();
+  } else {
+    const remaining = App.recordFailedAttempt();
+    if(remaining<=0) {
+      startLockoutCountdown(15*60);
+      Toast.show('Locked',`Too many failed attempts. Wait 15 minutes.`,'error',6000);
+    } else {
+      const w=document.getElementById('attempt-warning'), al=document.getElementById('attempts-left');
+      if(w) w.style.display='block'; if(al) al.textContent=remaining;
+      Toast.show('Login Failed',`${result.error||'Invalid credentials'}. ${remaining} attempt(s) left.`,'error');
+      document.getElementById('login-password').value='';
+      document.getElementById('login-password').focus();
+    }
   }
 }
 
-// ── PASSWORD CHANGE (first login) ───────────────────────────
-function submitPasswordChange() {
+// ── CHANGE PASSWORD (first login) ────────────────────────────
+async function submitPasswordChange() {
   const np=document.getElementById('new-pwd').value;
   const nc=document.getElementById('new-pwd-confirm').value;
   const msg=document.getElementById('pwd-strength-msg');
-  if(!np||np.length<6){if(msg)msg.textContent='⚠️ Password must be at least 6 characters.';msg.style.color='var(--ndc-red)';return;}
-  if(np!==nc){if(msg)msg.textContent='⚠️ Passwords do not match.';msg.style.color='var(--ndc-red)';return;}
-  App.changePassword(App.currentUser.id,np);
+  if(!np||np.length<6){if(msg){msg.textContent='⚠️ Password must be at least 6 characters.';msg.style.color='var(--ndc-red)';}return;}
+  if(np!==nc){if(msg){msg.textContent='⚠️ Passwords do not match.';msg.style.color='var(--ndc-red)';}return;}
+  const u = App.getCurrentUser() || App.currentUser;
+  const result = await App.changePassword('', np);
   Modal.close('modal-change-password');
-  Toast.show('Password Set','Your password has been updated. Welcome!','success');
-  App.setupInactivityTracking();
-  App.navigate('dashboard');
+  Toast.show('Password Set','Your password has been updated.','success');
+  App._logAuditPublic('PASSWORD_CHANGE','User set new password on first login', u?.username);
+  setTimeout(()=>{
+    navigateTo('dashboard');
+    App.syncAfterLogin();
+    App.startSyncTimer();
+  }, 50);
 }
 
-// ── SYNC STATIONS FROM SHEET ─────────────────────────────────
-async function syncStationsFromSheet() {
-  if (!App.settings.scriptUrl) {
-    Toast.show('No Script URL','Please save your Apps Script Web App URL in Settings → Google Sheets first.','error');
-    return;
-  }
-  Toast.show('Importing…','Fetching polling stations from Google Sheet.','info');
-  try {
-    const data = await App.apiGet('/stations');
-    if (!data?.stations?.length) {
-      Toast.show('No Stations Found','The Polling Stations sheet appears to be empty.','warning');
-      return;
-    }
-    // Replace local stations entirely with sheet data
-    App.pollingStations = data.stations;
-    App.settings.pollingStations = data.stations;
-    App.saveSettings();
-    PageRenderers._renderStationsList();
-    const sc = document.getElementById('station-count');
-    if (sc) sc.textContent = data.stations.length;
-    Toast.show('Stations Imported', `${data.stations.length} polling station(s) loaded from Google Sheet.`, 'success');
-    App.logAudit('SYNC_STATIONS', `Imported ${data.stations.length} stations from Google Sheet`, App.currentUser.username);
-  } catch(e) {
-    Toast.show('Sync Failed', 'Could not reach Google Sheets. Check your Script URL and internet connection.', 'error');
-  }
-}
-// ── EMERGENCY RESET ──────────────────────────────────────────
-// Clears cached user data so the app falls back to built-in defaults.
-// Admin can then log in with: admin / admin123
-function emergencyReset() {
-  if (!confirm(
-    'This will clear cached user accounts on THIS device and restore built-in defaults.\n\n' +
-    'After resetting, log in with:\n  Username: admin\n  Password: admin123\n\n' +
-    'Member records and settings are NOT affected.\n\nContinue?'
-  )) return;
-  localStorage.removeItem('knndc_users');
-  localStorage.removeItem('knndc_lockout');
-  localStorage.removeItem('knndc_attempts');
-  sessionStorage.removeItem('knndc_session');
-  document.getElementById('attempt-warning').style.display = 'none';
-  document.getElementById('lockout-banner').style.display  = 'none';
-  const btn = document.getElementById('login-btn');
-  if (btn) { btn.disabled = false; btn.textContent = '🔐 Sign In'; }
-  document.getElementById('login-username').value = 'admin';
-  document.getElementById('login-password').value = '';
-  document.getElementById('login-password').focus();
-  Toast.show('Reset Complete','Local user cache cleared. Log in with admin / admin123.','success',6000);
-}
-
-function setTab(el,tabId) {
-  document.querySelectorAll('.settings-nav-item').forEach(i=>i.classList.remove('active'));
-  document.querySelectorAll('.settings-tab').forEach(t=>t.style.display='none');
-  el.classList.add('active'); document.getElementById(tabId).style.display='block';
-}
+// ── LOGOUT ────────────────────────────────────────────────────
+const _origLogout = App.logout.bind(App);
+App.logout = function() {
+  const u = App.getCurrentUser() || App.currentUser;
+  App._logAuditPublic('LOGOUT', 'User logged out', u?.username);
+  App.stopSyncTimer();
+  _origLogout();
+  document.getElementById('app-shell').style.display='none';
+  document.getElementById('login-screen').style.display='';
+  document.getElementById('login-password').value='';
+  window._currentPage = 'dashboard';
+};
 
 // ── QUICK CONNECT ─────────────────────────────────────────────
-// Shown on the login screen when no Script URL is configured.
-// Lets a new device bootstrap fully from a single URL paste.
 async function quickConnect() {
   const input  = document.getElementById('qc-script-url');
   const btn    = document.getElementById('qc-connect-btn');
   const status = document.getElementById('qc-status');
   const url    = input?.value.trim();
-
-  if (!url || !url.startsWith('https://')) {
-    if (status) status.textContent = '⚠️ Please paste a valid Apps Script URL.';
-    return;
-  }
-
-  btn.disabled  = true;
-  btn.textContent = '⏳ Connecting…';
-  if (status) status.textContent = 'Fetching settings, accounts and stations…';
-
+  if(!url||!url.startsWith('https://')){if(status)status.textContent='⚠️ Please paste a valid API URL.';return;}
+  btn.disabled=true; btn.textContent='⏳ Connecting…';
+  if(status) status.textContent='Fetching settings, accounts and stations…';
+  // Save the URL first so apiGet uses it
+  App.saveSettings({scriptUrl:url});
   try {
     const [settingsRes, usersRes, stationsRes] = await Promise.allSettled([
       App.apiGet('/settings'),
       App.apiGet('/users'),
       App.apiGet('/stations'),
     ]);
-
-    // Persist the Script URL immediately so all subsequent fetches work
-    const stored = JSON.parse(localStorage.getItem('knndc_settings') || '{}');
-    stored.scriptUrl = url;
-
-    // Apply remote settings
-    if (settingsRes.status === 'fulfilled' && settingsRes.value?.settings && settingsRes.value?.exists) {
-      const remote = settingsRes.value.settings;
-      ['appName','constituency','sheetId'].forEach(k => { if (remote[k]) stored[k] = remote[k]; });
-      if (Array.isArray(remote.pollingStations) && remote.pollingStations.length) {
-        stored.pollingStations = remote.pollingStations;
-      }
+    // Apply settings
+    if(settingsRes.status==='fulfilled'&&settingsRes.value?.settings) {
+      const s=settingsRes.value.settings;
+      App.saveSettings({appName:s.appName||'KNNDCmdb', constituency:s.constituency||'Ketu North'});
     }
-
-    // Apply remote stations (getStations is more authoritative than settings blob)
-    if (stationsRes.status === 'fulfilled' && stationsRes.value?.stations?.length) {
-      const sheetStations = stationsRes.value.stations;
-      const base = stored.pollingStations || [];
-      const merged = [...base];
-      sheetStations.forEach(s => {
-        if (!s.code) return;
-        const idx = merged.findIndex(ps => ps.code === s.code);
-        if (idx >= 0) merged[idx] = { ...merged[idx], ...s }; else merged.push(s);
-      });
-      stored.pollingStations = merged;
-    }
-
-    localStorage.setItem('knndc_settings', JSON.stringify(stored));
-
-    // Apply to live App object
-    App.settings.scriptUrl       = url;
-    App.settings.sheetId         = stored.sheetId         || '';
-    App.settings.appName         = stored.appName         || CONFIG.APP_NAME;
-    App.settings.constituency    = stored.constituency    || CONFIG.CONSTITUENCY;
-    App.settings.pollingStations = stored.pollingStations || App.pollingStations;
-    App.pollingStations          = App.settings.pollingStations;
-    (App.applyAppName?.());
-
-    // Apply remote users
-    if (usersRes.status === 'fulfilled' && usersRes.value?.users?.length) {
+    // Apply users
+    if(usersRes.status==='fulfilled'&&usersRes.value?.users?.length) {
       localStorage.setItem('knndc_users', JSON.stringify(usersRes.value.users));
-      // App.users = usersRes.value.users;
     }
-
-    // Hide panel, show success
-    document.getElementById('quick-connect-panel').style.display = 'none';
-    const parts = [];
-    if (usersRes.value?.users?.length)       parts.push(`${usersRes.value.users.length} account(s)`);
-    if (stored.pollingStations?.length)       parts.push(`${stored.pollingStations.length} station(s)`);
-    Toast.show('Device Connected ✅', `Configuration loaded — ${parts.join(', ')}. You can now sign in.`, 'success', 7000);
-    // Update subtitle
-    const subtitle = document.querySelector('.login-subtitle');
-    if (subtitle) subtitle.textContent = '✅ Connected — please sign in';
-
-  } catch(err) {
-    if (status) status.textContent = '❌ Connection failed. Check the URL and try again.';
-    btn.disabled   = false;
-    btn.textContent = '✅ Connect';
+    // Apply stations
+    if(stationsRes.status==='fulfilled'&&stationsRes.value?.stations?.length) {
+      const ps = stationsRes.value.stations.map(s=>({
+        code:s.code, zone:s.zone, ward:s.ward, name:s.name,
+        branch:s.branch, branchCode:s.branch_code||s.branchCode
+      }));
+      App.saveSettings({pollingStations:ps});
+    }
+    document.getElementById('quick-connect-panel').style.display='none';
+    const parts=[];
+    if(usersRes.value?.users?.length)       parts.push(`${usersRes.value.users.length} account(s)`);
+    if(stationsRes.value?.stations?.length) parts.push(`${stationsRes.value.stations.length} station(s)`);
+    Toast.show('Connected ✅',`${parts.join(', ')} loaded. You can now sign in.`,'success',7000);
+    const subtitle=document.querySelector('.login-subtitle');
+    if(subtitle) subtitle.textContent='✅ Connected — please sign in';
+  } catch(e) {
+    Toast.show('Connect Failed','Could not reach the API. Check the URL.','error');
+    App.saveSettings({scriptUrl:''});
+  } finally {
+    btn.disabled=false; btn.textContent='✅ Connect';
   }
 }
 
-// ── INIT ─────────────────────────────────────────────────────
+// ── SYNC STATIONS FROM API ────────────────────────────────────
+async function syncStationsFromApi() {
+  if(!App.getApiBase()){Toast.show('No API URL','Please configure the API URL in Settings first.','error');return;}
+  Toast.show('Importing…','Fetching polling stations from API.','info');
+  try {
+    const data = await App.apiGet('/stations');
+    if(!data?.stations?.length){Toast.show('No Stations Found','The API returned no polling stations.','warning');return;}
+    const ps = data.stations.map(s=>({
+      code:s.code, zone:s.zone, ward:s.ward, name:s.name,
+      branch:s.branch, branchCode:s.branch_code||s.branchCode
+    }));
+    App.saveSettings({pollingStations:ps});
+    PageRenderers._renderStationsList();
+    const sc=document.getElementById('station-count'); if(sc) sc.textContent=ps.length;
+    Toast.show('Stations Imported',`${ps.length} polling station(s) loaded from API.`,'success');
+    App._logAuditPublic('SYNC_STATIONS',`Imported ${ps.length} stations from API`,(App.getCurrentUser()||App.currentUser)?.username);
+  } catch(e) {
+    Toast.show('Sync Failed','Could not reach the API.','error');
+  }
+}
+
+// ── SETTINGS TAB SWITCHER ─────────────────────────────────────
+function setTab(el, tabId) {
+  document.querySelectorAll('.settings-nav-item').forEach(i=>i.classList.remove('active'));
+  document.querySelectorAll('.settings-tab').forEach(t=>t.style.display='none');
+  el.classList.add('active'); document.getElementById(tabId).style.display='block';
+}
+
+// ── EMERGENCY RESET ───────────────────────────────────────────
+function emergencyReset() {
+  if(!confirm('This will clear cached user accounts on THIS device.\n\nAfter resetting, log in with:\n  Username: admin\n  Password: admin123\n\nMember records and settings are NOT affected.\n\nContinue?')) return;
+  localStorage.removeItem('knndc_users');
+  localStorage.removeItem('knndc_lockout');
+  sessionStorage.removeItem('knndc_session');
+  localStorage.removeItem('knndc_jwt');
+  document.getElementById('attempt-warning').style.display='none';
+  document.getElementById('lockout-banner').style.display='none';
+  const btn=document.getElementById('login-btn');
+  if(btn){btn.disabled=false;btn.textContent='🔐 Sign In';}
+  document.getElementById('login-username').value='admin';
+  document.getElementById('login-password').value='';
+  document.getElementById('login-password').focus();
+  Toast.show('Reset Complete','Local user cache cleared. Log in with admin / your password.','success',6000);
+}
+
+// ── ONLINE STATUS ─────────────────────────────────────────────
+function _updateConnStatus() {
+  const dot=document.getElementById('conn-dot');
+  if(dot) dot.className='online-dot'+(navigator.onLine?'':' offline');
+}
+window.addEventListener('online',  _updateConnStatus);
+window.addEventListener('offline', _updateConnStatus);
+
+// ── INITIALISE ────────────────────────────────────────────────
 document.getElementById('current-date').textContent=new Date().toLocaleDateString('en-GH',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 
 // Check lockout on page load
-(()=>{const l=JSON.parse(localStorage.getItem('knndc_lockout')||'null');if(l){const r=Math.ceil((l.until-Date.now())/1000);if(r>0) startLockoutCountdown(r);}})();
+(()=>{const l=JSON.parse(localStorage.getItem('knndc_lockout')||'null');if(l&&l.until){const r=Math.ceil((l.until-Date.now())/1000);if(r>0)startLockoutCountdown(r);}})();
 
 App.init();
+_updateConnStatus();
 
-// Show Quick Connect panel if this device has no Script URL configured
+// Show Quick Connect panel if no API URL configured
 (()=>{
-  const hasUrl = (JSON.parse(localStorage.getItem('knndc_settings')||'{}').scriptUrl) || CONFIG.SCRIPT_URL;
-  const panel  = document.getElementById('quick-connect-panel');
-  if (!hasUrl && panel) panel.style.display = 'block';
+  const hasUrl=(JSON.parse(localStorage.getItem('knndc_settings')||'{}').scriptUrl)||'';
+  const panel=document.getElementById('quick-connect-panel');
+  if(!hasUrl&&panel) panel.style.display='block';
 })();
 
-// ── PRE-LOGIN SYNC ────────────────────────────────────────────
-// On every device load, silently pull settings, users, AND polling
-// stations from the Sheet so a brand-new device is fully configured
-// before the user even attempts to sign in.
+// Pre-login: pull settings + stations from API (unauthenticated endpoints only)
 (async function prefetchOnLoad() {
-  const scriptUrl = JSON.parse(localStorage.getItem('knndc_settings')||'{}').scriptUrl
-                    || (typeof CONFIG !== 'undefined' ? CONFIG.SCRIPT_URL : '');
-  if (!scriptUrl || !navigator.onLine) return;
-
-  const banner = document.getElementById('user-sync-banner');
-  const storedUsers = localStorage.getItem('knndc_users');
-  const hasLocalUsers = storedUsers && JSON.parse(storedUsers).length > 0;
-
-  // Show syncing indicator only on brand-new devices (no local users yet)
-  if (!hasLocalUsers && banner) banner.style.display = 'block';
-
-  // ── Fetch settings, users, and stations in parallel ───────
-  const [settingsResult, usersResult, stationsResult] = await Promise.allSettled([
-    App.apiGet('/settings'),
-    App.apiGet('/users'),
-    App.apiGet('/stations'),
-  ]);
-
-  if (banner) banner.style.display = 'none';
-
-  // ── Apply remote settings (scriptUrl, sheetId, appName, etc.) ──
-  if (settingsResult.status === 'fulfilled' && settingsResult.value?.settings && settingsResult.value?.exists) {
-    const remote   = settingsResult.value.settings;
-    const stored   = JSON.parse(localStorage.getItem('knndc_settings') || '{}');
-    let   changed  = false;
-
-    const applyKey = (key) => {
-      const rv = remote[key];
-      if (rv && rv !== stored[key] && key !== 'pollingStations') {
-        stored[key] = rv;
-        changed = true;
-      }
-    };
-
-    ['scriptUrl','appName','constituency','sheetId'].forEach(applyKey);
-
-    // Merge pollingStations from settings if present
-    if (Array.isArray(remote.pollingStations) && remote.pollingStations.length) {
-      const local  = stored.pollingStations || [];
-      const merged = [...local];
-      let   stChanged = false;
-      remote.pollingStations.forEach(s => {
-        if (!s.code) return;
-        const idx = merged.findIndex(ps => ps.code === s.code);
-        if (idx >= 0) {
-          const before = JSON.stringify(merged[idx]);
-          merged[idx] = { ...merged[idx], ...s };
-          if (JSON.stringify(merged[idx]) !== before) stChanged = true;
-        } else { merged.push(s); stChanged = true; }
-      });
-      if (stChanged || !local.length) { stored.pollingStations = merged; changed = true; }
+  const apiUrl = JSON.parse(localStorage.getItem('knndc_settings')||'{}').scriptUrl || '';
+  if(!apiUrl||!navigator.onLine) return;
+  const banner=document.getElementById('user-sync-banner');
+  const hasLocalUsers=localStorage.getItem('knndc_users')&&JSON.parse(localStorage.getItem('knndc_users')).length>0;
+  if(!hasLocalUsers&&banner) banner.style.display='block';
+  try {
+    const [settingsRes, stationsRes] = await Promise.allSettled([
+      App.apiGet('/settings'),
+      App.apiGet('/stations'),
+    ]);
+    if(settingsRes.status==='fulfilled'&&settingsRes.value?.settings) {
+      const s=settingsRes.value.settings;
+      const stored=JSON.parse(localStorage.getItem('knndc_settings')||'{}');
+      if(s.appName)      stored.appName=s.appName;
+      if(s.constituency) stored.constituency=s.constituency;
+      localStorage.setItem('knndc_settings',JSON.stringify(stored));
     }
-
-    if (changed) {
-      localStorage.setItem('knndc_settings', JSON.stringify(stored));
-      // Sync live App object if already initialised
-      if (typeof App !== 'undefined' && App.settings) {
-        if (remote.scriptUrl)    App.settings.scriptUrl    = remote.scriptUrl;
-        if (remote.sheetId)      App.settings.sheetId      = remote.sheetId;
-        if (remote.appName)      App.settings.appName      = remote.appName;
-        if (remote.constituency) App.settings.constituency = remote.constituency;
-        if (stored.pollingStations?.length) {
-          App.settings.pollingStations = stored.pollingStations;
-          App.pollingStations          = stored.pollingStations;
-        }
-        App.applyAppName?.();
-      }
+    if(stationsRes.status==='fulfilled'&&stationsRes.value?.stations?.length) {
+      const ps=stationsRes.value.stations.map(s=>({
+        code:s.code, zone:s.zone, ward:s.ward, name:s.name,
+        branch:s.branch, branchCode:s.branch_code||s.branchCode
+      }));
+      App.saveSettings({pollingStations:ps});
     }
-  }
-
-  // ── Merge users ──────────────────────────────────────────
-  if (usersResult.status === 'fulfilled' && usersResult.value?.users?.length) {
-    const data = usersResult.value;
-    if (!hasLocalUsers) {
-      // Brand-new device — write sheet users directly
-      localStorage.setItem('knndc_users', JSON.stringify(data.users));
-      const subtitle = document.querySelector('.login-subtitle');
-      if (subtitle) subtitle.textContent = '✅ Accounts loaded — please sign in';
-    } else {
-      // Existing device — merge: sheet wins for role/stations/active, local password preserved
-      const local  = JSON.parse(storedUsers);
-      const merged = [...local];
-      data.users.forEach(sheetUser => {
-        if (!sheetUser.username && !sheetUser.id) return;
-        const idx = merged.findIndex(u => u.id === sheetUser.id || u.username === sheetUser.username);
-        if (idx >= 0) {
-          const localPwd = merged[idx].password;
-          const sheetPwd = sheetUser.password?.trim();
-          merged[idx] = { ...merged[idx], ...sheetUser, password: sheetPwd || localPwd };
-        } else if (sheetUser.password?.trim()) {
-          merged.push(sheetUser); // new account from another device
-        }
-      });
-      const hasAdmin = merged.some(u => u.role === 'admin' && u.password && u.active !== false);
-      if (hasAdmin) localStorage.setItem('knndc_users', JSON.stringify(merged));
-    }
-  }
-
-  // ── Merge polling stations (from dedicated getStations endpoint) ──
-  // This supplements what may already have come via settings above
-  if (stationsResult.status === 'fulfilled' && stationsResult.value?.stations?.length) {
-    const sheetStations = stationsResult.value.stations;
-    const settings = JSON.parse(localStorage.getItem('knndc_settings') || '{}');
-    const local    = settings.pollingStations || [];
-    const merged   = [...local];
-    let   changed  = false;
-
-    sheetStations.forEach(s => {
-      if (!s.code) return;
-      const idx = merged.findIndex(ps => ps.code === s.code);
-      if (idx >= 0) {
-        const before = JSON.stringify(merged[idx]);
-        merged[idx] = { ...merged[idx], ...s };
-        if (JSON.stringify(merged[idx]) !== before) changed = true;
-      } else {
-        merged.push(s);
-        changed = true;
-      }
-    });
-
-    if (changed || !local.length) {
-      settings.pollingStations = merged;
-      localStorage.setItem('knndc_settings', JSON.stringify(settings));
-      if (typeof App !== 'undefined' && App.settings) {
-        App.pollingStations          = merged;
-        App.settings.pollingStations = merged;
-      }
-    }
+  } catch {}
+  if(banner) banner.style.display='none';
+  if(!hasLocalUsers) {
+    const subtitle=document.querySelector('.login-subtitle');
+    if(subtitle) subtitle.textContent='🔄 Please sign in with your credentials';
   }
 })();
 
-setInterval(()=>{ if(App.currentUser&&App.currentPage==='dashboard') PageRenderers.dashboard(); },30000);
+// Periodic dashboard refresh
+setInterval(()=>{ if((App.getCurrentUser()||App.currentUser)&&window._currentPage==='dashboard') PageRenderers.dashboard(); }, 30000);
 </script>
 </body>
 </html>
