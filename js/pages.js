@@ -3,7 +3,7 @@
    ============================================================ */
 'use strict';
 
-var PageRenderers = {
+const PageRenderers = {
 
   // ══════════════════════════════════════════════════════════
   // DASHBOARD — with gender + zone distribution
@@ -272,11 +272,6 @@ var PageRenderers = {
   },
 
   submitEntry() {
-    // Lock against double-tap — if a save is already in progress, ignore
-    if (PageRenderers._saveLock) return;
-    PageRenderers._saveLock = true;
-    setTimeout(() => { PageRenderers._saveLock = false; }, 2000);
-
     const required=['f-branch-code','f-station-code','f-last-name','f-first-name','f-party-id','f-gender'];
     let ok=true;
     required.forEach(id=>{
@@ -307,152 +302,6 @@ var PageRenderers = {
     ['f-last-name','f-first-name','f-other-names','f-gender','f-party-id','f-voter-id','f-phone']
       .forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
     document.getElementById('f-last-name')?.focus();
-  },
-
-  // Real-time duplicate check fired on input of partyId / voterId fields.
-  // Checks the Sheet-wide ID index first, then unsynced local records.
-  // No Sheet query — purely in-memory, zero latency.
-  _checkDuplicateField(field, inputId, warnId) {
-    const input = document.getElementById(inputId);
-    const warn  = document.getElementById(warnId);
-    if (!input || !warn) return;
-    const val = input.value.trim().toLowerCase();
-    if (!val) { warn.style.display = 'none'; input.style.borderColor = ''; return; }
-
-    // 1. Check the Sheet-wide index (covers all enrolled members)
-    const idxMatch = App._lookupIdIndex(field, val);
-    if (idxMatch) {
-      warn.style.display = 'block';
-      warn.textContent   = `⚠️ Already in Sheet: ${idxMatch.firstName} ${idxMatch.lastName} — ${idxMatch.station} (Party ID: ${idxMatch.partyId || '—'})`;
-      input.style.borderColor = 'var(--ndc-red)';
-      return;
-    }
-
-    // 2. Check unsynced local records not yet in the index
-    const local = JSON.parse(localStorage.getItem('knndc_members') || '[]')
-      .filter(m => !m._demo);
-    const localMatch = local.find(m => (m[field] || '').trim().toLowerCase() === val);
-    if (localMatch) {
-      warn.style.display = 'block';
-      warn.textContent   = `⚠️ Already saved locally: ${localMatch.firstName} ${localMatch.lastName} — ${localMatch.station} (Party ID: ${localMatch.partyId || '—'})`;
-      input.style.borderColor = 'var(--ndc-red)';
-      return;
-    }
-
-    // No match — clear warning
-    warn.style.display = 'none';
-    input.style.borderColor = 'var(--ndc-green)';
-  },
-
-  _saveLock: false,
-  _selectedIds: new Set(),
-
-  // ── BULK SELECTION (admin only — All Records page) ────────────────────────
-  onRowSelect() {
-    const checked = [...document.querySelectorAll('.row-select:checked')];
-    PageRenderers._selectedIds = new Set(checked.map(c => c.dataset.id));
-    const bar   = document.getElementById('bulk-action-bar');
-    const count = document.getElementById('bulk-count');
-    const selAll = document.getElementById('select-all-records');
-    const total  = document.querySelectorAll('.row-select').length;
-    if (bar)    bar.style.display    = PageRenderers._selectedIds.size ? 'flex' : 'none';
-    if (count)  count.textContent    = `${PageRenderers._selectedIds.size} selected`;
-    if (selAll) selAll.indeterminate = PageRenderers._selectedIds.size > 0 && PageRenderers._selectedIds.size < total;
-    if (selAll) selAll.checked       = PageRenderers._selectedIds.size === total && total > 0;
-  },
-
-  toggleSelectAll(checked) {
-    document.querySelectorAll('.row-select').forEach(cb => {
-      cb.checked = checked;
-      if (checked) PageRenderers._selectedIds.add(cb.dataset.id);
-    });
-    if (!checked) PageRenderers._selectedIds.clear();
-    PageRenderers.onRowSelect();
-  },
-
-  clearBulkSelection() {
-    PageRenderers._selectedIds.clear();
-    document.querySelectorAll('.row-select').forEach(cb => { cb.checked = false; });
-    const selAll = document.getElementById('select-all-records');
-    if (selAll) { selAll.checked = false; selAll.indeterminate = false; }
-    const bar = document.getElementById('bulk-action-bar');
-    if (bar) bar.style.display = 'none';
-  },
-
-  openBulkBranchEdit() {
-    if (!PageRenderers._selectedIds.size) return;
-    document.getElementById('bulk-modal-count').textContent = PageRenderers._selectedIds.size;
-    document.getElementById('bulk-branch-code-input').value = '';
-    document.getElementById('bulk-branch-name').value = '';
-    document.getElementById('bulk-zone').value = '';
-    document.getElementById('bulk-ward').value = '';
-    document.getElementById('bulk-reason').value = '';
-    document.getElementById('bulk-branch-dropdown').innerHTML = '';
-    Modal.open('modal-bulk-branch');
-  },
-
-  _bulkBranchSearch(q) {
-    const dd = document.getElementById('bulk-branch-dropdown');
-    if (!dd) return;
-    const term = q.trim().toLowerCase();
-    if (!term) { dd.innerHTML = ''; dd.style.display = 'none'; return; }
-    const matches = App.pollingStations.filter(s =>
-      (s.branchCode||'').toLowerCase().includes(term) ||
-      (s.branch||'').toLowerCase().includes(term)
-    ).slice(0, 10);
-    if (!matches.length) { dd.innerHTML = ''; dd.style.display = 'none'; return; }
-    dd.style.display = 'block';
-    dd.innerHTML = matches.map(s =>
-      `<div class="search-dropdown-item" onclick="PageRenderers._bulkFillBranch(${JSON.stringify(s).replace(/"/g,'&quot;')})">
-        <strong>${s.branchCode}</strong> — ${s.branch} <span style="color:var(--gray-500);font-size:11px">(${s.zone||''})</span>
-      </div>`
-    ).join('');
-  },
-
-  _bulkFillBranch(s) {
-    document.getElementById('bulk-branch-code-input').value = s.branchCode||'';
-    document.getElementById('bulk-branch-name').value       = s.branch||'';
-    document.getElementById('bulk-zone').value              = s.zone||'';
-    document.getElementById('bulk-ward').value              = s.ward||'';
-    document.getElementById('bulk-branch-dropdown').style.display = 'none';
-    PageRenderers._bulkSelectedStation = s;
-  },
-
-  _bulkSelectedStation: null,
-
-  async submitBulkBranchEdit() {
-    const s = PageRenderers._bulkSelectedStation;
-    const reason = (document.getElementById('bulk-reason')?.value||'').trim();
-    if (!s?.branchCode) {
-      Toast.show('Select Branch','Please select a branch from the dropdown.','error'); return;
-    }
-    if (!reason) {
-      Toast.show('Reason Required','Please enter a reason for this bulk change.','error'); return;
-    }
-    const ids = [...PageRenderers._selectedIds];
-    Modal.close('modal-bulk-branch');
-    Toast.show('Updating…', `Applying branch change to ${ids.length} record(s)…`, 'info', 8000);
-
-    let ok = 0, fail = 0;
-    for (const id of ids) {
-      const success = App.updateMember(id, {
-        branchCode: s.branchCode,
-        branch:     s.branch,
-        zone:       s.zone,
-        ward:       s.ward,
-      }, `Bulk branch change: ${reason}`);
-      if (success) ok++; else fail++;
-    }
-
-    PageRenderers.clearBulkSelection();
-    PageRenderers._renderAllRecords();
-
-    if (fail === 0) Toast.show('Bulk Update Complete ✅', `${ok} record(s) updated to branch ${s.branchCode}.`, 'success', 6000);
-    else            Toast.show('Partial Update', `${ok} updated, ${fail} failed.`, 'warning', 6000);
-
-    App.logAudit('BULK_BRANCH_EDIT',
-      `Admin changed branch to ${s.branchCode} (${s.branch}) for ${ok} record(s). Reason: ${reason}`,
-      App.currentUser?.username);
   },
 
   // ══════════════════════════════════════════════════════════
@@ -500,19 +349,7 @@ var PageRenderers = {
     const st = PageRenderers._allState;
     let members = App.getMembersForUser();
 
-    // Multi-criteria AND search: split on whitespace, every token must match at least one field
-    if (st.q) {
-      const tokens = st.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
-      members = members.filter(m => {
-        const fields = [
-          m.firstName, m.lastName, m.otherNames, m.partyId, m.voterId,
-          m.phone, m.station, m.stationCode, m.ward, m.zone, m.branch,
-          m.branchCode, m.officerName
-        ].map(v => (v||'').toLowerCase());
-        // Every token must appear in at least one field (AND logic across tokens)
-        return tokens.every(tok => fields.some(f => f.includes(tok)));
-      });
-    }
+    if (st.q)       { const q=st.q.toLowerCase(); members=members.filter(m=>m.firstName?.toLowerCase().includes(q)||m.lastName?.toLowerCase().includes(q)||m.partyId?.toLowerCase().includes(q)||m.voterId?.toLowerCase().includes(q)||m.phone?.includes(q)||m.station?.toLowerCase().includes(q)||m.ward?.toLowerCase().includes(q)||m.zone?.toLowerCase().includes(q)); }
     if (st.zone)    members=members.filter(m=>m.zone===st.zone);
     if (st.ward)    members=members.filter(m=>m.ward===st.ward);
     if (st.station) members=members.filter(m=>m.station===st.station);
@@ -539,17 +376,13 @@ var PageRenderers = {
 
   _renderMembersTable(tbodyId, members, showActions) {
     const tbody=document.getElementById(tbodyId); if(!tbody) return;
-    const isAdmin = App.currentUser?.role === 'admin';
-    const isRecordsPage = tbodyId === 'records-tbody';
+    // canEditMember: admin=yes, exec=yes, ward/officer=station-scoped (officer: own records only)
+    // canDeleteMember: same but exec=no (view+edit only, no delete)
     tbody.innerHTML = members.length
       ? members.map(m => {
           const canEdit = showActions && App.canEditMember(m);
           const canDel  = showActions && App.canDeleteMember(m);
-          const chk = (isAdmin && isRecordsPage)
-            ? `<td style="width:32px"><input type="checkbox" class="row-select" data-id="${m.id}" onchange="PageRenderers.onRowSelect()"></td>`
-            : (isRecordsPage ? '<td></td>' : '');
-          return `<tr data-id="${m.id}">
-            ${chk}
+          return `<tr>
             <td><strong>${m.lastName||''},</strong> ${m.firstName||''} ${m.otherNames||''}</td>
             <td><span class="badge ${m.gender==='Male'?'badge-blue':'badge-red'}" style="font-size:11px">${m.gender||'—'}</span></td>
             <td>${m.zone||'—'}</td>
@@ -561,15 +394,14 @@ var PageRenderers = {
             <td>${m.branch||'—'}</td>
             <td>${m.timestamp||'—'}</td>
             ${showActions ? `<td>
-              ${canEdit ? `<button class="btn btn-sm btn-secondary" onclick="PageRenderers.openEdit('${m.id}')" title="Edit">✏️</button>` : ''}
-              ${canDel  ? `<button class="btn btn-sm btn-danger"    onclick="PageRenderers.confirmDelete('${m.id}')" title="Delete">🗑️</button>` : ''}
+              ${canEdit ? `<button class="btn btn-sm btn-secondary" onclick="PageRenderers.openEdit('${m.id}')" title="Edit record">✏️</button>` : ''}
+              ${canDel  ? `<button class="btn btn-sm btn-danger"    onclick="PageRenderers.confirmDelete('${m.id}')" title="Delete record">🗑️</button>` : ''}
               ${showActions && !canEdit && !canDel ? '<span style="color:var(--gray-300);font-size:11px">—</span>' : ''}
             </td>` : ''}
           </tr>`;
         }).join('')
-      : `<tr><td colspan="12"><div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">No records found</div></div></td></tr>`;
+      : `<tr><td colspan="11"><div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">No records found</div></div></td></tr>`;
   },
-
 
   openEdit(id) {
     const m = App.members.find(x=>x.id===id); if (!m) return;
@@ -1176,8 +1008,6 @@ var PageRenderers = {
     App.logAudit('SETTINGS_CHANGE','Updated and pushed settings to Google Sheets', App.currentUser.username);
     Toast.show('Settings Saved','Configuration saved locally and syncing to Google Sheets…','success');
     App._startSyncTimer();   // restart timer with possibly new script URL
-    // Hide the no-script banner if a URL is now set
-    if (typeof _updateNoScriptBanner === 'function') _updateNoScriptBanner();
 
     // Show confirmation once push completes
     if (App.isOnline && App.settings.scriptUrl) {

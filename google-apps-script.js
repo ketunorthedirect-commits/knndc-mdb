@@ -311,41 +311,17 @@ function _setupSummarySheet(ss) {
 // ════════════════════════════════════════════════════════════
 
 function doGet(e) {
-  const action   = e?.parameter?.action   || 'ping';
-  const callback = e?.parameter?.callback || '';
+  const action = e?.parameter?.action || 'ping';
   try {
-    let data;
-    if      (action==='getMembers')  data = _getMembers(e?.parameter?.stations || '');
-    else if (action==='getIdIndex')  data = _getIdIndex();
-    else if (action==='getStations') data = _getPollingStations();
-    else if (action==='getSettings') data = _getAppSettings();
-    else if (action==='getUsers')    data = _getUsers();
-    else if (action==='getAudit')    data = _getAuditLog();
-    else if (action==='ping')        data = {status:'ok',app:'KNNDCmdb',version:'3.2'};
-    else data = {error:'Unknown action'};
-
-    // JSONP via HtmlService — served from script.googleusercontent.com (no redirect).
-    // ContentService triggers a 302 redirect whose response is CORB-blocked by Chrome.
-    // HtmlService responses are served directly from the execution origin, so the
-    // browser executes the embedded <script> without any CORS/CORB check.
-    if (callback) {
-      const js   = callback + '(' + JSON.stringify(data) + ')';
-      const html = '<!DOCTYPE html><html><head></head><body><script>' + js + '<\/script></body></html>';
-      return HtmlService.createHtmlOutput(html)
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    }
-    return _jsonCors(data);
-  } catch(err) {
-    if (callback) {
-      const js   = callback + '(' + JSON.stringify({error: err.message}) + ')';
-      const html = '<!DOCTYPE html><html><head></head><body><script>' + js + '<\/script></body></html>';
-      return HtmlService.createHtmlOutput(html)
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    }
-    return _jsonCors({error: err.message});
-  }
+    if (action==='getMembers')   return _jsonCors(_getMembers());
+    if (action==='getStations')  return _jsonCors(_getPollingStations());
+    if (action==='getSettings')  return _jsonCors(_getAppSettings());
+    if (action==='getUsers')     return _jsonCors(_getUsers());
+    if (action==='getAudit')     return _jsonCors(_getAuditLog());
+    if (action==='ping')         return _jsonCors({status:'ok',app:'KNNDCmdb',version:'1.9'});
+    return _jsonCors({error:'Unknown action'});
+  } catch(err) { return _jsonCors({error:err.message}); }
 }
-
 
 function doPost(e) {
   try {
@@ -355,14 +331,6 @@ function doPost(e) {
     }
     const data=JSON.parse(e.postData.contents);
     const action=data.action||'addMember';
-    // Read actions routed through POST (avoids CORS GET redirect issues)
-    if (action==='getMembers')   return _jsonCors(_getMembers(data.stations||''));
-    if (action==='getIdIndex')   return _jsonCors(_getIdIndex());
-    if (action==='getStations')  return _jsonCors(_getPollingStations());
-    if (action==='getSettings')  return _jsonCors(_getAppSettings());
-    if (action==='getUsers')     return _jsonCors(_getUsers());
-    if (action==='getAudit')     return _jsonCors(_getAuditLog());
-    // Write actions
     if (action==='addMember')    return _jsonCors(_addMember(data));
     if (action==='upsertMember') return _jsonCors(_upsertMember(data));
     if (action==='updateMember') return _jsonCors(_updateMember(data));
@@ -378,10 +346,6 @@ function doPost(e) {
 
 // JSON response with permissive CORS headers
 function _jsonCors(data) {
-  // ContentService does not support setting response headers directly.
-  // Apps Script Web Apps handle CORS through deployment settings:
-  // Deploy → Manage deployments → Who has access: Anyone.
-  // The response below works for both doGet (JSONP) and doPost (fire-and-forget).
   return ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
@@ -492,65 +456,7 @@ function _upsertMember(data) {
     }
   }
 
-  // Not found by Record ID — check partyId and voterId before appending
-  // This catches cross-device duplicates where the same person was registered
-  // on two devices before either synced, both getting different Record IDs.
-  if (data.partyId && iParty >= 0) {
-    const pid = String(data.partyId).trim().toLowerCase();
-    for (let i = 4; i < all.length; i++) {
-      const sheetPid = String(all[i][iParty] || '').trim().toLowerCase();
-      if (sheetPid && sheetPid === pid) {
-        // Party ID already exists — update that row instead of appending
-        const r = i + 1;
-        const set = (ci, val) => { if (ci >= 0 && val !== undefined && val !== '') sheet.getRange(r, ci + 1).setValue(val); };
-        set(iFirst,   data.firstName);
-        set(iLast,    data.lastName);
-        set(iOther,   data.otherNames);
-        set(iVoter,   data.voterId);
-        set(iPhone,   data.phone);
-        set(iGender,  data.gender);
-        set(iZone,    data.zone);
-        set(iWard,    data.ward);
-        set(iStation, data.station);
-        set(iStCode,  data.stationCode);
-        set(iBranch,  data.branch);
-        set(iBrCode,  data.branchCode);
-        set(iOfficer, data.officer);
-        set(iOffName, data.officerName);
-        _refreshSummary(ss);
-        return { success: true, action: 'merged_party_id' };
-      }
-    }
-  }
-  if (data.voterId && iVoter >= 0) {
-    const vid = String(data.voterId).trim().toLowerCase();
-    for (let i = 4; i < all.length; i++) {
-      const sheetVid = String(all[i][iVoter] || '').trim().toLowerCase();
-      if (sheetVid && sheetVid === vid) {
-        // Voter ID already exists — treat as update
-        const r = i + 1;
-        const set = (ci, val) => { if (ci >= 0 && val !== undefined && val !== '') sheet.getRange(r, ci + 1).setValue(val); };
-        set(iFirst,   data.firstName);
-        set(iLast,    data.lastName);
-        set(iOther,   data.otherNames);
-        set(iParty,   data.partyId);
-        set(iPhone,   data.phone);
-        set(iGender,  data.gender);
-        set(iZone,    data.zone);
-        set(iWard,    data.ward);
-        set(iStation, data.station);
-        set(iStCode,  data.stationCode);
-        set(iBranch,  data.branch);
-        set(iBrCode,  data.branchCode);
-        set(iOfficer, data.officer);
-        set(iOffName, data.officerName);
-        _refreshSummary(ss);
-        return { success: true, action: 'merged_voter_id' };
-      }
-    }
-  }
-
-  // Confirmed not a duplicate — append as new row
+  // Not found — append as new row
   sheet.appendRow([
     data.firstName   || '',
     data.lastName    || '',
@@ -580,55 +486,32 @@ function _updateMember(data) {
   const all=sheet.getDataRange().getValues();
   if(all.length<5) return{success:false,error:'No data'};
 
+  // Locate columns by header (row 4 = index 3)
   const hdrs=all[3].map(h=>String(h).trim().toLowerCase());
   const c=(names)=>{ for(const n of names){const i=hdrs.indexOf(n.toLowerCase());if(i>=0)return i;} return -1; };
-  const iId     = c(['record id','id']);
-  const iFirst  = c(['first name','firstname']);
-  const iLast   = c(['surname','last name','lastname']);
-  const iOther  = c(['other names','othernames']);
-  const iParty  = c(['party id number','party id','partyid']);
-  const iVoter  = c(['voter id number','voter id','voterid']);
-  const iPhone  = c(['telephone number','phone','telephone']);
-  const iGender = c(['gender']);
-  const iZone   = c(['zone']);
-  const iWard   = c(['ward name','ward']);
-  const iStation= c(['polling station','station']);
-  const iStCode = c(['station code','stationcode']);
-  const iBranch = c(['branch name','branch']);
-  const iBrCode = c(['branch code','branchcode']);
-  const iOfficer= c(['officer id','officer']);
-  const iOffName= c(['officer name','officername']);
-  const iTime   = c(['date/time added','timestamp','date added']);
+  const iId    =c(['record id','id']);
+  const iFirst =c(['first name','firstname']);
+  const iLast  =c(['surname','last name','lastname']);
+  const iParty =c(['party id number','party id']);
+  const iVoter =c(['voter id number','voter id']);
+  const iPhone =c(['telephone number','phone']);
+  const iGender=c(['gender']);
 
   if(iId<0) return{success:false,error:'Record ID column not found'};
 
   for(let i=4;i<all.length;i++){
-    if(String(all[i][iId]||'').trim()===String(data.id||'').trim()){
+    if(String(all[i][iId]||'').trim()===String(data.id).trim()){
       const r=i+1;
-      // Use setValue for every defined field — allow empty string to clear a value
-      const set=(ci,val)=>{ if(ci>=0 && val!==undefined) sheet.getRange(r,ci+1).setValue(val); };
-      set(iFirst,   data.firstName);
-      set(iLast,    data.lastName);
-      set(iOther,   data.otherNames);
-      set(iParty,   data.partyId);
-      set(iVoter,   data.voterId);
-      set(iPhone,   data.phone);
-      set(iGender,  data.gender);
-      set(iZone,    data.zone);
-      set(iWard,    data.ward);
-      set(iStation, data.station);
-      set(iStCode,  data.stationCode);
-      set(iBranch,  data.branch);
-      set(iBrCode,  data.branchCode);
-      set(iOfficer, data.officer);
-      set(iOffName, data.officerName);
-      if(data.lastModified && iTime>=0) sheet.getRange(r,iTime+1).setValue(data.lastModified);
-      _refreshSummary(ss);
+      if(data.firstName  && iFirst>=0)  sheet.getRange(r,iFirst+1).setValue(data.firstName);
+      if(data.lastName   && iLast>=0)   sheet.getRange(r,iLast+1).setValue(data.lastName);
+      if(data.partyId    && iParty>=0)  sheet.getRange(r,iParty+1).setValue(data.partyId);
+      if(data.voterId    && iVoter>=0)  sheet.getRange(r,iVoter+1).setValue(data.voterId);
+      if(data.phone      && iPhone>=0)  sheet.getRange(r,iPhone+1).setValue(data.phone);
+      if(data.gender     && iGender>=0) sheet.getRange(r,iGender+1).setValue(data.gender);
       return{success:true};
     }
   }
-  // Record ID not found — fall back to upsert so edits are never silently lost
-  return _upsertMember(data);
+  return{success:false,error:'Record not found'};
 }
 
 function _deleteMember(data) {
@@ -696,16 +579,11 @@ function _getAuditLog() {
   return { entries, total: entries.length };
 }
 
-function _getMembers(stationFilter) {
+function _getMembers() {
   const ss=SpreadsheetApp.getActiveSpreadsheet();
   const sheet=ss.getSheetByName(SHEETS.MEMBERS); if(!sheet) return{members:[]};
   const all=sheet.getDataRange().getValues();
   if(all.length<5) return{members:[]};
-
-  // Parse comma-separated station codes filter (empty = return all)
-  const filterCodes = stationFilter
-    ? stationFilter.split(',').map(s=>s.trim().toLowerCase()).filter(Boolean)
-    : [];
 
   // Headers are on row 4 (index 3)
   const rawHdrs = all[3];
@@ -746,11 +624,6 @@ function _getMembers(stationFilter) {
     const lastName  = g(row,iLast);
     const id        = g(row,iId);
     if(!firstName && !lastName && !id) continue; // skip empty rows
-    // Apply station filter if provided
-    if(filterCodes.length > 0) {
-      const rowCode = String(row[iStCode]||'').trim().toLowerCase();
-      if(!filterCodes.includes(rowCode)) continue;
-    }
     members.push({
       id:          id,
       firstName:   firstName,
@@ -772,48 +645,6 @@ function _getMembers(stationFilter) {
     });
   }
   return{members,total:members.length};
-}
-
-// Lightweight index of all enrolled IDs — used by officer devices for fast
-// duplicate detection without storing full member records in localStorage.
-// Returns only the fields needed for duplicate checks: ~60 bytes per member
-// vs ~480 bytes for a full record. Safe for any device regardless of total enrolment.
-function _getIdIndex() {
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEETS.MEMBERS);
-  if (!sheet) return { index: [], ts: Date.now() };
-
-  const all = sheet.getDataRange().getValues();
-  if (all.length < 5) return { index: [], ts: Date.now() };
-
-  const hdrs = all[3].map(h => String(h).trim().toLowerCase());
-  const col  = (names) => { for (const n of names) { const i = hdrs.indexOf(n.toLowerCase()); if (i >= 0) return i; } return -1; };
-
-  const iId      = col(['record id','id']);
-  const iFirst   = col(['first name','firstname']);
-  const iLast    = col(['surname','last name','lastname']);
-  const iParty   = col(['party id number','party id','partyid']);
-  const iVoter   = col(['voter id number','voter id','voterid']);
-  const iStation = col(['polling station','station']);
-  const iStCode  = col(['station code','stationcode']);
-
-  const index = [];
-  for (let i = 4; i < all.length; i++) {
-    const row = all[i];
-    const pid = String(row[iParty]  || '').trim();
-    const vid = String(row[iVoter]  || '').trim();
-    if (!pid && !vid) continue; // skip empty rows
-    index.push({
-      id:          String(row[iId]      || '').trim(),
-      partyId:     pid,
-      voterId:     vid,
-      firstName:   String(row[iFirst]   || '').trim(),
-      lastName:    String(row[iLast]    || '').trim(),
-      station:     String(row[iStation] || '').trim(),
-      stationCode: String(row[iStCode]  || '').trim(),
-    });
-  }
-  return { index, total: index.length, ts: Date.now() };
 }
 
 function _getPollingStations() {
