@@ -30,15 +30,15 @@
     <div id="attempt-warning" style="display:none;background:#fef3c7;border:1px solid #d97706;border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:13px;color:#92400e">
       ⚠️ Incorrect credentials. <strong id="attempts-left"></strong> attempt(s) remaining.
     </div>
-    <!-- User sync indicator — shown on new devices while fetching accounts from Sheet -->
+    <!-- User sync indicator — shown on new devices while fetching accounts from API -->
     <div id="user-sync-banner" style="display:none;background:var(--ndc-green-pale);border:1px solid var(--ndc-green-lt);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ndc-green-dk);text-align:center">
       🔄 Fetching accounts from API…
     </div>
 
     <!-- Quick Connect — shown only on devices with no Script URL configured -->
     <div id="quick-connect-panel" style="display:none;background:var(--ndc-green-pale);border:1px solid var(--ndc-green);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px">
-      <div style="font-weight:700;color:var(--ndc-green-dk);margin-bottom:4px;font-size:13px">🔗 First-time setup — Connect to Google Sheets</div>
-      <div style="font-size:12px;color:var(--gray-600);margin-bottom:10px">Paste the API base URL below (e.g. https://knndc-api-production.up.railway.app). All settings, accounts and stations will be downloaded automatically.</div>
+      <div style="font-weight:700;color:var(--ndc-green-dk);margin-bottom:4px;font-size:13px">🔗 First-time setup — Connect to API Database</div>
+      <div style="font-size:12px;color:var(--gray-600);margin-bottom:10px">Paste your Railway API URL below. All settings, accounts and stations will be downloaded automatically.</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input type="text" id="qc-script-url"
           placeholder="https://knndc-api-production.up.railway.app"
@@ -86,7 +86,7 @@
         <span class="app-name">KNNDCmdb · Members Registration Portal</span>
       </div>
       <div class="header-actions">
-        <button class="btn-icon" title="Sync from APIs" onclick="App.fetchFromApi().then(()=>Toast.show('Synced','Data refreshed from API.','success'))">🔄</button>
+        <button class="btn-icon" title="Sync from API Databases" onclick="App.fetchFromApi().then(()=>Toast.show('Synced','Data refreshed from API.','success'))">🔄</button>
         <span id="conn-dot" class="online-dot"></span>
         <div class="header-user" onclick="App.logout()" title="Logout">
           <div class="user-avatar" id="user-avatar">--</div>
@@ -172,8 +172,8 @@
       <div class="section-header">
         <div><div class="section-title">New Member Registration</div><div class="section-subtitle">Complete all required fields</div></div>
         <button class="btn btn-outline" id="entry-push-btn" onclick="App.bulkPushToApi().then(r=>Toast.show(r.success?'Pushed':'Failed',r.success?'Records uploaded':r.error||'Error',r.success?'success':'error'))"
-          title="Force-upload all your station records to Google Sheets">
-          ☁️ Push Records to Sheet
+          title="Upload records to API Database">
+          ☁️ Push Records to API
         </button>
       </div>
       <div class="card">
@@ -223,8 +223,8 @@
             <button class="btn btn-primary btn-lg" onclick="PageRenderers.submitEntry()">✅ Save Member Record</button>
             <button class="btn btn-secondary" onclick="PageRenderers.entry()">🔄 Reset</button>
             <button class="btn btn-outline" onclick="App.bulkPushToApi().then(r=>Toast.show(r.success?'Pushed':'Failed',r.success?'Records uploaded':r.error||'Error',r.success?'success':'error'))"
-              title="Force-upload all your station records to Google Sheets">
-              ☁️ Push Records to Sheet
+              title="Upload records to API Database">
+              ☁️ Push Records to API
             </button>
           </div>
         </div>
@@ -258,8 +258,8 @@
           <button id="records-pull-btn" class="btn btn-secondary"
             style="display:none"
             onclick="App.fetchFromApi().then(()=>{PageRenderers.records();Toast.show('Synced','Records refreshed.','success');})"
-            title="Force a full re-sync from Google Sheets — use if local count is lower than expected">
-            🔄 Pull All from Sheet
+            title="Force a full re-sync from API Database">
+            🔄 Pull All from API
           </button>
           <button class="btn btn-outline" onclick="PageRenderers.exportExcel()">⬇️ Export Excel</button>
           <button class="btn btn-secondary" onclick="PageRenderers.exportPDF()">🖨️ Print/PDF</button>
@@ -428,10 +428,10 @@
     <div id="page-audit" class="page">
       <div class="section-header"><div class="section-title">Audit Log</div><div class="section-subtitle">All system activities — all users, all devices</div></div>
 
-      <!-- Sync banner — shown briefly while fetching from Sheet -->
+      <!-- Sync banner — shown briefly while fetching from API -->
       <div id="audit-sync-banner" style="display:none;align-items:center;gap:10px;background:var(--ndc-green-pale);border:1px solid var(--ndc-green-lt);border-radius:var(--radius);padding:10px 16px;margin-bottom:12px;font-size:13px;color:var(--ndc-green-dk)">
         <span style="animation:spin 1s linear infinite;display:inline-block">🔄</span>
-        Fetching latest activity from API…
+        Fetching latest activity from API database…
       </div>
 
       <div class="search-bar" style="flex-wrap:wrap;gap:8px">
@@ -450,7 +450,7 @@
         <select id="audit-user-filter" onchange="PageRenderers._renderAuditEntries()" style="width:auto">
           <option value="">All Users</option>
         </select>
-        <button class="btn btn-outline btn-sm" onclick="PageRenderers.audit()" title="Refresh from Google Sheets">🔄 Refresh</button>
+        <button class="btn btn-outline btn-sm" onclick="PageRenderers.audit()" title="Refresh from API Database">🔄 Refresh</button>
         <button class="btn btn-danger btn-sm" onclick="if(confirm('Clear ALL local audit logs on this device?')){localStorage.removeItem('knndc_audit');document.getElementById('audit-user-filter').dataset.populated='';PageRenderers.audit();Toast.show('Log Cleared','','warning');}">🗑️ Clear</button>
       </div>
       <div id="audit-entries"></div>
@@ -461,7 +461,7 @@
       <div class="section-header">
         <div><div class="section-title">User Management</div><div class="section-subtitle">Manage accounts, roles and station assignments</div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-secondary" onclick="App.forcePushUsersToApi().then(r=>Toast.show(r.success?'Users Pushed':'Failed',`${r.pushed||0} user(s) pushed`,r.success?'success':'error'))" title="Save all user accounts to Google Sheets">☁️ Push Users to Sheet</button>
+          <button class="btn btn-secondary" onclick="App.forcePushUsersToApi().then(r=>Toast.show(r.success?'Users Pushed':'Failed',`${r.pushed||0} user(s) pushed`,r.success?'success':'error'))" title="Save all user accounts to API Database">☁️ Push Users to API</button>
           <button class="btn btn-primary" onclick="PageRenderers.openAddUser()">➕ Add New User</button>
         </div>
       </div>
@@ -484,7 +484,7 @@
             <div class="card-body" style="padding:12px">
               <nav class="settings-nav">
                 <div class="settings-nav-item active" onclick="setTab(this,'stab-general')">⚙️ General</div>
-                <div class="settings-nav-item" onclick="setTab(this,'stab-sheets')">📊 Google Sheets</div>
+                <div class="settings-nav-item" onclick="setTab(this,'stab-sheets')">🔗 API Connection</div>
                 <div class="settings-nav-item" onclick="setTab(this,'stab-stations')">🏢 Polling Stations</div>
                 <div class="settings-nav-item" onclick="setTab(this,'stab-about')">ℹ️ About</div>
               </nav>
@@ -510,48 +510,37 @@
 
           <div id="stab-sheets" class="settings-tab" style="display:none">
             <div class="card">
-              <div class="card-header"><div class="card-icon">📊</div><h3>Google Sheets Integration</h3></div>
+              <div class="card-header"><div class="card-icon">📊</div><h3>API Database Connection</h3></div>
               <div class="card-body">
 
                 <!-- Bootstrap banner — shown on new devices without Script URL -->
                 <div id="bootstrap-banner" style="display:none;background:var(--ndc-green-pale);border:1px solid var(--ndc-green);border-radius:var(--radius);padding:16px;margin-bottom:20px">
-                  <div style="font-weight:700;color:var(--ndc-green-dk);margin-bottom:6px">🔗 Connect this device to Google Sheets</div>
+                  <div style="font-weight:700;color:var(--ndc-green-dk);margin-bottom:6px">🔗 Connect this device to API Database</div>
                   <div style="font-size:13px;color:var(--gray-600)">
-                    This device is not yet connected to the Google Sheet. Enter the <strong>API Base URL</strong> below and click
-                    <strong>💾 Save</strong>. The app will automatically download all settings, member data, and polling stations from the Sheet.
+                    This device is not yet connected to the API database. Enter the <strong>API Base URL</strong> below and click
+                    <strong>💾 Save</strong>. The app will automatically download all settings, member data, and polling stations from the API.
                   </div>
                 </div>
 
                 <div style="background:var(--ndc-green-pale);border-radius:var(--radius);padding:14px;margin-bottom:20px;font-size:13px;color:var(--ndc-green-dk)">
-                  ☁️ Settings are <strong>shared across all devices</strong>. When you save here, all future logins (on any device) will automatically receive the correct Sheet connection and app name.
-                  The API Key is stored locally only (not synced) for security.
+                  ☁️ Settings are <strong>shared across all devices</strong>. When you save here, all future logins on any device will receive the correct API connection automatically.
                 </div>
 
                 <div class="form-grid">
                   <div class="form-group full-width">
-                    <label>Google Sheet ID</label>
-                    <input type="text" id="set-sheet-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms">
-                    <span class="input-hint">Found in the Google Sheet URL between /d/ and /edit</span>
-                  </div>
-                  <div class="form-group full-width">
-                    <label>API Key <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--gray-400)">(stored on this device only — not synced to Sheet)</span></label>
-                    <input type="text" id="set-api-key" placeholder="AIzaSy…">
-                    <span class="input-hint">From Google Cloud Console → APIs & Services → Credentials</span>
-                  </div>
-                  <div class="form-group full-width">
-                    <label>Apps Script Web App URL <span class="required">*</span></label>
+                    <label>API Base URL <span class="required">*</span></label>
                     <input type="text" id="set-script-url" placeholder="https://knndc-api-production.up.railway.app">
-                    <span class="input-hint">From Apps Script → Deploy → New Deployment → Web App. This URL unlocks settings sync across all devices.</span>
+                    <span class="input-hint">Your Railway API URL — e.g. https://knndc-api-production.up.railway.app</span>
                   </div>
                 </div>
                 <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
-                  <button class="btn btn-primary" onclick="PageRenderers.saveGeneralSettings()">💾 Save & Sync to Sheet</button>
-                  <button class="btn btn-secondary" onclick="App.fetchFromApi().then(()=>{Toast.show('Synced','Members refreshed.','success');})">🔄 Pull Members from Sheet</button>
-                  <button class="btn btn-secondary" onclick="App.apiGet('/users').then(r=>{if(r.success&&r.users?.length){localStorage.setItem('knndc_users',JSON.stringify(r.users));PageRenderers.users();Toast.show('Users Synced','Accounts refreshed from API.','success');}else{Toast.show('No Users','API returned no users.','warning');}})">👥 Pull Users from Sheet</button>
-                  <button class="btn btn-secondary" onclick="App.forcePushUsersToApi().then(r=>Toast.show(r.success?'Users Pushed':'Failed',`${r.pushed||0} user(s) pushed`,r.success?'success':'error'))">☁️ Push Users to Sheet</button>
+                  <button class="btn btn-primary" onclick="PageRenderers.saveGeneralSettings()">💾 Save & Connect</button>
+                  <button class="btn btn-secondary" onclick="App.fetchFromApi().then(()=>{Toast.show('Synced','Members refreshed.','success');})">🔄 Pull Members from API</button>
+                  <button class="btn btn-secondary" onclick="App.apiGet('/users').then(r=>{if(r.success&&r.users?.length){localStorage.setItem('knndc_users',JSON.stringify(r.users));PageRenderers.users();Toast.show('Users Synced','Accounts refreshed from API.','success');}else{Toast.show('No Users','API returned no users.','warning');}})">👥 Pull Users from API</button>
+                  <button class="btn btn-secondary" onclick="App.forcePushUsersToApi().then(r=>Toast.show(r.success?'Users Pushed':'Failed',`${r.pushed||0} user(s) pushed`,r.success?'success':'error'))">☁️ Push Users to API</button>
                   <button class="btn btn-secondary" onclick="App.flushOfflineQueue()">📤 Upload Offline Queue</button>
-                  <button class="btn btn-outline" onclick="App.bulkPushToApi().then(r=>Toast.show(r.success?'All Records Pushed':'Failed',r.success?`${r.saved||0} record(s) pushed`:r.error||'Error',r.success?'success':'error'))" title="Push all local records to Google Sheets">
-                    ☁️ Push All Records to Sheet
+                  <button class="btn btn-outline" onclick="App.bulkPushToApi().then(r=>Toast.show(r.success?'All Records Pushed':'Failed',r.success?`${r.saved||0} record(s) pushed`:r.error||'Error',r.success?'success':'error'))" title="Push all local records to API Database">
+                    ☁️ Push All Records to API
                   </button>
                 </div>
               </div>
@@ -559,36 +548,35 @@
           </div>
 
           <div id="stab-stations" class="settings-tab" style="display:none">
-            <!-- Import from sheet banner -->
+            <!-- Import from API banner -->
             <div class="card" style="margin-bottom:16px;border-left:4px solid var(--ndc-green)">
               <div class="card-body" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
                 <div style="font-size:28px">☁️</div>
                 <div style="flex:1">
-                  <div style="font-weight:700;color:var(--ndc-green-dk)">Sync from API</div>
-                  <div style="font-size:12px;color:var(--gray-500);margin-top:2px">Pull the latest Polling Stations list from the API — overrides local data. Requires API URL to be set.</div>
+                  <div style="font-weight:700;color:var(--ndc-green-dk)">Sync from API Database</div>
+                  <div style="font-size:12px;color:var(--gray-500);margin-top:2px">Pull the latest polling stations from the API database — overrides local data.</div>
                 </div>
-                <button class="btn btn-primary" onclick="syncStationsFromApi()">🔄 Import from Sheet</button>
+                <button class="btn btn-primary" onclick="syncStationsFromApi()">🔄 Import from API</button>
               </div>
             </div>
 
             <div class="card" style="margin-bottom:16px">
-              <div class="card-header"><div class="card-icon" style="background:var(--ndc-green-lt)">☁️</div><h3>Push Stations to Google Sheet</h3></div>
+              <div class="card-header"><div class="card-icon" style="background:var(--ndc-green-lt)">☁️</div><h3>Push Stations to API Database</h3></div>
               <div class="card-body">
                 <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
                   <div style="flex:1;min-width:200px">
                     <div style="font-size:13px;color:var(--gray-600);margin-bottom:4px">
-                      Overwrites the <strong>Polling Stations</strong> tab in your Google Sheet with the
+                      Saves all configured polling stations to the API database, replacing the
                       <strong><span id="push-station-count">0</span> station(s)</strong> currently configured in this app.
                     </div>
                     <div style="font-size:12px;color:var(--gray-400)">
                       Use this after adding or editing stations locally so all devices can pull the updated list.
-                      Requires Script URL to be set.
                     </div>
                   </div>
                   <button class="btn btn-secondary" id="push-stations-btn"
                     onclick="App.forcePushStationsToApi().then(r=>Toast.show(r.success?'Stations Pushed':'Failed',r.success?`${r.saved||0} station(s) pushed`:r.error||'Error',r.success?'success':'error'))"
-                    title="Send all configured polling stations to the Google Sheets Polling Stations tab">
-                    ☁️ Push Stations to Sheet
+                    title="Save all polling stations to the API database">
+                    ☁️ Push Stations to API
                   </button>
                 </div>
               </div>
@@ -1086,7 +1074,7 @@ document.getElementById('current-date').textContent=new Date().toLocaleDateStrin
 // current version, wipe stale cached users and session so all
 // devices always load fresh data after an update.
 (()=>{
-  const CURRENT = '3.0.3';
+  const CURRENT = '3.0.4';
   const stored  = localStorage.getItem('knndc_app_version');
   if (stored !== CURRENT) {
     localStorage.removeItem('knndc_users');

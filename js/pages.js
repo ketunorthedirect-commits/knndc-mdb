@@ -958,8 +958,8 @@ var PageRenderers = {
     const s = App.getSettings() || {};
     s.appName      = document.getElementById('set-app-name').value.trim()      || s.appName;
     s.constituency = document.getElementById('set-constituency').value.trim()   || s.constituency;
-    s.sheetId      = document.getElementById('set-sheet-id').value.trim();
-    s.apiKey       = document.getElementById('set-api-key').value.trim();
+    s.sheetId      = ''; // Sheet ID no longer used in v3.0
+    s.apiKey       = ''; // API Key no longer used in v3.0
     s.scriptUrl    = document.getElementById('set-script-url').value.trim();
     App.saveSettings(s);
     App.startSyncTimer();
@@ -979,7 +979,7 @@ var PageRenderers = {
     const ps = App.getPollingStations() || [];
     const sc = document.getElementById('station-count'); if (sc) sc.textContent = ps.length;
     const pc = document.getElementById('push-station-count'); if (pc) pc.textContent = ps.length;
-    if (!ps.length) { c.innerHTML = '<div class="empty-state"><div class="empty-icon">🏢</div><div class="empty-title">No stations configured</div><div class="empty-text">Add manually or use "Import from Sheet" above.</div></div>'; return; }
+    if (!ps.length) { c.innerHTML = '<div class="empty-state"><div class="empty-icon">🏢</div><div class="empty-title">No stations configured</div><div class="empty-text">Add manually or use "Import from API" above.</div></div>'; return; }
     c.innerHTML = `<div class="table-wrap"><table>
       <thead><tr><th>#</th><th>Zone</th><th>Ward</th><th>Polling Station</th><th>Branch</th><th>Stn Code</th><th>Branch Code</th><th>Action</th></tr></thead>
       <tbody>${ps.map((s, i) => `<tr>

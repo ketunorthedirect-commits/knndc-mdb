@@ -1,5 +1,5 @@
 // ============================================================
-// KNNDCmdb  app.js  v3.0.3
+// KNNDCmdb  app.js  v3.0.4
 // Elections & IT Directorate · Ketu North NDC · 2026
 //
 // Changes from v2.4.0 → v3.0:
@@ -17,7 +17,7 @@ var App = (() => {
   'use strict';
 
   // ── Version ───────────────────────────────────────────────
-  const VERSION = '3.0.3';
+  const VERSION = '3.0.4';
 
   // ── localStorage keys ─────────────────────────────────────
   const LS = {
@@ -601,12 +601,14 @@ var App = (() => {
 
   // ── Force push helpers (Settings page buttons) ────────────
   async function forcePushStationsToApi() {
-    if (!getApiBase() || isJwtExpired()) return { success: false, error: 'Not connected' };
+    if (!getApiBase()) return { success: false, error: 'Not connected' };
+    if (isJwtExpired()) loadJwt(); // reload from localStorage
     return apiPost('/stations/save', { stations: pollingStations });
   }
 
   async function forcePushUsersToApi() {
-    if (!getApiBase() || isJwtExpired()) return { success: false, error: 'Not connected' };
+    if (!getApiBase()) return { success: false, error: 'Not connected' };
+    if (isJwtExpired()) loadJwt();
     const users = getUsers().filter(u => !u.isSystem);
     let ok = 0;
     for (const u of users) {
@@ -617,7 +619,8 @@ var App = (() => {
   }
 
   async function bulkPushToApi() {
-    if (!getApiBase() || isJwtExpired()) return { success: false, error: 'Not connected' };
+    if (!getApiBase()) return { success: false, error: 'Not connected' };
+    if (isJwtExpired()) loadJwt();
     return apiPost('/members/bulk', { members: getMembers() });
   }
 
