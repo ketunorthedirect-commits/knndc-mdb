@@ -59,6 +59,9 @@ function _todayISO() { return new Date().toISOString().slice(0, 10); }
 function _daysAgoISO(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
 function _isoOf(m) { return m.isoDate || m.iso_date || ''; }
 
+// ── Bulk selection state ─────────────────────────────────────
+var _selectedIds = new Set();
+
 var PageRenderers = {
 
   // ══════════════════════════════════════════════════════════
@@ -385,7 +388,22 @@ var PageRenderers = {
     const per = 20, total = members.length, pages = Math.ceil(total / per) || 1;
     const page = Math.min(st.page, pages), slice = members.slice((page - 1) * per, page * per);
     document.getElementById('records-count').textContent = `${total.toLocaleString()} record${total !== 1 ? 's' : ''}`;
+
+    // Station delete banner — show only when a station filter is active and user is admin
+    const stBanner = document.getElementById('station-delete-banner');
+    const stLabel  = document.getElementById('station-delete-label');
+    const cu = App.getCurrentUser() || App.currentUser;
+    if (stBanner) {
+      if (st.station && cu?.role === 'admin') {
+        stBanner.style.display = 'flex';
+        if (stLabel) stLabel.textContent = `${st.station} (${total} records)`;
+      } else {
+        stBanner.style.display = 'none';
+      }
+    }
+
     this._renderMembersTable('records-tbody', slice, true);
+    this._updateBulkToolbar();
     const pc = document.getElementById('records-pagination'); if (!pc) return; pc.innerHTML = '';
     if (pages > 1) {
       const mk = (lbl, pg, active, disabled) => { const b = document.createElement('button'); b.className = 'page-btn' + (active ? ' active' : ''); b.textContent = lbl; b.disabled = disabled; b.onclick = () => { PageRenderers._allState.page = pg; PageRenderers._renderAllRecords(); }; return b; };
@@ -400,6 +418,7 @@ var PageRenderers = {
 
   _renderMembersTable(tbodyId, members, showActions) {
     const tbody = document.getElementById(tbodyId); if (!tbody) return;
+    const isRecordsTbody = tbodyId === 'records-tbody';
     tbody.innerHTML = members.length
       ? members.map(m => {
           const canEdit = showActions && App.canModifyMember(m);
@@ -410,7 +429,9 @@ var PageRenderers = {
           const pid= m.partyId   || m.party_id   || '—';
           const vid= m.voterId   || m.voter_id   || '—';
           const sc = m.stationCode||m.station_code||'';
-          return `<tr>
+          const checked = _selectedIds.has(m.id) ? 'checked' : '';
+          return `<tr${_selectedIds.has(m.id) ? ' style="background:var(--ndc-green-pale)"' : ''}>
+            ${isRecordsTbody ? `<td><input type="checkbox" ${checked} onchange="PageRenderers.toggleRowSelect('${m.id}',this.checked)" style="accent-color:var(--ndc-green);width:auto"></td>` : ''}
             <td><strong>${ln},</strong> ${fn} ${on}</td>
             <td><span class="badge ${m.gender==='Male'?'badge-blue':'badge-red'}" style="font-size:11px">${m.gender||'—'}</span></td>
             <td>${m.zone||'—'}</td>
@@ -428,7 +449,193 @@ var PageRenderers = {
             </td>` : ''}
           </tr>`;
         }).join('')
-      : `<tr><td colspan="11"><div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">No records found</div></div></td></tr>`;
+      : `<tr><td colspan="12"><div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">No records found</div></div></td></tr>`;
+  },
+
+  // ── Selection helpers ──────────────────────────────────────
+  toggleRowSelect(id, checked) {
+    if (checked) _selectedIds.add(id); else _selectedIds.delete(id);
+    this._updateBulkToolbar();
+    // Update select-all checkbox state
+    const allChk = document.getElementById('select-all-chk');
+    if (allChk) {
+      const allOnPage = [...document.querySelectorAll('#records-tbody input[type=checkbox]')];
+      allChk.checked = allOnPage.length > 0 && allOnPage.every(c => c.checked);
+      allChk.indeterminate = allOnPage.some(c => c.checked) && !allChk.checked;
+    }
+  },
+
+  toggleSelectAll(checked) {
+    document.querySelectorAll('#records-tbody input[type=checkbox]').forEach(cb => {
+      cb.checked = checked;
+      const id = cb.closest('tr')?.querySelector('input[type=checkbox]')?.getAttribute('onchange')?.match(/'([^']+)'/)?.[1];
+      if (id) { if (checked) _selectedIds.add(id); else _selectedIds.delete(id); }
+    });
+    // Re-do using row highlighting approach
+    const rows = document.querySelectorAll('#records-tbody tr');
+    rows.forEach(tr => {
+      const cb = tr.querySelector('input[type=checkbox]');
+      if (!cb) return;
+      const match = cb.getAttribute('onchange')?.match(/'([^']+)'/);
+      if (match) {
+        cb.checked = checked;
+        if (checked) { _selectedIds.add(match[1]); tr.style.background = 'var(--ndc-green-pale)'; }
+        else          { _selectedIds.delete(match[1]); tr.style.background = ''; }
+      }
+    });
+    this._updateBulkToolbar();
+  },
+
+  selectAllFiltered() {
+    const st = PageRenderers._allState;
+    let members = _getMyMembers();
+    if (st.q)       { const q=st.q.toLowerCase(); members=members.filter(m=>(m.firstName||'').toLowerCase().includes(q)||(m.lastName||'').toLowerCase().includes(q)||(m.partyId||'').toLowerCase().includes(q)); }
+    if (st.zone)    members = members.filter(m => m.zone === st.zone);
+    if (st.ward)    members = members.filter(m => m.ward === st.ward);
+    if (st.station) members = members.filter(m => m.station === st.station);
+    if (st.branch)  members = members.filter(m => m.branch === st.branch);
+    if (st.gender)  members = members.filter(m => m.gender === st.gender);
+    members.forEach(m => _selectedIds.add(m.id));
+    PageRenderers._renderAllRecords();
+    Toast.show('Selected', `${_selectedIds.size} record(s) selected across all pages.`, 'info');
+  },
+
+  clearSelection() {
+    _selectedIds.clear();
+    const allChk = document.getElementById('select-all-chk');
+    if (allChk) { allChk.checked = false; allChk.indeterminate = false; }
+    PageRenderers._renderAllRecords();
+  },
+
+  _updateBulkToolbar() {
+    const toolbar = document.getElementById('bulk-toolbar');
+    const countEl = document.getElementById('bulk-count');
+    if (!toolbar) return;
+    if (_selectedIds.size > 0) {
+      toolbar.style.display = 'flex';
+      if (countEl) countEl.textContent = _selectedIds.size;
+    } else {
+      toolbar.style.display = 'none';
+    }
+  },
+
+  // ── Delete by station ──────────────────────────────────────
+  confirmDeleteStation() {
+    const station = PageRenderers._allState?.station;
+    if (!station) return;
+    const count = _getMyMembers().filter(m => m.station === station).length;
+    if (!confirm(`Delete ALL ${count} record(s) for station:\n"${station}"\n\nThis cannot be undone. Continue?`)) return;
+    const reason = prompt('Reason for deletion (required):');
+    if (!reason?.trim()) { Toast.show('Cancelled', 'A reason is required.', 'warning'); return; }
+    const toDelete = _getMyMembers().filter(m => m.station === station);
+    let done = 0;
+    toDelete.forEach(m => { App.deleteMember(m.id, reason); done++; });
+    Toast.show('Deleted', `${done} record(s) for "${station}" deleted.`, 'error', 5000);
+    PageRenderers._allState.station = '';
+    const sel = document.getElementById('filter-station');
+    if (sel) sel.value = '';
+    PageRenderers.records();
+  },
+
+  // ── Bulk edit ─────────────────────────────────────────────
+  openBulkEdit() {
+    if (_selectedIds.size === 0) { Toast.show('Nothing selected', 'Select at least one record.', 'warning'); return; }
+    const countEl = document.getElementById('bulk-edit-count');
+    if (countEl) countEl.textContent = _selectedIds.size;
+    ['bulk-branch-code','bulk-zone','bulk-ward','bulk-station','bulk-station-code','bulk-branch','bulk-reason']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    this._setupBulkStationSearch();
+    Modal.open('modal-bulk-edit');
+  },
+
+  _setupBulkStationSearch() {
+    const input    = document.getElementById('bulk-branch-code');
+    const dropdown = document.getElementById('bulk-branch-dropdown');
+    if (!input || !dropdown) return;
+    const show = (q) => {
+      const hits = (App.getPollingStations()||[]).filter(s =>
+        !q ||
+        (s.branchCode||s.branch_code||'').toLowerCase().includes(q) ||
+        s.branch?.toLowerCase().includes(q) ||
+        s.name?.toLowerCase().includes(q) ||
+        s.ward?.toLowerCase().includes(q) ||
+        s.zone?.toLowerCase().includes(q) ||
+        s.code?.toLowerCase().includes(q)
+      ).slice(0, 30);
+      dropdown.innerHTML = hits.length
+        ? hits.map(s => `<div class="dropdown-item" data-code="${s.code}">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+              <div><strong style="color:var(--ndc-green-dk)">${s.branchCode||s.branch_code}</strong>
+              <span style="color:var(--gray-500);font-size:11px;margin-left:6px">${s.name}</span></div>
+              <div style="display:flex;gap:4px">
+                <span class="badge badge-green" style="font-size:10px">${s.zone||''}</span>
+                <span class="badge badge-blue" style="font-size:10px">${s.ward||''}</span>
+              </div>
+            </div>
+            <div style="font-size:11px;color:var(--gray-400);margin-top:2px">Branch: ${s.branch} · Code: ${s.code}</div>
+          </div>`).join('')
+        : '<div class="dropdown-item" style="color:var(--gray-400);text-align:center;padding:12px">No matching stations</div>';
+      dropdown.classList.add('open');
+      dropdown.querySelectorAll('.dropdown-item[data-code]').forEach(item => {
+        item.onclick = () => {
+          const s = (App.getPollingStations()||[]).find(ps => ps.code === item.dataset.code);
+          if (s) {
+            document.getElementById('bulk-branch-code').value  = s.branchCode||s.branch_code;
+            document.getElementById('bulk-zone').value         = s.zone;
+            document.getElementById('bulk-ward').value         = s.ward;
+            document.getElementById('bulk-station').value      = s.name;
+            document.getElementById('bulk-station-code').value = s.code;
+            document.getElementById('bulk-branch').value       = s.branch;
+            Toast.show('Station Selected', `${s.name} · ${s.branchCode||s.branch_code}`, 'success');
+          }
+          dropdown.classList.remove('open');
+        };
+      });
+    };
+    const ni = input.cloneNode(true); input.parentNode.replaceChild(ni, input);
+    ni.addEventListener('focus', () => show(ni.value.toLowerCase().trim()));
+    ni.addEventListener('input', () => show(ni.value.toLowerCase().trim()));
+    document.addEventListener('click', e => { if (!ni.contains(e.target) && !dropdown.contains(e.target)) dropdown.classList.remove('open'); });
+  },
+
+  submitBulkEdit() {
+    const reason = document.getElementById('bulk-reason')?.value.trim();
+    if (!reason) { Toast.show('Reason Required', 'Please provide a reason for this bulk change.', 'error'); return; }
+    const g = id => document.getElementById(id)?.value.trim() || '';
+    const patch = {
+      branchCode:  g('bulk-branch-code'),
+      zone:        g('bulk-zone'),
+      ward:        g('bulk-ward'),
+      station:     g('bulk-station'),
+      stationCode: g('bulk-station-code'),
+      branch:      g('bulk-branch'),
+    };
+    // Only include fields that were filled in
+    const update = Object.fromEntries(Object.entries(patch).filter(([,v]) => v !== ''));
+    if (Object.keys(update).length === 0) { Toast.show('Nothing to update', 'Fill in at least one field.', 'warning'); return; }
+    let done = 0;
+    _selectedIds.forEach(id => {
+      App.updateMember({ id, ...update });
+      done++;
+    });
+    App._logAuditPublic('BULK_EDIT', `Bulk updated ${done} record(s): ${Object.keys(update).join(', ')}. Reason: ${reason}`, (App.getCurrentUser()||App.currentUser)?.username);
+    Modal.close('modal-bulk-edit');
+    Toast.show('Bulk Update Done', `${done} record(s) updated.`, 'success');
+    _selectedIds.clear();
+    PageRenderers.records();
+  },
+
+  confirmBulkDelete() {
+    if (_selectedIds.size === 0) return;
+    if (!confirm(`Delete ${_selectedIds.size} selected record(s)?\n\nThis cannot be undone.`)) return;
+    const reason = prompt('Reason for deletion (required):');
+    if (!reason?.trim()) { Toast.show('Cancelled', 'A reason is required.', 'warning'); return; }
+    let done = 0;
+    _selectedIds.forEach(id => { App.deleteMember(id, reason); done++; });
+    App._logAuditPublic('BULK_DELETE', `Bulk deleted ${done} record(s). Reason: ${reason}`, (App.getCurrentUser()||App.currentUser)?.username);
+    Toast.show('Deleted', `${done} record(s) deleted.`, 'error', 5000);
+    _selectedIds.clear();
+    PageRenderers.records();
   },
 
   openEdit(id) {

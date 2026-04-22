@@ -1,5 +1,5 @@
 // ============================================================
-// KNNDCmdb  app.js  v3.0.5
+// KNNDCmdb  app.js  v3.0.6
 // Elections & IT Directorate · Ketu North NDC · 2026
 //
 // Changes from v2.4.0 → v3.0:
@@ -17,7 +17,7 @@ var App = (() => {
   'use strict';
 
   // ── Version ───────────────────────────────────────────────
-  const VERSION = '3.0.5';
+  const VERSION = '3.0.6';
 
   // ── localStorage keys ─────────────────────────────────────
   const LS = {
