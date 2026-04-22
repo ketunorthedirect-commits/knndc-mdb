@@ -1,5 +1,5 @@
 // ============================================================
-// KNNDCmdb  app.js  v3.0.4
+// KNNDCmdb  app.js  v3.0.5
 // Elections & IT Directorate · Ketu North NDC · 2026
 //
 // Changes from v2.4.0 → v3.0:
@@ -17,7 +17,7 @@ var App = (() => {
   'use strict';
 
   // ── Version ───────────────────────────────────────────────
-  const VERSION = '3.0.4';
+  const VERSION = '3.0.5';
 
   // ── localStorage keys ─────────────────────────────────────
   const LS = {
@@ -344,12 +344,12 @@ var App = (() => {
   function getMembers() {
     // Use in-memory cache if available (set by fetchFromApi after login)
     if (_membersCache !== null) return _membersCache;
-    // Fall back to localStorage (scoped records saved for non-admin users,
-    // or offline-added records before first sync)
+    // Fall back to localStorage — normalise field names in case snake_case
+    // records were stored from a previous API fetch
     const stored = lsGet(LS.MEMBERS, []);
     if (stored.length) {
-      _membersCache = stored; // warm the cache
-      return stored;
+      _membersCache = stored.map(_normaliseMember);
+      return _membersCache;
     }
     return [];
   }
@@ -444,6 +444,36 @@ var App = (() => {
   }
 
   // ── Remote sync ───────────────────────────────────────────
+
+  // ── Normalise API member record (snake_case → camelCase) ──────
+  // The MySQL API returns snake_case field names.
+  // The frontend everywhere expects camelCase.
+  // Run every member through this once on fetch so the rest of the
+  // app never needs to handle both forms.
+  function _normaliseMember(m) {
+    return {
+      id:           m.id,
+      firstName:    m.firstName    || m.first_name    || '',
+      lastName:     m.lastName     || m.last_name     || '',
+      otherNames:   m.otherNames   || m.other_names   || '',
+      gender:       m.gender       || '',
+      zone:         m.zone         || '',
+      partyId:      m.partyId      || m.party_id      || '',
+      voterId:      m.voterId      || m.voter_id      || '',
+      phone:        m.phone        || '',
+      ward:         m.ward         || '',
+      station:      m.station      || '',
+      stationCode:  m.stationCode  || m.station_code  || '',
+      branch:       m.branch       || '',
+      branchCode:   m.branchCode   || m.branch_code   || '',
+      officer:      m.officer      || '',
+      officerName:  m.officerName  || m.officer_name  || '',
+      timestamp:    m.timestamp    || '',
+      isoDate:      m.isoDate      || m.iso_date      || '',
+      _demo:        m._demo        || false,
+    };
+  }
+
   async function fetchFromApi() {
     if (!getApiBase() || isJwtExpired()) return false;
 
@@ -461,7 +491,7 @@ var App = (() => {
         const queue     = lsGet(LS.OFFLINE_QUEUE, []);
         const queueIds  = new Set(queue.map(m => m.id));
         const localOnly = (_membersCache || []).filter(m => !apiIds.has(m.id) && queueIds.has(m.id));
-        const allMembers = [...mRes.members, ...localOnly];
+        const allMembers = [...mRes.members.map(_normaliseMember), ...localOnly];
 
         // For non-admin users, also save scoped subset to localStorage
         // so data survives a page refresh without another API call
