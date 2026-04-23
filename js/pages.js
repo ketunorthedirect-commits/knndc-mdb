@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Page Renderers  v3.0.7
+   KNNDCmdb – Page Renderers  v3.0.9
    MySQL REST API backend edition
    ============================================================ */
 
@@ -840,123 +840,54 @@ var PageRenderers = {
   },
 
   exportExcel() {
-    // Get filtered members (respects current filter state, not all 12k records)
     const st = PageRenderers._allState || {};
-    let members = _getMyMembers();
-    if (st.q)       { const q=st.q.toLowerCase(); members=members.filter(m=>(m.firstName||m.first_name||'').toLowerCase().includes(q)||(m.lastName||m.last_name||'').toLowerCase().includes(q)||(m.partyId||m.party_id||'').toLowerCase().includes(q)); }
-    if (st.zone)    members = members.filter(m => m.zone === st.zone);
-    if (st.ward)    members = members.filter(m => m.ward === st.ward);
-    if (st.station) members = members.filter(m => m.station === st.station);
-    if (st.branch)  members = members.filter(m => m.branch === st.branch);
-    if (st.gender)  members = members.filter(m => m.gender === st.gender);
+    const u  = App.getCurrentUser() || App.currentUser;
+    if (!u) return;
 
-    if (!members.length) { Toast.show('No Data', 'No records match the current filter.', 'warning'); return; }
-
-    const constituency = (App.getSettings()||{}).constituency || 'Ketu North';
-
-    if (typeof XLSX === 'undefined') {
-      const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-      s.onload = () => PageRenderers.exportExcel();
-      document.head.appendChild(s);
-      Toast.show('Loading', 'Preparing export library…', 'info');
+    if (!App.getApiBase() || App.isJwtExpired()) {
+      Toast.show('Not Connected', 'Connect to the API first to export.', 'error');
       return;
     }
 
-    try {
-      Toast.show('Exporting', `Preparing ${members.length} records…`, 'info');
-      const wb  = XLSX.utils.book_new();
-      const hdr = ['First Name','Surname','Party ID Number','Voter ID Number','Telephone Number','Gender','Zone','Ward','Polling Station','Station Code','Branch','Branch Code'];
-      const toRow = m => [
-        m.firstName||m.first_name||'',
-        m.lastName||m.last_name||'',
-        m.partyId||m.party_id||'',
-        m.voterId||m.voter_id||'',
-        m.phone||'',
-        m.gender||'',
-        m.zone||'',
-        m.ward||'',
-        m.station||'',
-        m.stationCode||m.station_code||'',
-        m.branch||'',
-        m.branchCode||m.branch_code||'',
-      ];
+    Toast.show('Exporting…', 'Generating Excel file — please wait.', 'info');
 
-      const mkSheet = (rows) => {
-        const ws = XLSX.utils.aoa_to_sheet(rows);
-        ws['!cols'] = [{wch:16},{wch:16},{wch:18},{wch:18},{wch:14},{wch:8},{wch:12},{wch:16},{wch:24},{wch:12},{wch:20},{wch:12}];
-        return ws;
-      };
+    // Build filter payload
+    const body = {};
+    if (st.station) body.station = st.station;
+    if (st.ward)    body.ward    = st.ward;
+    if (st.zone)    body.zone    = st.zone;
+    if (st.branch)  body.branch  = st.branch;
+    if (st.gender)  body.gender  = st.gender;
 
-      // All members sheet
-      const filterDesc = [st.zone, st.ward, st.station, st.branch, st.gender].filter(Boolean).join(' · ') || 'ALL RECORDS';
-      XLSX.utils.book_append_sheet(wb,
-        mkSheet([
-          ['MEMBERSHIP DATABASE','','','','','','','','','','',''],
-          [`Filter: ${filterDesc}  |  Constituency: ${constituency}  |  Total: ${members.length}`,'','','','','','','','','','',''],
-          ['','','','','','','','','','','',''],
-          hdr,
-          ...members.map(toRow)
-        ]),
-        'All Records'
-      );
+    // Use XHR so we can handle the binary blob response
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', App.getApiBase() + '/export/members', true);
+    xhr.responseType = 'blob';
+    xhr.timeout = 60000; // 60 seconds for large exports
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.setRequestHeader('Authorization', 'Bearer ' + (App.getJwt() || localStorage.getItem('knndc_jwt')?.replace(/"/g,'')||''));
 
-      // Per-station sheets — only if filtering by station or ward (manageable size)
-      if (st.station || st.ward || members.length <= 500) {
-        const byStation = {};
-        members.forEach(m => {
-          const k = m.stationCode||m.station_code||'UNK';
-          if (!byStation[k]) byStation[k] = { info: m, members: [] };
-          byStation[k].members.push(m);
-        });
-        Object.values(byStation).forEach(({ info, members: sm }) => {
-          const name = (info.station||'Station').replace(/[\\\/\?\*\[\]:]/g,'').substring(0,31);
-          XLSX.utils.book_append_sheet(wb,
-            mkSheet([
-              ['MEMBERSHIP DATABASE','','','','','','','','','','',''],
-              [`Station: ${info.station||'—'} / ${info.branch||'—'}  |  Constituency: ${constituency}`,'','','','','','','','','','',''],
-              ['','','','','','','','','','','',''],
-              hdr,
-              ...sm.map(toRow)
-            ]),
-            name
-          );
-        });
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        // Create a download link and click it
+        const url  = URL.createObjectURL(xhr.response);
+        const a    = document.createElement('a');
+        const filterDesc = [st.station, st.ward, st.zone].filter(Boolean).join('_') || 'All';
+        a.href     = url;
+        a.download = `KNNDCmdb_${filterDesc}_${new Date().toISOString().slice(0,10)}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        Toast.show('Export Ready', 'Excel file downloaded.', 'success');
+        App._logAuditPublic('EXPORT_EXCEL', `Exported records (filter: ${filterDesc||'All'})`, u.username);
+      } else {
+        Toast.show('Export Failed', 'Server returned an error. Try filtering to a smaller set.', 'error');
       }
-
-      // Summary sheet
-      const byStation2 = {};
-      members.forEach(m => {
-        const k = m.station||'Unknown';
-        if (!byStation2[k]) byStation2[k] = { ward:m.ward||'—', branch:m.branch||'—', total:0, male:0, female:0 };
-        byStation2[k].total++;
-        if (m.gender==='Male') byStation2[k].male++;
-        if (m.gender==='Female') byStation2[k].female++;
-      });
-      const summaryRows = Object.entries(byStation2)
-        .sort((a,b) => b[1].total - a[1].total)
-        .map(([station, d]) => [d.ward, station, d.branch, d.total, d.male, d.female]);
-      const wsSummary = XLSX.utils.aoa_to_sheet([
-        ['MEMBERSHIP DATABASE — SUMMARY','','','','',''],
-        [`Constituency: ${constituency}  |  Export Date: ${new Date().toLocaleDateString('en-GH')}  |  Filter: ${filterDesc}`,'','','','',''],
-        ['','','','','',''],
-        ['Ward','Polling Station','Branch','Total','Male','Female'],
-        ...summaryRows,
-        ['','','GRAND TOTAL', members.length,
-          members.filter(m=>m.gender==='Male').length,
-          members.filter(m=>m.gender==='Female').length]
-      ]);
-      wsSummary['!cols'] = [{wch:18},{wch:28},{wch:20},{wch:8},{wch:8},{wch:8}];
-      XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
-
-      const filename = `KNNDCmdb_${st.station||st.ward||'All'}_${new Date().toISOString().slice(0,10)}.xlsx`;
-      XLSX.writeFile(wb, filename);
-      Toast.show('Export Ready', `${members.length} records exported.`, 'success');
-      App._logAuditPublic('EXPORT_EXCEL', `Exported ${members.length} records (filter: ${filterDesc})`, (App.getCurrentUser()||App.currentUser)?.username);
-    } catch(e) {
-      console.error('Export error:', e);
-      Toast.show('Export Failed', 'An error occurred. Try filtering to a smaller set of records first.', 'error', 6000);
-    }
+    };
+    xhr.onerror   = () => Toast.show('Export Failed', 'Network error. Check your connection.', 'error');
+    xhr.ontimeout = () => Toast.show('Export Timed Out', 'Try filtering to a smaller set of records.', 'error');
+    xhr.send(JSON.stringify(body));
   },
 
   exportPDF() {
