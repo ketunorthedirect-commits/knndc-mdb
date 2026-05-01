@@ -1,5 +1,5 @@
 // ============================================================
-// KNNDCmdb  app.js  v3.0.6
+// KNNDCmdb  app.js  v3.0.9
 // Elections & IT Directorate · Ketu North NDC · 2026
 //
 // Changes from v2.4.0 → v3.0:
@@ -17,7 +17,7 @@ var App = (() => {
   'use strict';
 
   // ── Version ───────────────────────────────────────────────
-  const VERSION = '3.0.6';
+  const VERSION = '3.0.9';
 
   // ── localStorage keys ─────────────────────────────────────
   const LS = {
@@ -474,51 +474,64 @@ var App = (() => {
     };
   }
 
-  async function fetchFromApi() {
+  // Timestamp of last successful full sync — used for incremental fetches
+  let _lastSyncTime = null;
+
+  async function fetchFromApi(incremental) {
     if (!getApiBase() || isJwtExpired()) return false;
 
     try {
-      // Fetch members and stations in parallel
-      // For large datasets (admin sees all 12k+ records), only cache in memory
-      // For scoped users (ward/officer), the dataset is small enough for localStorage
-      const [mRes, sRes] = await Promise.all([
-        apiGet('/members'),
-        apiGet('/stations'),
-      ]);
+      // Incremental sync: only fetch records changed since last sync
+      // Full sync: fetch everything (on first load or manual refresh)
+      const membersUrl = (incremental && _lastSyncTime)
+        ? '/members?since=' + encodeURIComponent(_lastSyncTime)
+        : '/members';
 
-      if (mRes.success && Array.isArray(mRes.members)) {
-        const apiIds    = new Set(mRes.members.map(m => m.id));
-        const queue     = lsGet(LS.OFFLINE_QUEUE, []);
-        const queueIds  = new Set(queue.map(m => m.id));
-        const localOnly = (_membersCache || []).filter(m => !apiIds.has(m.id) && queueIds.has(m.id));
-        const allMembers = [...mRes.members.map(_normaliseMember), ...localOnly];
+      // Only re-fetch stations on full sync (they rarely change)
+      const requests = [apiGet(membersUrl)];
+      if (!incremental || !pollingStations.length) requests.push(apiGet('/stations'));
+      else requests.push(Promise.resolve(null));
 
-        // For non-admin users, also save scoped subset to localStorage
-        // so data survives a page refresh without another API call
+      const [mRes, sRes] = await Promise.all(requests);
+
+      if (mRes && mRes.success && Array.isArray(mRes.members)) {
+        const queue    = lsGet(LS.OFFLINE_QUEUE, []);
+        const queueIds = new Set(queue.map(m => m.id));
+
+        if (incremental && _membersCache !== null) {
+          // Merge incremental updates into existing cache
+          const updates = new Map(mRes.members.map(m => [m.id, _normaliseMember(m)]));
+          _membersCache = _membersCache
+            .map(m => updates.has(m.id) ? updates.get(m.id) : m)
+            .concat([...updates.values()].filter(m => !_membersCache.find(c => c.id === m.id)));
+        } else {
+          // Full sync — replace cache entirely
+          const apiIds    = new Set(mRes.members.map(m => m.id));
+          const localOnly = (_membersCache || []).filter(m => !apiIds.has(m.id) && queueIds.has(m.id));
+          _membersCache   = [...mRes.members.map(_normaliseMember), ...localOnly];
+        }
+
+        // Persist to localStorage for non-admin (scoped data is small enough)
         if (currentUser && currentUser.role !== 'admin') {
-          const scoped = getMembersForUser(allMembers);
           try {
-            const json = JSON.stringify(scoped);
-            if (json.length < 4 * 1024 * 1024) {
-              localStorage.setItem(LS.MEMBERS, json);
-            }
+            const json = JSON.stringify(_membersCache);
+            if (json.length < 4 * 1024 * 1024) localStorage.setItem(LS.MEMBERS, json);
           } catch {}
         } else {
-          // Admin: memory only (too large for localStorage)
           localStorage.removeItem(LS.MEMBERS);
         }
 
-        _membersCache = allMembers;
+        _lastSyncTime = new Date().toISOString();
       }
 
-      if (sRes.success && Array.isArray(sRes.stations)) {
+      if (sRes && sRes.success && Array.isArray(sRes.stations)) {
         pollingStations = sRes.stations.map(s => ({
-          code:        s.code,
-          zone:        s.zone,
-          ward:        s.ward,
-          name:        s.name,
-          branch:      s.branch,
-          branchCode:  s.branch_code || s.branchCode,
+          code:       s.code,
+          zone:       s.zone,
+          ward:       s.ward,
+          name:       s.name,
+          branch:     s.branch,
+          branchCode: s.branch_code || s.branchCode,
         }));
         saveSettings({ pollingStations });
       }
@@ -611,7 +624,7 @@ var App = (() => {
       _fetchAndApplyRemoteSettings(),
       _fetchUsersFromApi(),
     ]);
-    await fetchFromApi();
+    await fetchFromApi(false); // full sync on login
     await flushOfflineQueue();
   }
 
@@ -619,11 +632,12 @@ var App = (() => {
   let _syncTimer = null;
   function startSyncTimer() {
     if (_syncTimer) clearInterval(_syncTimer);
+    // Incremental sync every 5 minutes — only fetches records changed since last sync
+    // Much faster than full sync; full sync only happens on login or manual refresh
     _syncTimer = setInterval(async () => {
       if (!currentUser) return;
-      await fetchFromApi();
-      await _fetchUsersFromApi();
-    }, 2 * 60 * 1000);
+      await fetchFromApi(true);  // incremental=true
+    }, 5 * 60 * 1000);
   }
   function stopSyncTimer() {
     if (_syncTimer) { clearInterval(_syncTimer); _syncTimer = null; }
