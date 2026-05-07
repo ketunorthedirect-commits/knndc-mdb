@@ -366,9 +366,16 @@ var PageRenderers = {
   // ══════════════════════════════════════════════════════════
   records() {
     PageRenderers._allState = PageRenderers._allState || { q:'', page:1, zone:'', ward:'', station:'', branch:'', gender:'' };
-    const pullBtn = document.getElementById('records-pull-btn');
+    const pullBtn   = document.getElementById('records-pull-btn');
+    const bulkBar   = document.getElementById('bulk-toolbar');
+    const selectAll = document.getElementById('select-all-chk');
     const u = App.getCurrentUser() || App.currentUser;
-    if (pullBtn) pullBtn.style.display = u?.role === 'admin' ? '' : 'none';
+    const isReadOnly = u?.role === 'exec' || u?.role === 'ward';
+
+    if (pullBtn)   pullBtn.style.display   = u?.role === 'admin' ? '' : 'none';
+    if (bulkBar)   bulkBar.style.display   = isReadOnly ? 'none' : '';
+    if (selectAll) selectAll.style.display = isReadOnly ? 'none' : '';
+
     if (u?.role === 'admin' && navigator.onLine) App.fetchFromApi();
     this._populateRecordFilters();
     this._renderAllRecords();
@@ -450,10 +457,12 @@ var PageRenderers = {
   _renderMembersTable(tbodyId, members, showActions) {
     const tbody = document.getElementById(tbodyId); if (!tbody) return;
     const isRecordsTbody = tbodyId === 'records-tbody';
+    const u = App.getCurrentUser() || App.currentUser;
+    const isReadOnly = u?.role === 'exec' || u?.role === 'ward';
     tbody.innerHTML = members.length
       ? members.map(m => {
-          const canEdit = showActions && App.canModifyMember(m);
-          const canDel  = showActions && App.canModifyMember(m);
+          const canEdit = showActions && !isReadOnly && App.canModifyMember(m);
+          const canDel  = showActions && !isReadOnly && App.canModifyMember(m);
           const fn = m.firstName || m.first_name || '';
           const ln = m.lastName  || m.last_name  || '';
           const on = m.otherNames|| m.other_names || '';
@@ -462,7 +471,7 @@ var PageRenderers = {
           const sc = m.stationCode||m.station_code||'';
           const checked = _selectedIds.has(m.id) ? 'checked' : '';
           return `<tr${_selectedIds.has(m.id) ? ' style="background:var(--ndc-green-pale)"' : ''}>
-            ${isRecordsTbody ? `<td><input type="checkbox" ${checked} onchange="PageRenderers.toggleRowSelect('${m.id}',this.checked)" style="accent-color:var(--ndc-green);width:auto"></td>` : ''}
+            ${isRecordsTbody && !isReadOnly ? `<td><input type="checkbox" ${checked} onchange="PageRenderers.toggleRowSelect('${m.id}',this.checked)" style="accent-color:var(--ndc-green);width:auto"></td>` : isRecordsTbody ? '<td></td>' : ''}
             <td><strong>${ln},</strong> ${fn} ${on}</td>
             <td><span class="badge ${m.gender==='Male'?'badge-blue':'badge-red'}" style="font-size:11px">${m.gender||'—'}</span></td>
             <td>${m.zone||'—'}</td>
@@ -542,6 +551,8 @@ var PageRenderers = {
     const toolbar = document.getElementById('bulk-toolbar');
     const countEl = document.getElementById('bulk-count');
     if (!toolbar) return;
+    const u = App.getCurrentUser() || App.currentUser;
+    if (u?.role === 'exec' || u?.role === 'ward') { toolbar.style.display = 'none'; return; }
     if (_selectedIds.size > 0) {
       toolbar.style.display = 'flex';
       if (countEl) countEl.textContent = _selectedIds.size;

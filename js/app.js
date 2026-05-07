@@ -1,5 +1,5 @@
 // ============================================================
-// KNNDCmdb  app.js  v3.1.2
+// KNNDCmdb  app.js  v3.1.8
 // Elections & IT Directorate · Ketu North NDC · 2026
 //
 // Changes from v2.4.0 → v3.0:
@@ -17,7 +17,7 @@ var App = (() => {
   'use strict';
 
   // ── Version ───────────────────────────────────────────────
-  const VERSION = '3.1.2';
+  const VERSION = '3.1.8';
 
   // ── localStorage keys ─────────────────────────────────────
   const LS = {
@@ -354,9 +354,9 @@ var App = (() => {
   function canModifyMember(member) {
     if (!currentUser) return false;
     const role = currentUser.role;
-    if (role === 'admin') return true;
-    if (role === 'exec') return false;
-    if (role === 'ward') return member.ward === currentUser.ward;
+    if (role === 'admin')   return true;
+    if (role === 'exec')    return false;  // read-only — can search all records
+    if (role === 'ward')    return false;  // read-only — can search ward records only
     if (role === 'officer') {
       const sc = member.stationCode || member.station_code || '';
       return (currentUser.assignedStations || []).includes(sc);
