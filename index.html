@@ -942,10 +942,10 @@
   </div>
 </div>
 
-<script src="js/app.js?v=3.1.9"></script>
-<script src="js/pages.js?v=3.1.9"></script>
-<script src="js/app.js?v=3.1.9"></script>
-<script src="js/pages.js?v=3.1.9"></script>
+<script src="js/app.js?v=3.2.0"></script>
+<script src="js/pages.js?v=3.2.0"></script>
+<script src="js/app.js?v=3.2.0"></script>
+<script src="js/pages.js?v=3.2.0"></script>
 <script>
 // ── CONFIG ────────────────────────────────────────────────────
 const CONFIG = {
@@ -1202,7 +1202,7 @@ function emergencyReset() {
   if(!confirm('This will clear cached user accounts on THIS device.\n\nAfter resetting, log in with:\n  Username: admin\n  Password: admin123\n\nMember records and settings are NOT affected.\n\nContinue?')) return;
   localStorage.removeItem('knndc_users');
   localStorage.removeItem('knndc_lockout');
-  sessionStorage.removeItem('knndc_session');
+  localStorage.removeItem('knndc_session');
   localStorage.removeItem('knndc_jwt');
   document.getElementById('attempt-warning').style.display='none';
   document.getElementById('lockout-banner').style.display='none';
@@ -1233,12 +1233,12 @@ document.getElementById('current-date').textContent=new Date().toLocaleDateStrin
 // current version, wipe stale cached users and session so all
 // devices always load fresh data after an update.
 (()=>{
-  const CURRENT = '3.1.9';
+  const CURRENT = '3.2.0';
   const stored  = localStorage.getItem('knndc_app_version');
   if (stored !== CURRENT) {
     localStorage.removeItem('knndc_users');
-    localStorage.removeItem('knndc_session');
-    localStorage.removeItem('knndc_jwt');
+    // NOTE: knndc_session and knndc_jwt are intentionally NOT cleared here
+    // so users stay logged in across version updates
     localStorage.removeItem('knndc_lockout');
     sessionStorage.clear();
     localStorage.setItem('knndc_app_version', CURRENT);
@@ -1247,6 +1247,28 @@ document.getElementById('current-date').textContent=new Date().toLocaleDateStrin
 
 App.init();
 _updateConnStatus();
+
+// ── Restore session on page refresh ──────────────────────────
+// If a valid session exists in localStorage, skip login screen
+(()=>{
+  if (App.restoreSession()) {
+    const u = App.getCurrentUser();
+    if (u) {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app-shell').style.display    = 'flex';
+      document.getElementById('app-shell').style.flexDirection = 'column';
+      _renderNav();
+      _renderHeader();
+      setTimeout(()=>{
+        navigateTo('dashboard');
+        App.syncAfterLogin().then(()=>{
+          if(window._currentPage==='dashboard') PageRenderers.dashboard();
+        });
+        App.startSyncTimer();
+      }, 50);
+    }
+  }
+})();
 
 // Auto-configure API URL from server — users never need to type it
 // Quick Connect panel only shown if auto-config fails

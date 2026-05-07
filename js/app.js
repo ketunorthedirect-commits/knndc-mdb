@@ -1,5 +1,5 @@
 // ============================================================
-// KNNDCmdb  app.js  v3.1.8
+// KNNDCmdb  app.js  v3.2.0
 // Elections & IT Directorate · Ketu North NDC · 2026
 //
 // Changes from v2.4.0 → v3.0:
@@ -17,7 +17,7 @@ var App = (() => {
   'use strict';
 
   // ── Version ───────────────────────────────────────────────
-  const VERSION = '3.1.8';
+  const VERSION = '3.2.0';
 
   // ── localStorage keys ─────────────────────────────────────
   const LS = {
@@ -251,7 +251,7 @@ var App = (() => {
           user.active = !!user.active;
 
           // Store in session and update local users cache
-          sessionStorage.setItem(LS.SESSION, JSON.stringify(user));
+          localStorage.setItem(LS.SESSION, JSON.stringify(user));
           const users = lsGet(LS.USERS, []);
           const idx = users.findIndex(u => u.id === user.id);
           if (idx >= 0) users[idx] = { ...users[idx], ...user };
@@ -283,7 +283,7 @@ var App = (() => {
     if (user.password && user.password !== password)
       return { success: false, error: 'Invalid credentials' };
     setJwt('');
-    sessionStorage.setItem(LS.SESSION, JSON.stringify(user));
+    localStorage.setItem(LS.SESSION, JSON.stringify(user));
     currentUser = user;
     return { success: true, user, offline: true };
   }
@@ -292,18 +292,19 @@ var App = (() => {
   function logout() {
     currentUser = null;
     setJwt('');
-    sessionStorage.removeItem(LS.SESSION);
+    localStorage.removeItem(LS.SESSION);
   }
 
   // ── Session restore ───────────────────────────────────────
   function restoreSession() {
     try {
-      const raw = sessionStorage.getItem(LS.SESSION);
+      const raw = localStorage.getItem(LS.SESSION);
       if (!raw) return false;
       currentUser = JSON.parse(raw);
       loadJwt();
+      // If JWT expired, try to reload from localStorage one more time
+      if (!jwt || isJwtExpired()) loadJwt();
       return !!currentUser;
-      // Note: expired JWT handled gracefully in fetchFromApi
     } catch { return false; }
   }
 
@@ -321,7 +322,7 @@ var App = (() => {
       fresh.branch  !== currentUser.branch;
 
     currentUser = { ...currentUser, ...fresh };
-    sessionStorage.setItem(LS.SESSION, JSON.stringify(currentUser));
+    localStorage.setItem(LS.SESSION, JSON.stringify(currentUser));
 
     if (changed) {
       _renderNav();
@@ -753,7 +754,7 @@ var App = (() => {
     users[idx].mustChangePassword = false;
     lsSet(LS.USERS, users);
     currentUser = { ...currentUser, mustChangePassword: false };
-    sessionStorage.setItem(LS.SESSION, JSON.stringify(currentUser));
+    localStorage.setItem(LS.SESSION, JSON.stringify(currentUser));
     return { success: true };
   }
 
