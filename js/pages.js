@@ -909,7 +909,7 @@ var PageRenderers = {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', App.getApiBase() + '/export/members', true);
     xhr.responseType = 'blob';
-    xhr.timeout = 60000; // 60 seconds for large exports
+    xhr.timeout = 180000; // 3 minutes for large exports with many stations
     xhr.setRequestHeader('Content-Type', 'application/json');
     xhr.setRequestHeader('Authorization', 'Bearer ' + (App.getJwt() || localStorage.getItem('knndc_jwt')?.replace(/"/g,'')||''));
 
