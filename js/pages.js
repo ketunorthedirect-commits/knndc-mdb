@@ -379,7 +379,31 @@ var PageRenderers = {
   _renderAllRecords() {
     const st = PageRenderers._allState;
     let members = _getMyMembers();
-    if (st.q)       { const q = st.q.toLowerCase(); members = members.filter(m => (m.firstName||m.first_name)?.toLowerCase().includes(q)||(m.lastName||m.last_name)?.toLowerCase().includes(q)||(m.partyId||m.party_id)?.toLowerCase().includes(q)||(m.voterId||m.voter_id)?.toLowerCase().includes(q)||m.phone?.includes(q)||m.station?.toLowerCase().includes(q)||m.ward?.toLowerCase().includes(q)||m.zone?.toLowerCase().includes(q)); }
+    if (st.q) {
+      const q = st.q.toLowerCase();
+      members = members.filter(m => {
+        const fn = (m.firstName||m.first_name||'').toLowerCase();
+        const ln = (m.lastName||m.last_name||'').toLowerCase();
+        const on = (m.otherNames||m.other_names||'').toLowerCase();
+        const fullName = `${fn} ${ln} ${on}`.trim();
+        const fullNameAlt = `${ln} ${fn} ${on}`.trim();
+        return fullName.includes(q) || fullNameAlt.includes(q) ||
+          (m.partyId||m.party_id||'').toLowerCase().includes(q) ||
+          (m.voterId||m.voter_id||'').toLowerCase().includes(q) ||
+          (m.phone||'').includes(q) ||
+          (m.station||'').toLowerCase().includes(q) ||
+          (m.ward||'').toLowerCase().includes(q) ||
+          (m.zone||'').toLowerCase().includes(q);
+      });
+    }
+    // Sort by party_id ascending (primary) then last_name (secondary)
+    members = members.slice().sort((a, b) => {
+      const pa = (a.partyId||a.party_id||'').toUpperCase();
+      const pb = (b.partyId||b.party_id||'').toUpperCase();
+      if (pa < pb) return -1;
+      if (pa > pb) return  1;
+      return (a.lastName||a.last_name||'').localeCompare(b.lastName||b.last_name||'');
+    });
     if (st.zone)    members = members.filter(m => m.zone === st.zone);
     if (st.ward)    members = members.filter(m => m.ward === st.ward);
     if (st.station) members = members.filter(m => m.station === st.station);
@@ -785,7 +809,11 @@ var PageRenderers = {
 
   _renderReports() {
     const st = PageRenderers._repState;
-    let members = _getMyMembers();
+    let members = _getMyMembers().slice().sort((a,b)=>{
+      const pa=(a.partyId||a.party_id||'').toUpperCase();
+      const pb=(b.partyId||b.party_id||'').toUpperCase();
+      return pa<pb?-1:pa>pb?1:0;
+    });
     if (st.zone)    members = members.filter(m => m.zone === st.zone);
     if (st.ward)    members = members.filter(m => m.ward === st.ward);
     if (st.station) members = members.filter(m => m.station === st.station);
@@ -1252,5 +1280,71 @@ var PageRenderers = {
     Toast.show('Station Removed', `${s.name} removed.`, 'warning');
     const cu = App.getCurrentUser() || App.currentUser;
     App._logAuditPublic('REMOVE_STATION', `Removed: ${s.name} (${s.code})`, cu?.username);
+  },
+
+  // ── BACKUP & RESTORE ──────────────────────────────────────────
+  downloadBackup() {
+    const u = App.getCurrentUser() || App.currentUser;
+    if (u?.role !== 'admin') { Toast.show('Admin Only', 'Only admins can create backups.', 'error'); return; }
+    if (!App.getApiBase() || App.isJwtExpired()) { Toast.show('Not Connected', 'Connect to the API first.', 'error'); return; }
+    Toast.show('Backup', 'Preparing database backup…', 'info');
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', App.getApiBase() + '/backup', true);
+    xhr.responseType = 'blob';
+    xhr.timeout = 60000;
+    xhr.setRequestHeader('Authorization', 'Bearer ' + (App.getJwt() || localStorage.getItem('knndc_jwt')?.replace(/"/g,'')||''));
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        const url = URL.createObjectURL(xhr.response);
+        const a   = document.createElement('a');
+        a.href     = url;
+        a.download = `KNNDCmdb_backup_${new Date().toISOString().slice(0,10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        Toast.show('Backup Ready', 'Database backup downloaded.', 'success');
+        App._logAuditPublic('BACKUP', 'Full database backup downloaded', u.username);
+      } else {
+        Toast.show('Backup Failed', 'Server error. Check Railway logs.', 'error');
+      }
+    };
+    xhr.onerror = xhr.ontimeout = () => Toast.show('Backup Failed', 'Network error.', 'error');
+    xhr.send();
+  },
+
+  restoreBackup() {
+    const u = App.getCurrentUser() || App.currentUser;
+    if (u?.role !== 'admin') { Toast.show('Admin Only', 'Only admins can restore backups.', 'error'); return; }
+    if (!confirm('⚠️ Restoring a backup will OVERWRITE existing records with backup data.\n\nThis cannot be undone. Continue?')) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        try {
+          const backup = JSON.parse(ev.target.result);
+          if (!backup.version || !backup.members) { Toast.show('Invalid File', 'This does not appear to be a valid KNNDCmdb backup.', 'error'); return; }
+          Toast.show('Restoring…', `Uploading ${backup.members.length} members…`, 'info');
+          const res = await App.apiPost('/restore', backup);
+          if (res.success) {
+            Toast.show('Restore Complete', `Members: ${res.restored.members}, Stations: ${res.restored.stations}`, 'success', 7000);
+            App._logAuditPublic('RESTORE', `Database restored from backup. Members: ${res.restored.members}`, u.username);
+            // Refresh local cache
+            await App.fetchFromApi(false);
+            PageRenderers.settings();
+          } else {
+            Toast.show('Restore Failed', res.error || 'Unknown error', 'error');
+          }
+        } catch (err) {
+          Toast.show('Invalid File', 'Could not parse backup file: ' + err.message, 'error');
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
   },
 };

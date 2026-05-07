@@ -1,5 +1,5 @@
 // ============================================================
-// KNNDCmdb  app.js  v3.0.9
+// KNNDCmdb  app.js  v3.1.0
 // Elections & IT Directorate · Ketu North NDC · 2026
 //
 // Changes from v2.4.0 → v3.0:
@@ -17,7 +17,7 @@ var App = (() => {
   'use strict';
 
   // ── Version ───────────────────────────────────────────────
-  const VERSION = '3.0.9';
+  const VERSION = '3.1.0';
 
   // ── localStorage keys ─────────────────────────────────────
   const LS = {
@@ -85,6 +85,43 @@ var App = (() => {
 
   function getApiBase() {
     return (settings.scriptUrl || '').replace(/\/+$/, '');
+  }
+
+  // ── Fetch API URL from a known bootstrap URL ──────────────────
+  // The bootstrap URL is the only thing hardcoded — it returns the
+  // real API URL so users never need to type or know it.
+  // Set BOOTSTRAP_URL in your Railway environment variables.
+  const BOOTSTRAP_URL = 'https://knndc-api-production.up.railway.app';
+
+  async function fetchApiConfig() {
+    // If already configured, skip
+    if (getApiBase()) return true;
+    try {
+      const xhr = new XMLHttpRequest();
+      const result = await new Promise(resolve => {
+        xhr.open('GET', BOOTSTRAP_URL + '/config', true);
+        xhr.timeout = 8000;
+        xhr.onload  = () => { try { resolve(JSON.parse(xhr.responseText)); } catch { resolve(null); } };
+        xhr.onerror = xhr.ontimeout = () => resolve(null);
+        xhr.send();
+      });
+      if (result?.c) {
+        // XOR decode
+        const key     = 'knndc2026';
+        const decoded = atob(result.c);
+        let url = '';
+        for (let i = 0; i < decoded.length; i++) {
+          url += String.fromCharCode(decoded.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+        }
+        if (url.startsWith('https://')) {
+          saveSettings({ scriptUrl: url });
+          return true;
+        }
+      }
+      // Fallback: use bootstrap URL directly
+      saveSettings({ scriptUrl: BOOTSTRAP_URL });
+      return true;
+    } catch { return false; }
   }
 
   // ── JWT helpers ───────────────────────────────────────────
@@ -602,6 +639,8 @@ var App = (() => {
 
   // Prefetch before login (settings + stations for Quick Connect)
   async function prefetchOnLoad() {
+    // Auto-configure API URL from server if not already set
+    if (!getApiBase()) await fetchApiConfig();
     if (!getApiBase()) return;
     await Promise.allSettled([
       _fetchAndApplyRemoteSettings(),
@@ -822,6 +861,6 @@ var App = (() => {
     showToast,
 
     // Low-level API helpers (used by pages.js for settings page)
-    apiGet, apiPost, pingApi,
+    apiGet, apiPost, pingApi, fetchApiConfig,
   };
 })();
