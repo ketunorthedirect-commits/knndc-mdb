@@ -537,21 +537,20 @@
     <!-- ════ SETTINGS ════ -->
     <div id="page-settings" class="page">
       <div class="section-header"><div class="section-title">System Settings</div></div>
-      <div class="settings-layout">
-        <div>
-          <div class="card">
-            <div class="card-body" style="padding:12px">
-              <nav class="settings-nav">
-                <div class="settings-nav-item active" onclick="setTab(this,'stab-general')">⚙️ General</div>
-                <div class="settings-nav-item" onclick="setTab(this,'stab-sheets')">🔗 API Connection</div>
-                <div class="settings-nav-item" onclick="setTab(this,'stab-stations')">🏢 Polling Stations</div>
-                <div class="settings-nav-item" onclick="setTab(this,'stab-backup')">💾 Backup</div>
-                <div class="settings-nav-item" onclick="setTab(this,'stab-about')">ℹ️ About</div>
-              </nav>
-            </div>
-          </div>
+      <!-- Settings nav — horizontal on mobile, vertical sidebar on desktop -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-body" style="padding:10px 12px">
+          <nav class="settings-nav" id="settings-nav-bar" style="display:flex;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;gap:4px;-webkit-overflow-scrolling:touch">
+            <div class="settings-nav-item active" onclick="setTab(this,'stab-general')">⚙️ General</div>
+            <div class="settings-nav-item" onclick="setTab(this,'stab-sheets')">🔗 API Connection</div>
+            <div class="settings-nav-item" onclick="setTab(this,'stab-stations')">🏢 Polling Stations</div>
+            <div class="settings-nav-item" onclick="setTab(this,'stab-backup')">💾 Backup</div>
+            <div class="settings-nav-item" onclick="setTab(this,'stab-about')">ℹ️ About</div>
+          </nav>
         </div>
-        <div>
+      </div>
+      <!-- Settings content — full width -->
+      <div>
           <div id="stab-general" class="settings-tab">
             <div class="card">
               <div class="card-header"><div class="card-icon">⚙️</div><h3>General Configuration</h3></div>
