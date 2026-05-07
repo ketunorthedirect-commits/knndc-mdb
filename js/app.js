@@ -1,5 +1,5 @@
 // ============================================================
-// KNNDCmdb  app.js  v3.1.0
+// KNNDCmdb  app.js  v3.1.2
 // Elections & IT Directorate · Ketu North NDC · 2026
 //
 // Changes from v2.4.0 → v3.0:
@@ -17,7 +17,7 @@ var App = (() => {
   'use strict';
 
   // ── Version ───────────────────────────────────────────────
-  const VERSION = '3.1.0';
+  const VERSION = '3.1.2';
 
   // ── localStorage keys ─────────────────────────────────────
   const LS = {
@@ -302,9 +302,8 @@ var App = (() => {
       if (!raw) return false;
       currentUser = JSON.parse(raw);
       loadJwt();
-      // If JWT is expired, clear it (user will need to re-login on next API call)
-      if (isJwtExpired()) setJwt('');
       return !!currentUser;
+      // Note: expired JWT handled gracefully in fetchFromApi
     } catch { return false; }
   }
 
@@ -515,7 +514,10 @@ var App = (() => {
   let _lastSyncTime = null;
 
   async function fetchFromApi(incremental) {
-    if (!getApiBase() || isJwtExpired()) return false;
+    if (!getApiBase()) return false;
+    // Always reload JWT from localStorage — in-memory jwt is lost on mobile page reload
+    if (!jwt || isJwtExpired()) loadJwt();
+    if (isJwtExpired()) return false;
 
     try {
       // Incremental sync: only fetch records changed since last sync
@@ -659,12 +661,14 @@ var App = (() => {
 
   // Full sync after login
   async function syncAfterLogin() {
-    await Promise.allSettled([
+    // Run settings/users fetch in parallel with members for speed
+    const [, , membersOk] = await Promise.allSettled([
       _fetchAndApplyRemoteSettings(),
       _fetchUsersFromApi(),
+      fetchFromApi(false), // full sync — runs in parallel
     ]);
-    await fetchFromApi(false); // full sync on login
     await flushOfflineQueue();
+    return membersOk.status === 'fulfilled' && membersOk.value === true;
   }
 
   // Periodic sync timer (every 2 min)
