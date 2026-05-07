@@ -944,10 +944,10 @@
   </div>
 </div>
 
-<script src="js/app.js?v=3.2.3"></script>
-<script src="js/pages.js?v=3.2.3"></script>
-<script src="js/app.js?v=3.2.3"></script>
-<script src="js/pages.js?v=3.2.3"></script>
+<script src="js/app_v3.js"></script>
+<script src="js/pages_v3.js"></script>
+<script src="js/app_v3.js"></script>
+<script src="js/pages_v3.js"></script>
 <script>
 // ── CONFIG ────────────────────────────────────────────────────
 const CONFIG = {
@@ -1235,7 +1235,7 @@ document.getElementById('current-date').textContent=new Date().toLocaleDateStrin
 // current version, wipe stale cached users and session so all
 // devices always load fresh data after an update.
 (()=>{
-  const CURRENT = '3.2.3';
+  const CURRENT = '3.2.4';
   const stored  = localStorage.getItem('knndc_app_version');
   if (stored !== CURRENT) {
     localStorage.removeItem('knndc_users');
