@@ -10,9 +10,12 @@
   <style>
   /* ── Mobile responsive (v3.1.1) ──────────────────────────────── */
   @media (max-width: 768px) {
-    .site-nav { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; position: sticky !important; top: 0 !important; z-index: 200 !important; background: #fff !important; border-bottom: 1px solid #e5e7eb !important; }
-    .site-nav .nav-inner { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; gap: 4px !important; padding: 6px 8px !important; overflow-x: auto !important; }
-    .nav-link { white-space: nowrap !important; padding: 6px 10px !important; font-size: 12px !important; border-radius: 6px !important; flex-shrink: 0 !important; }
+    .site-nav { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; position: sticky !important; top: 0 !important; z-index: 200 !important; background: #fff !important; border-bottom: 2px solid #1a6b3a !important; }
+    .site-nav .nav-inner { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; gap: 0 !important; padding: 0 !important; overflow-x: auto !important; width: 100% !important; }
+    .nav-link { white-space: nowrap !important; padding: 8px 0 6px !important; font-size: 10px !important; border-radius: 0 !important; flex: 1 !important; min-width: 52px !important; text-align: center !important; border-bottom: 3px solid transparent !important; display: flex !important; flex-direction: column !important; align-items: center !important; gap: 2px !important; }
+    .nav-link .nav-icon { font-size: 18px !important; line-height: 1 !important; display: block !important; }
+    .nav-link .nav-text { font-size: 9px !important; display: block !important; opacity: 0.8 !important; }
+    .nav-link.active { border-bottom-color: #1a6b3a !important; color: #1a6b3a !important; background: #e8f5ee !important; opacity: 1 !important; }
     .sidebar { display: none !important; }
     .main-wrapper, .main-content { margin-left: 0 !important; padding: 10px 8px !important; }
     .section-header { flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; margin-bottom: 12px !important; }
@@ -921,10 +924,10 @@
   </div>
 </div>
 
-<script src="js/app.js?v=3.1.2"></script>
-<script src="js/pages.js?v=3.1.2"></script>
-<script src="js/app.js?v=3.1.2"></script>
-<script src="js/pages.js?v=3.1.2"></script>
+<script src="js/app.js?v=3.1.3"></script>
+<script src="js/pages.js?v=3.1.3"></script>
+<script src="js/app.js?v=3.1.3"></script>
+<script src="js/pages.js?v=3.1.3"></script>
 <script>
 // ── CONFIG ────────────────────────────────────────────────────
 const CONFIG = {
@@ -970,7 +973,9 @@ function _renderNav() {
   const pages = App.ROLE_PAGES[u.role] || [];
   const labels = { dashboard:'🏠 Dashboard', entry:'✍️ Data Entry', 'my-records':'📋 My Records', records:'📊 All Records', reports:'📄 Reports', analytics:'📈 Analytics', audit:'🛡️ Audit Log', users:'👥 Users', settings:'⚙️ Settings' };
   const nav = document.getElementById('main-nav');
-  if (nav) nav.innerHTML = pages.map(p => `<a class="nav-link${window._currentPage===p?' active':''}" href="#" data-page="${p}" onclick="navigateTo('${p}');return false">${labels[p]||p}</a>`).join('');
+  const icons = { dashboard:'🏠', entry:'✍️', 'my-records':'📋', records:'📊', reports:'📄', analytics:'📈', audit:'🛡️', users:'👥', settings:'⚙️' };
+  const short = { dashboard:'Home', entry:'Entry', 'my-records':'Mine', records:'Records', reports:'Reports', analytics:'Stats', audit:'Audit', users:'Users', settings:'Settings' };
+  if (nav) nav.innerHTML = pages.map(p => `<a class="nav-link${window._currentPage===p?' active':''}" href="#" data-page="${p}" onclick="navigateTo('${p}');return false" title="${labels[p]||p}"><span class="nav-icon">${icons[p]||'📄'}</span><span class="nav-text">${short[p]||p}</span></a>`).join('');
 }
 
 function _renderHeader() {
@@ -1210,7 +1215,7 @@ document.getElementById('current-date').textContent=new Date().toLocaleDateStrin
 // current version, wipe stale cached users and session so all
 // devices always load fresh data after an update.
 (()=>{
-  const CURRENT = '3.1.2';
+  const CURRENT = '3.1.3';
   const stored  = localStorage.getItem('knndc_app_version');
   if (stored !== CURRENT) {
     localStorage.removeItem('knndc_users');
