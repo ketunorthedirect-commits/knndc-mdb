@@ -7,6 +7,44 @@
   <link rel="stylesheet" href="css/styles.css">
   <link rel="icon" type="image/png" href="assets/ndc-logo.png">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+  /* ── Mobile responsive (v3.1.1) ──────────────────────────────── */
+  @media (max-width: 768px) {
+    .site-nav { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; position: sticky !important; top: 0 !important; z-index: 200 !important; background: #fff !important; border-bottom: 1px solid #e5e7eb !important; }
+    .site-nav .nav-inner { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; gap: 4px !important; padding: 6px 8px !important; overflow-x: auto !important; }
+    .nav-link { white-space: nowrap !important; padding: 6px 10px !important; font-size: 12px !important; border-radius: 6px !important; flex-shrink: 0 !important; }
+    .sidebar { display: none !important; }
+    .main-wrapper, .main-content { margin-left: 0 !important; padding: 10px 8px !important; }
+    .section-header { flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; margin-bottom: 12px !important; }
+    .section-header .btn-group { flex-wrap: wrap !important; }
+    .stat-cards, .stats-grid, .grid-3, .grid-4 { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+    .stat-card, .kpi-card { padding: 10px 12px !important; }
+    .stat-value { font-size: 20px !important; }
+    .search-bar { flex-direction: column !important; gap: 8px !important; }
+    .search-bar select, .search-bar input { width: 100% !important; }
+    .table-wrap { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; }
+    table { min-width: 700px !important; }
+    td, th { font-size: 11px !important; padding: 5px 7px !important; }
+    .modal { margin: 8px !important; width: calc(100vw - 16px) !important; max-width: unset !important; max-height: 88vh !important; overflow-y: auto !important; border-radius: 10px !important; }
+    .form-grid { grid-template-columns: 1fr !important; }
+    .btn { font-size: 12px !important; padding: 7px 11px !important; }
+    .btn-group { flex-wrap: wrap !important; gap: 5px !important; }
+    .login-card { margin: 12px !important; padding: 18px !important; }
+    .charts-row, .chart-grid { grid-template-columns: 1fr !important; }
+    .settings-layout { grid-template-columns: 1fr !important; }
+    .settings-nav { display: flex !important; flex-direction: row !important; overflow-x: auto !important; flex-wrap: nowrap !important; gap: 4px !important; }
+    .settings-nav-item { white-space: nowrap !important; font-size: 12px !important; padding: 6px 10px !important; flex-shrink: 0 !important; }
+    #bulk-toolbar { flex-wrap: wrap !important; gap: 6px !important; }
+    .pagination { flex-wrap: wrap !important; gap: 3px !important; }
+    .user-name-hdr, .user-role-hdr { display: none !important; }
+    .app-header { padding: 8px 12px !important; }
+  }
+  @media (max-width: 480px) {
+    .stat-cards, .stats-grid { grid-template-columns: 1fr !important; }
+    .stat-value { font-size: 18px !important; }
+    .section-title { font-size: 16px !important; }
+  }
+  </style>
 </head>
 <body>
 
@@ -507,6 +545,7 @@
                 <div class="settings-nav-item active" onclick="setTab(this,'stab-general')">⚙️ General</div>
                 <div class="settings-nav-item" onclick="setTab(this,'stab-sheets')">🔗 API Connection</div>
                 <div class="settings-nav-item" onclick="setTab(this,'stab-stations')">🏢 Polling Stations</div>
+                <div class="settings-nav-item" onclick="setTab(this,'stab-backup')">💾 Backup</div>
                 <div class="settings-nav-item" onclick="setTab(this,'stab-about')">ℹ️ About</div>
               </nav>
             </div>
@@ -615,6 +654,40 @@
               </div>
             </div>
             <div class="card"><div class="card-header"><div class="card-icon">🏢</div><h3>Configured Stations (<span id="station-count">0</span>)</h3></div><div class="card-body"><div id="stations-list"></div></div></div>
+          </div>
+
+          <div id="stab-backup" class="settings-tab" style="display:none">
+            <div class="card" style="margin-bottom:18px">
+              <div class="card-header">
+                <div class="card-icon">💾</div>
+                <div>
+                  <div class="card-title">Download Backup</div>
+                  <div class="card-subtitle">Export the full database as a JSON file — members, stations and settings</div>
+                </div>
+              </div>
+              <div class="card-body">
+                <p style="font-size:13px;color:var(--gray-600,#4b5563);margin-bottom:14px">
+                  The backup contains all <strong>members, polling stations</strong> and <strong>app settings</strong>.
+                  Store it safely — it can restore the database if needed. Passwords are <strong>not</strong> included.
+                </p>
+                <button class="btn btn-primary" onclick="PageRenderers.downloadBackup()">⬇️ Download Database Backup</button>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <div class="card-icon">♻️</div>
+                <div>
+                  <div class="card-title">Restore from Backup</div>
+                  <div class="card-subtitle">Upload a backup file to restore members and stations</div>
+                </div>
+              </div>
+              <div class="card-body">
+                <div style="background:#fef3c7;border:1px solid #d97706;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:13px;color:#92400e">
+                  ⚠️ <strong>Warning:</strong> Restoring overwrites existing records with backup data. This cannot be undone.
+                </div>
+                <button class="btn btn-danger" onclick="PageRenderers.restoreBackup()">♻️ Restore from Backup File</button>
+              </div>
+            </div>
           </div>
 
           <div id="stab-about" class="settings-tab" style="display:none">
@@ -849,10 +922,10 @@
   </div>
 </div>
 
-<script src="js/app.js?v=3.1.0"></script>
-<script src="js/pages.js?v=3.1.0"></script>
-<script src="js/app.js?v=3.1.0"></script>
-<script src="js/pages.js?v=3.1.0"></script>
+<script src="js/app.js?v=3.1.1"></script>
+<script src="js/pages.js?v=3.1.1"></script>
+<script src="js/app.js?v=3.1.1"></script>
+<script src="js/pages.js?v=3.1.1"></script>
 <script>
 // ── CONFIG ────────────────────────────────────────────────────
 const CONFIG = {
@@ -1132,7 +1205,7 @@ document.getElementById('current-date').textContent=new Date().toLocaleDateStrin
 // current version, wipe stale cached users and session so all
 // devices always load fresh data after an update.
 (()=>{
-  const CURRENT = '3.1.0';
+  const CURRENT = '3.1.1';
   const stored  = localStorage.getItem('knndc_app_version');
   if (stored !== CURRENT) {
     localStorage.removeItem('knndc_users');
