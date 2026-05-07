@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ketu North NDC Members Database</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" type="image/png" href="assets/ndc-logo.png">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+  /* ── Mobile responsive (v3.1.1) ──────────────────────────────── */
+  @media (max-width: 768px) {
+    .site-nav { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; position: sticky !important; top: 48px !important; z-index: 199 !important; background: #fff !important; border-bottom: 2px solid #1a6b3a !important; }
+    .site-nav .nav-inner { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; gap: 0 !important; padding: 0 !important; overflow-x: auto !important; width: 100% !important; }
+    .nav-link { white-space: nowrap !important; padding: 8px 0 6px !important; font-size: 10px !important; border-radius: 0 !important; flex: 1 !important; min-width: 52px !important; text-align: center !important; border-bottom: 3px solid transparent !important; display: flex !important; flex-direction: column !important; align-items: center !important; gap: 2px !important; }
+    .nav-link .nav-icon { font-size: 18px !important; line-height: 1 !important; display: block !important; }
+    .nav-link .nav-text { font-size: 9px !important; display: block !important; opacity: 0.8 !important; }
+    .nav-link.active { border-bottom-color: #1a6b3a !important; color: #1a6b3a !important; background: #e8f5ee !important; opacity: 1 !important; }
+    .site-header { position: sticky !important; top: 0 !important; z-index: 200 !important; }
+    .header-inner { padding: 6px 10px !important; min-height: 48px !important; }
+    .header-logo { width: 30px !important; height: 30px !important; }
+    .app-title-text { font-size: 12px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; max-width: 160px !important; }
+    .app-name { display: none !important; }
+    .header-brand { overflow: hidden !important; min-width: 0 !important; flex: 1 !important; }
+    .sidebar { display: none !important; }
+    .main-wrapper, .main-content { margin-left: 0 !important; padding: 10px 8px !important; }
+    .section-header { flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; margin-bottom: 12px !important; }
+    .section-header .btn-group { flex-wrap: wrap !important; }
+    .stat-cards, .stats-grid, .grid-3, .grid-4 { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+    .stat-card, .kpi-card { padding: 10px 12px !important; }
+    .stat-value { font-size: 20px !important; }
+    .search-bar { flex-direction: column !important; gap: 8px !important; }
+    .search-bar select, .search-bar input { width: 100% !important; }
+    .table-wrap { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; }
+    table { min-width: 700px !important; }
+    td, th { font-size: 11px !important; padding: 5px 7px !important; }
+    .modal { margin: 8px !important; width: calc(100vw - 16px) !important; max-width: unset !important; max-height: 88vh !important; overflow-y: auto !important; border-radius: 10px !important; }
+    .form-grid { grid-template-columns: 1fr !important; }
+    .btn { font-size: 12px !important; padding: 7px 11px !important; }
+    .btn-group { flex-wrap: wrap !important; gap: 5px !important; }
+    .login-card { margin: 12px !important; padding: 18px !important; }
+    .charts-row, .chart-grid { grid-template-columns: 1fr !important; }
+    .settings-layout { grid-template-columns: 1fr !important; }
+    .settings-nav { display: flex !important; flex-direction: row !important; overflow-x: auto !important; flex-wrap: nowrap !important; gap: 4px !important; }
+    .settings-nav-item { white-space: nowrap !important; font-size: 12px !important; padding: 6px 10px !important; flex-shrink: 0 !important; }
+    #bulk-toolbar { flex-wrap: wrap !important; gap: 6px !important; }
+    .pagination { flex-wrap: wrap !important; gap: 3px !important; }
+    .user-name-hdr, .user-role-hdr { display: none !important; }
+    .app-header { padding: 8px 12px !important; }
+  }
+  @media (max-width: 480px) {
+    .stat-cards, .stats-grid { grid-template-columns: 1fr !important; }
+    .stat-value { font-size: 18px !important; }
+    .section-title { font-size: 16px !important; }
+  }
+    /* ── Logo sizing ─────────────────────────────────────────────── */
+    .login-logo { width: 100px !important; height: auto !important; max-width: 100px !important; }
+    .login-logo-wrap { text-align: center !important; display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; gap: 10px !important; margin-bottom: 16px !important; }
+    .login-title { text-align: center !important; width: 100% !important; }
+    .header-logo { width: 36px !important; height: 36px !important; object-fit: contain !important; }
+    @media (max-width: 768px) {
+      .login-logo { width: 70px !important; max-width: 70px !important; }
+      .login-title { text-align: center !important; font-size: clamp(15px,4vw,20px) !important; white-space: normal !important; word-wrap: break-word !important; line-height: 1.3 !important; padding: 0 4px !important; }
+      .login-card { text-align: center !important; }
+      .login-logo-wrap { margin-bottom: 12px !important; }
+      .header-logo { width: 28px !important; height: 28px !important; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="offline-banner">⚡ You are offline — records are queued and will sync automatically.</div>
+
+<!-- ═══════════════════════════════════════════
+     LOGIN SCREEN
+════════════════════════════════════════════ -->
+<div id="login-screen" class="login-page">
+  <div class="login-card">
+    <div class="login-logo-wrap" style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:16px">
+      <img src="assets/ndc-logo.png" alt="NDC Logo" class="login-logo" style="width:100px;height:auto;max-width:100px">
+      <div class="login-title app-title-text" style="text-align:center;width:100%;white-space:normal;word-wrap:break-word;line-height:1.3;padding:0 8px;font-size:clamp(16px,4vw,24px)">Ketu North NDC Members Database</div>
+      <div class="login-subtitle">KNNDCmdb · Constituency Members Portal</div>
+    </div>
+
+    <div id="lockout-banner" style="display:none;background:var(--ndc-red-pale);border:1px solid var(--ndc-red);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;text-align:center">
+      <div style="font-weight:700;color:var(--ndc-red-dk)">🔒 Account Temporarily Locked</div>
+      <div style="font-size:13px;color:var(--ndc-red-dk);margin-top:4px">Try again in <strong id="lockout-timer">2:00</strong></div>
+    </div>
+    <div id="attempt-warning" style="display:none;background:#fef3c7;border:1px solid #d97706;border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:13px;color:#92400e">
+      ⚠️ Incorrect credentials. <strong id="attempts-left"></strong> attempt(s) remaining.
+    </div>
+    <!-- User sync indicator — shown on new devices while fetching accounts from API -->
+    <div id="user-sync-banner" style="display:none;background:var(--ndc-green-pale);border:1px solid var(--ndc-green-lt);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--ndc-green-dk);text-align:center">
+      🔄 Fetching accounts from API…
+    </div>
+
+    <!-- Quick Connect — shown only on devices with no Script URL configured -->
+    <div id="quick-connect-panel" style="display:none;background:var(--ndc-green-pale);border:1px solid var(--ndc-green);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px">
+      <div style="font-weight:700;color:var(--ndc-green-dk);margin-bottom:4px;font-size:13px">🔗 First-time setup — Connect to API Database</div>
+      <div style="font-size:12px;color:var(--gray-600);margin-bottom:10px">Paste your Railway API URL below. All settings, accounts and stations will be downloaded automatically.</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="text" id="qc-script-url"
+          placeholder="https://knndc-api-production.up.railway.app"
+          style="flex:1;min-width:0;font-size:12px;padding:8px 10px;border:1px solid var(--ndc-green);border-radius:var(--radius);outline:none"
+          autocomplete="off">
+        <button id="qc-connect-btn" onclick="quickConnect()"
+          style="background:var(--ndc-green);color:#fff;border:none;border-radius:var(--radius);padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">
+          ✅ Connect
+        </button>
+      </div>
+      <div id="qc-status" style="font-size:11px;margin-top:6px;color:var(--ndc-green-dk);min-height:14px"></div>
+    </div>
+
+    <div class="form-group" style="margin-bottom:14px">
+      <label for="login-username">Username <span class="required">*</span></label>
+      <input type="text" id="login-username" placeholder="Enter your username" autocomplete="username">
+    </div>
+    <div class="form-group" style="margin-bottom:8px">
+      <label for="login-password">Password <span class="required">*</span></label>
+      <div style="position:relative">
+        <input type="password" id="login-password" placeholder="Enter your password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()" style="padding-right:46px">
+        <button type="button" onclick="togglePassword()" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:18px;color:var(--gray-400)">👁️</button>
+      </div>
+    </div>
+    <div style="margin-bottom:20px;text-align:right">
+      <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--gray-500);cursor:pointer;text-transform:none;letter-spacing:0;font-weight:400">
+        <input type="checkbox" id="show-pwd-check" onchange="togglePassword()" style="width:auto;accent-color:var(--ndc-green)"> Show password
+      </label>
+    </div>
+    <button class="btn btn-primary btn-lg" id="login-btn" style="width:100%" onclick="doLogin()">🔐 Sign In</button>
+  </div>
+  <div style="color:rgba(255,255,255,.6);font-size:12px">Powered by the Elections and IT Directorate, 2026</div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     APP SHELL
+════════════════════════════════════════════ -->
+<div id="app-shell" style="display:none;flex-direction:column;min-height:100vh">
+
+  <header class="site-header">
+    <div class="header-inner">
+      <img src="assets/ndc-logo.png" alt="NDC" class="header-logo">
+      <div class="header-brand">
+        <h1 class="app-title-text">Ketu North NDC Members Database</h1>
+        <span class="app-name">KNNDCmdb · Members Registration Portal</span>
+      </div>
+      <div class="header-actions">
+        <button class="btn-icon" title="Sync from API Databases" onclick="App.fetchFromApi().then(()=>Toast.show('Synced','Data refreshed from API.','success'))">🔄</button>
+        <span id="conn-dot" class="online-dot"></span>
+        <div class="header-user" onclick="App.logout()" title="Logout">
+          <div class="user-avatar" id="user-avatar">--</div>
+          <div class="user-info">
+            <div class="user-name" id="user-name-hdr">—</div>
+            <div class="user-role" id="user-role-hdr">—</div>
+          </div>
+        </div>
+        <button class="btn-icon" onclick="App.logout()" title="Logout">🚪</button>
+      </div>
+    </div>
+  </header>
+
+  <nav class="site-nav"><div class="nav-inner" id="main-nav"></div></nav>
+
+  <main class="main-wrapper">
+
+    <!-- ════ DASHBOARD ════ -->
+    <div id="page-dashboard" class="page">
+      <div class="section-header">
+        <div>
+          <div class="section-title" id="dash-welcome">Welcome</div>
+          <div class="section-subtitle" id="dash-role"></div>
+        </div>
+        <div style="font-size:13px;color:var(--gray-500)">📅 <span id="current-date"></span></div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">Total Members</div><div class="stat-value" id="dash-total">0</div><div class="stat-change">All registered</div></div>
+        <div class="stat-card red"><div class="stat-icon">📅</div><div class="stat-label">Today's Entries</div><div class="stat-value" id="dash-today">0</div></div>
+        <div class="stat-card blue"><div class="stat-icon">🏢</div><div class="stat-label">Active Stations</div><div class="stat-value" id="dash-stations">0</div></div>
+        <div class="stat-card amber"><div class="stat-icon">📶</div><div class="stat-label">Offline Queue</div><div class="stat-value" id="dash-offline">0</div></div>
+      </div>
+
+      <!-- Gender + Zone summary row -->
+      <div class="three-col" style="margin-bottom:20px">
+        <div class="card">
+          <div class="card-header"><div class="card-icon">📊</div><h3>Entries — Last 7 Days</h3></div>
+          <div class="card-body"><canvas id="dash-chart" style="width:100%"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-icon red">⚧</div><h3>Gender Distribution</h3></div>
+          <div class="card-body">
+            <div style="display:flex;gap:16px;align-items:center">
+              <canvas id="dash-gender-chart" style="width:130px;flex-shrink:0"></canvas>
+              <div style="flex:1">
+                <div style="margin-bottom:12px">
+                  <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--ndc-green-dk);margin-bottom:4px"><span>♂ Male</span><span id="dash-male">0</span></div>
+                  <div class="progress-bar"><div class="progress-fill" id="dash-male-bar" style="width:0%"></div></div>
+                  <div style="font-size:11px;color:var(--gray-400);margin-top:2px" id="dash-male-pct">0%</div>
+                </div>
+                <div>
+                  <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--ndc-red-dk);margin-bottom:4px"><span>♀ Female</span><span id="dash-female">0</span></div>
+                  <div class="progress-bar"><div class="progress-fill red" id="dash-female-bar" style="width:0%"></div></div>
+                  <div style="font-size:11px;color:var(--gray-400);margin-top:2px" id="dash-female-pct">0%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-icon" style="background:var(--ndc-green-lt)">🗺️</div><h3>Zone Distribution</h3></div>
+          <div class="card-body">
+            <canvas id="dash-zone-chart" style="width:100%;margin-bottom:8px"></canvas>
+            <div id="dash-zone-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-icon red">🕓</div><h3>Recent Entries</h3></div>
+        <div class="table-wrap" style="border:none">
+          <table>
+            <thead><tr><th>Name</th><th>Gender</th><th>Zone</th><th>Party ID</th><th>Station</th><th>Officer</th><th>Time</th></tr></thead>
+            <tbody id="dash-recent-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ DATA ENTRY ════ -->
+    <div id="page-entry" class="page">
+      <div class="section-header">
+        <div><div class="section-title">New Member Registration</div><div class="section-subtitle">Complete all required fields</div></div>
+        <button class="btn btn-outline" id="entry-push-btn" onclick="App.bulkPushToApi().then(r=>Toast.show(r.success?'Pushed':'Failed',r.success?'Records uploaded':r.error||'Error',r.success?'success':'error'))"
+          title="Upload records to API Database">
+          ☁️ Push Records to API
+        </button>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-icon">✍️</div><h2>Member Registration Form</h2></div>
+        <div class="card-body">
+
+          <!-- Station Lookup -->
+          <div style="background:var(--ndc-green-pale);border:1px solid var(--ndc-green-lt);border-radius:var(--radius);padding:16px 20px;margin-bottom:24px">
+            <div style="font-size:12px;font-weight:600;color:var(--ndc-green-dk);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">🔍 Station Lookup — Search by Branch Code</div>
+            <div style="font-size:12px;color:var(--gray-500);margin-bottom:14px">Type a Branch Code, Station Name, Zone or Ward. All station fields will fill automatically.</div>
+            <div class="form-group" style="margin-bottom:14px">
+              <label>Branch Code <span class="required">*</span> <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--ndc-green-dk)">— start typing to search</span></label>
+              <div class="search-dropdown-wrap">
+                <input type="text" id="f-branch-code" placeholder="e.g. BR-001 or Aflao…" autocomplete="off">
+                <div id="branch-code-dropdown" class="search-dropdown"></div>
+              </div>
+            </div>
+            <div class="form-grid">
+              <div class="form-group"><label>Zone</label><input type="text" id="f-zone" readonly class="auto-filled" placeholder="Auto-filled"></div>
+              <div class="form-group"><label>Ward Name</label><input type="text" id="f-ward-name" readonly class="auto-filled" placeholder="Auto-filled"></div>
+              <div class="form-group"><label>Polling Station Name</label><input type="text" id="f-station-name" readonly class="auto-filled" placeholder="Auto-filled"></div>
+              <div class="form-group"><label>Branch Name</label><input type="text" id="f-branch-name" readonly class="auto-filled" placeholder="Auto-filled"></div>
+              <div class="form-group"><label>Polling Station Code</label><input type="text" id="f-station-code" readonly class="auto-filled" placeholder="Auto-filled"></div>
+            </div>
+          </div>
+
+          <!-- Member Details -->
+          <div class="form-grid">
+            <div class="form-group"><label>Last Name / Surname <span class="required">*</span></label><input type="text" id="f-last-name" placeholder="e.g. Mensah"></div>
+            <div class="form-group"><label>First Name <span class="required">*</span></label><input type="text" id="f-first-name" placeholder="e.g. Kofi"></div>
+            <div class="form-group"><label>Other Names</label><input type="text" id="f-other-names" placeholder="e.g. Agyei"></div>
+            <div class="form-group">
+              <label>Gender <span class="required">*</span></label>
+              <select id="f-gender">
+                <option value="">— Select Gender —</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Party ID Number <span class="required">*</span></label><input type="text" id="f-party-id" placeholder="e.g. NDC-2024-001"></div>
+            <div class="form-group"><label>Voter ID Number</label><input type="text" id="f-voter-id" placeholder="e.g. GH-V-001234"></div>
+            <div class="form-group"><label>Telephone Number</label><input type="tel" id="f-phone" placeholder="e.g. 0244001122"></div>
+          </div>
+
+          <hr class="divider">
+          <div class="btn-group">
+            <button class="btn btn-primary btn-lg" onclick="PageRenderers.submitEntry()">✅ Save Member Record</button>
+            <button class="btn btn-secondary" onclick="PageRenderers.entry()">🔄 Reset</button>
+            <button class="btn btn-outline" onclick="App.bulkPushToApi().then(r=>Toast.show(r.success?'Pushed':'Failed',r.success?'Records uploaded':r.error||'Error',r.success?'success':'error'))"
+              title="Upload records to API Database">
+              ☁️ Push Records to API
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ MY RECORDS ════ -->
+    <div id="page-my-records" class="page">
+      <div class="section-header">
+        <div><div class="section-title">My Records</div><div class="section-subtitle" id="my-records-count"></div></div>
+        <button class="btn btn-outline" onclick="PageRenderers.exportExcel()">⬇️ Export Excel</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap" style="border:none">
+          <table>
+            <thead><tr><th>Name</th><th>Gender</th><th>Zone</th><th>Party ID</th><th>Voter ID</th><th>Phone</th><th>Station</th><th>Branch</th><th>Date/Time</th><th>Actions</th></tr></thead>
+            <tbody id="my-records-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ ALL RECORDS ════ -->
+    <div id="page-records" class="page">
+      <div class="section-header">
+        <div>
+          <div class="section-title">All Records</div>
+          <div class="section-subtitle" id="records-count"></div>
+        </div>
+        <div class="btn-group">
+          <button id="records-pull-btn" class="btn btn-secondary"
+            style="display:none"
+            onclick="App.fetchFromApi().then(()=>{PageRenderers.records();Toast.show('Synced','Records refreshed.','success');})"
+            title="Force a full re-sync from API Database">
+            🔄 Pull All from API
+          </button>
+          <button class="btn btn-outline" onclick="PageRenderers.exportExcel()">⬇️ Export Excel</button>
+          <button class="btn btn-secondary" onclick="PageRenderers.exportPDF()">🖨️ Print/PDF</button>
+        </div>
+      </div>
+      <div class="search-bar">
+        <div class="search-input-wrap" style="flex:2;min-width:200px">
+          <span class="search-ico">🔍</span>
+          <input type="text" placeholder="Search name, ID, phone, station, zone…" oninput="PageRenderers._allState={...PageRenderers._allState,q:this.value,page:1};PageRenderers._renderAllRecords()">
+        </div>
+        <select id="filter-zone"    onchange="PageRenderers._allState={...PageRenderers._allState,zone:this.value,page:1};PageRenderers._renderAllRecords()" style="width:auto"><option value="">All Zones</option></select>
+        <select id="filter-ward"    onchange="PageRenderers._allState={...PageRenderers._allState,ward:this.value,page:1};PageRenderers._renderAllRecords()" style="width:auto"><option value="">All Wards</option></select>
+        <select id="filter-station" onchange="PageRenderers._allState={...PageRenderers._allState,station:this.value,page:1};PageRenderers._renderAllRecords()" style="width:auto"><option value="">All Stations</option></select>
+        <select id="filter-branch"  onchange="PageRenderers._allState={...PageRenderers._allState,branch:this.value,page:1};PageRenderers._renderAllRecords()" style="width:auto"><option value="">All Branches</option></select>
+        <select                     onchange="PageRenderers._allState={...PageRenderers._allState,gender:this.value,page:1};PageRenderers._renderAllRecords()" style="width:auto">
+          <option value="">All Genders</option><option value="Male">Male</option><option value="Female">Female</option>
+        </select>
+      </div>
+
+      <!-- Bulk action toolbar — shown when records are selected -->
+      <div id="bulk-toolbar" style="display:none;background:var(--ndc-green-pale);border:1px solid var(--ndc-green-lt);border-radius:var(--radius);padding:10px 16px;margin-bottom:12px;display:none;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:600;color:var(--ndc-green-dk)"><span id="bulk-count">0</span> record(s) selected</span>
+        <button class="btn btn-secondary btn-sm" onclick="PageRenderers.openBulkEdit()">✏️ Edit Station/Branch</button>
+        <button class="btn btn-danger btn-sm" onclick="PageRenderers.confirmBulkDelete()">🗑️ Delete Selected</button>
+        <button class="btn btn-outline btn-sm" onclick="PageRenderers.clearSelection()">✕ Clear Selection</button>
+        <div style="margin-left:auto;font-size:12px;color:var(--gray-500)">
+          <button class="btn btn-outline btn-sm" onclick="PageRenderers.selectAllFiltered()">Select All Filtered</button>
+        </div>
+      </div>
+
+      <!-- Delete by station banner — shown when a station filter is active -->
+      <div id="station-delete-banner" style="display:none;background:#fef3c7;border:1px solid #d97706;border-radius:var(--radius);padding:10px 16px;margin-bottom:12px;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="font-size:13px;color:#92400e">⚠️ Station filter active — <strong id="station-delete-label"></strong></span>
+        <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="PageRenderers.confirmDeleteStation()">🗑️ Delete ALL records for this station</button>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap" style="border:none">
+          <table>
+            <thead><tr>
+              <th style="width:36px"><input type="checkbox" id="select-all-chk" onchange="PageRenderers.toggleSelectAll(this.checked)" style="accent-color:var(--ndc-green);width:auto"></th>
+              <th>Full Name</th><th>Gender</th><th>Zone</th><th>Party ID</th><th>Voter ID</th><th>Phone</th><th>Ward</th><th>Station</th><th>Branch</th><th>Date/Time</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="records-tbody"></tbody>
+          </table>
+        </div>
+        <div id="records-pagination" class="pagination" style="padding:16px"></div>
+      </div>
+    </div>
+
+    <!-- ════ REPORTS ════ -->
+    <div id="page-reports" class="page">
+      <div class="section-header">
+        <div><div class="section-title">Reports & Summary</div></div>
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="PageRenderers.exportExcel()">⬇️ Export Excel</button>
+          <button class="btn btn-secondary" onclick="PageRenderers.exportPDF()">🖨️ Print PDF</button>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="search-bar" style="margin-bottom:16px">
+        <select id="rep-filter-zone"    onchange="PageRenderers._repState={...PageRenderers._repState,zone:this.value};PageRenderers._renderReports()" style="width:auto"><option value="">All Zones</option></select>
+        <select id="rep-filter-ward"    onchange="PageRenderers._repState={...PageRenderers._repState,ward:this.value};PageRenderers._renderReports()" style="width:auto"><option value="">All Wards</option></select>
+        <select id="rep-filter-station" onchange="PageRenderers._repState={...PageRenderers._repState,station:this.value};PageRenderers._renderReports()" style="width:auto"><option value="">All Stations</option></select>
+        <select id="rep-filter-branch"  onchange="PageRenderers._repState={...PageRenderers._repState,branch:this.value};PageRenderers._renderReports()" style="width:auto"><option value="">All Branches</option></select>
+        <select onchange="PageRenderers._repState={...PageRenderers._repState,gender:this.value};PageRenderers._renderReports()" style="width:auto">
+          <option value="">All Genders</option><option value="Male">Male</option><option value="Female">Female</option>
+        </select>
+      </div>
+
+      <!-- Daily banner -->
+      <div class="card" style="background:linear-gradient(135deg,var(--ndc-green-dk),var(--ndc-green));color:white;margin-bottom:20px">
+        <div class="card-body" style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+          <div class="card-icon" style="background:rgba(255,255,255,.2);font-size:28px;width:52px;height:52px">📋</div>
+          <div>
+            <div style="font-size:12px;opacity:.8;text-transform:uppercase;letter-spacing:.5px">Daily — <span id="daily-date"></span></div>
+            <div style="font-family:var(--font-head);font-size:36px;font-weight:800;line-height:1"><span id="daily-count">0</span></div>
+            <div style="font-size:13px;opacity:.8">members registered today</div>
+          </div>
+          <div style="flex:1"></div>
+          <div style="text-align:right">
+            <div style="font-size:12px;opacity:.8">Total</div>
+            <div style="font-size:28px;font-weight:800;font-family:var(--font-head)" id="report-total">0</div>
+          </div>
+          <div style="text-align:center;padding:12px 20px;background:rgba(255,255,255,.15);border-radius:var(--radius)">
+            <div style="font-size:11px;opacity:.7">Male</div>
+            <div style="font-size:22px;font-weight:800;font-family:var(--font-head)" id="rep-male-count">0</div>
+          </div>
+          <div style="text-align:center;padding:12px 20px;background:rgba(200,16,46,.3);border-radius:var(--radius)">
+            <div style="font-size:11px;opacity:.7">Female</div>
+            <div style="font-size:22px;font-weight:800;font-family:var(--font-head)" id="rep-female-count">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header"><div class="card-icon">🏢</div><h3>By Polling Station</h3></div>
+          <div class="table-wrap" style="border:none;border-radius:0">
+            <table>
+              <thead><tr><th>#</th><th>Zone</th><th>Ward</th><th>Station</th><th>Branch</th><th>Total</th><th>♂</th><th>♀</th><th>Progress</th><th>%</th></tr></thead>
+              <tbody id="report-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="card">
+            <div class="card-header"><div class="card-icon red">🥧</div><h3>Station Distribution</h3></div>
+            <div class="card-body"><canvas id="report-chart" style="width:100%"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-icon">⚧</div><h3>Gender Distribution</h3></div>
+            <div class="card-body"><canvas id="rep-gender-chart" style="width:100%"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ ANALYTICS ════ -->
+    <div id="page-analytics" class="page">
+      <div class="section-header"><div class="section-title">Analytics Dashboard</div></div>
+      <!-- Filters -->
+      <div class="search-bar" style="margin-bottom:16px">
+        <select id="ana-filter-zone"    onchange="PageRenderers._anaState={...PageRenderers._anaState,zone:this.value};PageRenderers._renderAnalytics()" style="width:auto"><option value="">All Zones</option></select>
+        <select id="ana-filter-ward"    onchange="PageRenderers._anaState={...PageRenderers._anaState,ward:this.value};PageRenderers._renderAnalytics()" style="width:auto"><option value="">All Wards</option></select>
+        <select id="ana-filter-station" onchange="PageRenderers._anaState={...PageRenderers._anaState,station:this.value};PageRenderers._renderAnalytics()" style="width:auto"><option value="">All Stations</option></select>
+        <select id="ana-filter-branch"  onchange="PageRenderers._anaState={...PageRenderers._anaState,branch:this.value};PageRenderers._renderAnalytics()" style="width:auto"><option value="">All Branches</option></select>
+        <select onchange="PageRenderers._anaState={...PageRenderers._anaState,gender:this.value};PageRenderers._renderAnalytics()" style="width:auto">
+          <option value="">All Genders</option><option value="Male">Male</option><option value="Female">Female</option>
+        </select>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">Total</div><div class="stat-value" id="ana-total">0</div></div>
+        <div class="stat-card red"><div class="stat-icon">📅</div><div class="stat-label">Today</div><div class="stat-value" id="ana-today">0</div></div>
+        <div class="stat-card blue"><div class="stat-icon">🏢</div><div class="stat-label">Stations</div><div class="stat-value" id="ana-stations">0</div></div>
+        <div class="stat-card" style="--before-color:var(--ndc-green-lt)"><div class="stat-icon">🗺️</div><div class="stat-label">Active Zones</div><div class="stat-value" id="ana-zones">0</div></div>
+        <div class="stat-card purple"><div class="stat-icon">📈</div><div class="stat-label">Day-over-Day</div><div class="stat-value" id="ana-growth">—</div></div>
+      </div>
+
+      <!-- Gender stats -->
+      <div class="two-col" style="margin-bottom:20px">
+        <div class="card" style="border-left:4px solid var(--ndc-green)">
+          <div class="card-body" style="display:flex;align-items:center;gap:16px">
+            <div style="font-size:36px">♂</div>
+            <div>
+              <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-500)">Male Members</div>
+              <div style="font-family:var(--font-head);font-size:32px;font-weight:800;color:var(--ndc-green-dk)" id="ana-male">0</div>
+              <div style="font-size:13px;color:var(--gray-400)" id="ana-male-pct">0%</div>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="border-left:4px solid var(--ndc-red)">
+          <div class="card-body" style="display:flex;align-items:center;gap:16px">
+            <div style="font-size:36px">♀</div>
+            <div>
+              <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--gray-500)">Female Members</div>
+              <div style="font-family:var(--font-head);font-size:32px;font-weight:800;color:var(--ndc-red-dk)" id="ana-female">0</div>
+              <div style="font-size:13px;color:var(--gray-400)" id="ana-female-pct">0%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="three-col" style="margin-bottom:20px">
+        <div class="card"><div class="card-header"><div class="card-icon">📊</div><h3>7-Day Trend</h3></div><div class="card-body"><canvas id="ana-chart" style="width:100%"></canvas></div></div>
+        <div class="card"><div class="card-header"><div class="card-icon red">⚧</div><h3>Gender Split</h3></div><div class="card-body"><canvas id="ana-gender-chart" style="width:100%"></canvas></div></div>
+        <div class="card">
+          <div class="card-header"><div class="card-icon" style="background:var(--ndc-green-lt)">🗺️</div><h3>Zone Distribution</h3></div>
+          <div class="card-body">
+            <canvas id="ana-zone-chart" style="width:100%;margin-bottom:10px"></canvas>
+            <div id="ana-zone-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-icon amber">🏆</div><h3>Top Officers by Entries</h3></div>
+        <div class="table-wrap" style="border:none;border-radius:0">
+          <table><thead><tr><th>Officer</th><th>Records</th><th>Progress</th><th>Share</th></tr></thead><tbody id="ana-officers-tbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ AUDIT LOG ════ -->
+    <div id="page-audit" class="page">
+      <div class="section-header"><div class="section-title">Audit Log</div><div class="section-subtitle">All system activities — all users, all devices</div></div>
+
+      <!-- Sync banner — shown briefly while fetching from API -->
+      <div id="audit-sync-banner" style="display:none;align-items:center;gap:10px;background:var(--ndc-green-pale);border:1px solid var(--ndc-green-lt);border-radius:var(--radius);padding:10px 16px;margin-bottom:12px;font-size:13px;color:var(--ndc-green-dk)">
+        <span style="animation:spin 1s linear infinite;display:inline-block">🔄</span>
+        Fetching latest activity from API database…
+      </div>
+
+      <div class="search-bar" style="flex-wrap:wrap;gap:8px">
+        <div class="search-input-wrap"><span class="search-ico">🔍</span><input type="text" id="audit-search" placeholder="Search action, user, details…" oninput="PageRenderers._renderAuditEntries()"></div>
+        <select id="audit-filter" onchange="PageRenderers._renderAuditEntries()" style="width:auto">
+          <option value="">All Actions</option>
+          <option>LOGIN</option><option>LOGOUT</option><option>AUTO_LOGOUT</option><option>LOCKOUT</option>
+          <option>ADD_MEMBER</option><option>EDIT_MEMBER</option><option>DELETE_MEMBER</option><option>DUPLICATE_BLOCKED</option><option>EDIT_DENIED</option><option>DELETE_DENIED</option>
+          <option>EXPORT_EXCEL</option><option>EXPORT_PDF</option>
+          <option>ADD_USER</option><option>EDIT_USER</option><option>ENABLE_USER</option><option>DISABLE_USER</option>
+          <option>PASSWORD_CHANGE</option><option>PASSWORD_RESET</option><option>ASSIGN_STATIONS</option>
+          <option>SETTINGS_CHANGE</option><option>ADD_STATION</option><option>REMOVE_STATION</option>
+          <option>PUSH_STATIONS</option><option>SYNC_USERS</option><option>BULK_PUSH</option>
+          <option>CLEAR_DEMO</option>
+        </select>
+        <select id="audit-user-filter" onchange="PageRenderers._renderAuditEntries()" style="width:auto">
+          <option value="">All Users</option>
+        </select>
+        <button class="btn btn-outline btn-sm" onclick="PageRenderers.audit()" title="Refresh from API Database">🔄 Refresh</button>
+        <button class="btn btn-danger btn-sm" onclick="if(confirm('Clear ALL local audit logs on this device?')){localStorage.removeItem('knndc_audit');document.getElementById('audit-user-filter').dataset.populated='';PageRenderers.audit();Toast.show('Log Cleared','','warning');}">🗑️ Clear</button>
+      </div>
+      <div id="audit-entries"></div>
+    </div>
+
+    <!-- ════ USERS ════ -->
+    <div id="page-users" class="page">
+      <div class="section-header">
+        <div><div class="section-title">User Management</div><div class="section-subtitle">Manage accounts, roles and station assignments</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-secondary" onclick="App.forcePushUsersToApi().then(r=>Toast.show(r.success?'Users Pushed':'Failed',`${r.pushed||0} user(s) pushed`,r.success?'success':'error'))" title="Save all user accounts to API Database">☁️ Push Users to API</button>
+          <button class="btn btn-primary" onclick="PageRenderers.openAddUser()">➕ Add New User</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-wrap" style="border:none">
+          <table>
+            <thead><tr><th></th><th>Name / Username</th><th>Role</th><th>Password Status</th><th>Ward</th><th>Assigned Stations</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="users-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ SETTINGS ════ -->
+    <div id="page-settings" class="page">
+      <div class="section-header"><div class="section-title">System Settings</div></div>
+      <!-- Settings nav — horizontal on mobile, vertical sidebar on desktop -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-body" style="padding:10px 12px">
+          <nav class="settings-nav" id="settings-nav-bar" style="display:flex;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;gap:4px;-webkit-overflow-scrolling:touch">
+            <div class="settings-nav-item active" onclick="setTab(this,'stab-general')">⚙️ General</div>
+            <div class="settings-nav-item" onclick="setTab(this,'stab-sheets')">🔗 API Connection</div>
+            <div class="settings-nav-item" onclick="setTab(this,'stab-stations')">🏢 Polling Stations</div>
+            <div class="settings-nav-item" onclick="setTab(this,'stab-backup')">💾 Backup</div>
+            <div class="settings-nav-item" onclick="setTab(this,'stab-about')">ℹ️ About</div>
+          </nav>
+        </div>
+      </div>
+      <!-- Settings content — full width -->
+      <div>
+          <div id="stab-general" class="settings-tab">
+            <div class="card">
+              <div class="card-header"><div class="card-icon">⚙️</div><h3>General Configuration</h3></div>
+              <div class="card-body">
+                <div class="form-grid">
+                  <div class="form-group full-width"><label>Application Name <span class="required">*</span></label><input type="text" id="set-app-name"><span class="input-hint">Appears on every page header.</span></div>
+                  <div class="form-group"><label>Constituency Name</label><input type="text" id="set-constituency"></div>
+                </div>
+                <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
+                  <button class="btn btn-primary" onclick="PageRenderers.saveGeneralSettings()">💾 Save Settings</button>
+                  <button class="btn btn-danger" onclick="Modal.open('modal-demo-clear')" style="margin-left:auto">🗑️ Clear Demo Data</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="stab-sheets" class="settings-tab" style="display:none">
+            <div class="card">
+              <div class="card-header"><div class="card-icon">📊</div><h3>API Database Connection</h3></div>
+              <div class="card-body">
+
+                <!-- Bootstrap banner — shown on new devices without Script URL -->
+                <div id="bootstrap-banner" style="display:none;background:var(--ndc-green-pale);border:1px solid var(--ndc-green);border-radius:var(--radius);padding:16px;margin-bottom:20px">
+                  <div style="font-weight:700;color:var(--ndc-green-dk);margin-bottom:6px">🔗 Connect this device to API Database</div>
+                  <div style="font-size:13px;color:var(--gray-600)">
+                    This device is not yet connected to the API database. Enter the <strong>API Base URL</strong> below and click
+                    <strong>💾 Save</strong>. The app will automatically download all settings, member data, and polling stations from the API.
+                  </div>
+                </div>
+
+                <div style="background:var(--ndc-green-pale);border-radius:var(--radius);padding:14px;margin-bottom:20px;font-size:13px;color:var(--ndc-green-dk)">
+                  ☁️ Settings are <strong>shared across all devices</strong>. When you save here, all future logins on any device will receive the correct API connection automatically.
+                </div>
+
+                <div class="form-grid">
+                  <div class="form-group full-width">
+                    <label>API Base URL <span class="required">*</span></label>
+                    <input type="text" id="set-script-url" placeholder="https://knndc-api-production.up.railway.app">
+                    <span class="input-hint">Your Railway API URL — e.g. https://knndc-api-production.up.railway.app</span>
+                  </div>
+                </div>
+                <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
+                  <button class="btn btn-primary" onclick="PageRenderers.saveGeneralSettings()">💾 Save & Connect</button>
+                  <button class="btn btn-secondary" onclick="App.fetchFromApi().then(()=>{Toast.show('Synced','Members refreshed.','success');})">🔄 Pull Members from API</button>
+                  <button class="btn btn-secondary" onclick="App.apiGet('/users').then(r=>{if(r.success&&r.users?.length){localStorage.setItem('knndc_users',JSON.stringify(r.users));PageRenderers.users();Toast.show('Users Synced','Accounts refreshed from API.','success');}else{Toast.show('No Users','API returned no users.','warning');}})">👥 Pull Users from API</button>
+                  <button class="btn btn-secondary" onclick="App.forcePushUsersToApi().then(r=>Toast.show(r.success?'Users Pushed':'Failed',`${r.pushed||0} user(s) pushed`,r.success?'success':'error'))">☁️ Push Users to API</button>
+                  <button class="btn btn-secondary" onclick="App.flushOfflineQueue()">📤 Upload Offline Queue</button>
+                  <button class="btn btn-outline" onclick="App.bulkPushToApi().then(r=>Toast.show(r.success?'All Records Pushed':'Failed',r.success?`${r.saved||0} record(s) pushed`:r.error||'Error',r.success?'success':'error'))" title="Push all local records to API Database">
+                    ☁️ Push All Records to API
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="stab-stations" class="settings-tab" style="display:none">
+            <!-- Import from API banner -->
+            <div class="card" style="margin-bottom:16px;border-left:4px solid var(--ndc-green)">
+              <div class="card-body" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+                <div style="font-size:28px">☁️</div>
+                <div style="flex:1">
+                  <div style="font-weight:700;color:var(--ndc-green-dk)">Sync from API Database</div>
+                  <div style="font-size:12px;color:var(--gray-500);margin-top:2px">Pull the latest polling stations from the API database — overrides local data.</div>
+                </div>
+                <button class="btn btn-primary" onclick="syncStationsFromApi()">🔄 Import from API</button>
+              </div>
+            </div>
+
+            <div class="card" style="margin-bottom:16px">
+              <div class="card-header"><div class="card-icon" style="background:var(--ndc-green-lt)">☁️</div><h3>Push Stations to API Database</h3></div>
+              <div class="card-body">
+                <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+                  <div style="flex:1;min-width:200px">
+                    <div style="font-size:13px;color:var(--gray-600);margin-bottom:4px">
+                      Saves all configured polling stations to the API database, replacing the
+                      <strong><span id="push-station-count">0</span> station(s)</strong> currently configured in this app.
+                    </div>
+                    <div style="font-size:12px;color:var(--gray-400)">
+                      Use this after adding or editing stations locally so all devices can pull the updated list.
+                    </div>
+                  </div>
+                  <button class="btn btn-secondary" id="push-stations-btn"
+                    onclick="App.forcePushStationsToApi().then(r=>Toast.show(r.success?'Stations Pushed':'Failed',r.success?`${r.saved||0} station(s) pushed`:r.error||'Error',r.success?'success':'error'))"
+                    title="Save all polling stations to the API database">
+                    ☁️ Push Stations to API
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="card" style="margin-bottom:16px">
+              <div class="card-header"><div class="card-icon">➕</div><h3>Add New Station</h3></div>
+              <div class="card-body">
+                <div class="form-grid">
+                  <div class="form-group"><label>Zone <span class="required">*</span></label><input type="text" id="st-zone" placeholder="e.g. Zone A"></div>
+                  <div class="form-group"><label>Ward Name <span class="required">*</span></label><input type="text" id="st-ward" placeholder="e.g. Aflao Ward"></div>
+                  <div class="form-group"><label>Station Name <span class="required">*</span></label><input type="text" id="st-name" placeholder="e.g. Aflao A Polling Station"></div>
+                  <div class="form-group"><label>Branch Name <span class="required">*</span></label><input type="text" id="st-branch" placeholder="e.g. Aflao Branch"></div>
+                  <div class="form-group"><label>Station Code <span class="required">*</span></label><input type="text" id="st-code" placeholder="e.g. PS-001"></div>
+                  <div class="form-group"><label>Branch Code <span class="required">*</span></label><input type="text" id="st-bcode" placeholder="e.g. BR-001"></div>
+                </div>
+                <div style="margin-top:16px"><button class="btn btn-primary" onclick="PageRenderers.addStation()">➕ Add Station</button></div>
+              </div>
+            </div>
+            <div class="card"><div class="card-header"><div class="card-icon">🏢</div><h3>Configured Stations (<span id="station-count">0</span>)</h3></div><div class="card-body"><div id="stations-list"></div></div></div>
+          </div>
+
+          <div id="stab-backup" class="settings-tab" style="display:none">
+            <div class="card" style="margin-bottom:18px">
+              <div class="card-header">
+                <div class="card-icon">💾</div>
+                <div>
+                  <div class="card-title">Download Backup</div>
+                  <div class="card-subtitle">Export the full database as a JSON file — members, stations and settings</div>
+                </div>
+              </div>
+              <div class="card-body">
+                <p style="font-size:13px;color:var(--gray-600,#4b5563);margin-bottom:14px">
+                  The backup contains all <strong>members, polling stations</strong> and <strong>app settings</strong>.
+                  Store it safely — it can restore the database if needed. Passwords are <strong>not</strong> included.
+                </p>
+                <button class="btn btn-primary" onclick="PageRenderers.downloadBackup()">⬇️ Download Database Backup</button>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <div class="card-icon">♻️</div>
+                <div>
+                  <div class="card-title">Restore from Backup</div>
+                  <div class="card-subtitle">Upload a backup file to restore members and stations</div>
+                </div>
+              </div>
+              <div class="card-body">
+                <div style="background:#fef3c7;border:1px solid #d97706;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:13px;color:#92400e">
+                  ⚠️ <strong>Warning:</strong> Restoring overwrites existing records with backup data. This cannot be undone.
+                </div>
+                <button class="btn btn-danger" onclick="PageRenderers.restoreBackup()">♻️ Restore from Backup File</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="stab-about" class="settings-tab" style="display:none">
+            <div class="card">
+              <div class="card-header"><div class="card-icon blue">ℹ️</div><h3>About KNNDCmdb</h3></div>
+              <div class="card-body" style="text-align:center;padding:40px">
+                <img src="assets/ndc-logo.png" style="width:80px;margin-bottom:16px">
+                <div style="font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--ndc-green-dk)">KNNDCmdb v3.0.0</div>
+                <div style="color:var(--gray-500);margin-top:8px">Ketu North NDC Members Database</div>
+                <div style="color:var(--gray-400);font-size:13px;margin-top:4px">Elections & IT Directorate, 2026</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="site-footer"><strong>Powered by the Elections and IT Directorate, 2026</strong> &nbsp;·&nbsp; KNNDCmdb v3.0.0</footer>
+</div>
+
+<div id="toast-container"></div>
+
+<!-- ═══ MODAL: BULK EDIT STATION/BRANCH ═══ -->
+<div id="modal-bulk-edit" class="modal-overlay">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header"><div class="card-icon">✏️</div><h3>Bulk Edit — Station &amp; Branch</h3><button class="modal-close" onclick="Modal.close('modal-bulk-edit')">✕</button></div>
+    <div class="modal-body">
+      <div style="background:var(--ndc-green-pale);border:1px solid var(--ndc-green-lt);border-radius:var(--radius);padding:12px 16px;margin-bottom:18px;font-size:13px;color:var(--ndc-green-dk)">
+        Editing <strong id="bulk-edit-count">0</strong> selected record(s). Leave a field blank to keep its current value.
+      </div>
+      <div style="font-size:11px;font-weight:600;color:var(--ndc-green-dk);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
+        🔍 Search by Branch Code to auto-fill all fields
+      </div>
+      <div class="form-group" style="margin-bottom:14px">
+        <label>Branch Code</label>
+        <div class="search-dropdown-wrap">
+          <input type="text" id="bulk-branch-code" placeholder="Type to search station…" autocomplete="off">
+          <div id="bulk-branch-dropdown" class="search-dropdown"></div>
+        </div>
+      </div>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group"><label style="font-size:11px">Zone</label><input type="text" id="bulk-zone" placeholder="Leave blank to keep"></div>
+        <div class="form-group"><label style="font-size:11px">Ward</label><input type="text" id="bulk-ward" placeholder="Leave blank to keep"></div>
+        <div class="form-group"><label style="font-size:11px">Station Name</label><input type="text" id="bulk-station" placeholder="Leave blank to keep"></div>
+        <div class="form-group"><label style="font-size:11px">Station Code</label><input type="text" id="bulk-station-code" placeholder="Leave blank to keep"></div>
+        <div class="form-group"><label style="font-size:11px">Branch Name</label><input type="text" id="bulk-branch" placeholder="Leave blank to keep"></div>
+      </div>
+      <div class="form-group" style="margin-top:10px">
+        <label>Reason for Change <span class="required">*</span></label>
+        <textarea id="bulk-reason" rows="2" placeholder="Required: explain why these records are being updated…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('modal-bulk-edit')">Cancel</button>
+      <button class="btn btn-primary" onclick="PageRenderers.submitBulkEdit()">💾 Apply to All Selected</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: EDIT MEMBER ═══ -->
+<div id="modal-edit" class="modal-overlay">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header"><div class="card-icon">✏️</div><h3>Edit Member Record</h3><button class="modal-close" onclick="Modal.close('modal-edit')">✕</button></div>
+    <div class="modal-body">
+      <div id="edit-current-info" style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:var(--radius);padding:10px 14px;font-size:12px;color:var(--gray-600);margin-bottom:16px"></div>
+      <input type="hidden" id="edit-id">
+
+      <!-- Station Re-assignment (collapsible via branch code search) -->
+      <div style="background:var(--ndc-green-pale);border:1px solid var(--ndc-green-lt);border-radius:var(--radius);padding:14px 16px;margin-bottom:18px">
+        <div style="font-size:11px;font-weight:600;color:var(--ndc-green-dk);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
+          🔍 Change Station (optional) — search by Branch Code
+        </div>
+        <div class="form-group" style="margin-bottom:10px">
+          <label style="text-transform:none;letter-spacing:0;font-weight:600;font-size:12px;color:var(--gray-600)">Branch Code</label>
+          <div class="search-dropdown-wrap">
+            <input type="text" id="edit-branch-code" placeholder="Type to search and change station…" autocomplete="off">
+            <div id="edit-branch-dropdown" class="search-dropdown"></div>
+          </div>
+        </div>
+        <div class="form-grid" style="grid-template-columns:repeat(3,1fr);gap:8px">
+          <div class="form-group">
+            <label style="font-size:11px">Zone</label>
+            <input type="text" id="edit-zone" readonly class="auto-filled" placeholder="Auto-filled">
+          </div>
+          <div class="form-group">
+            <label style="font-size:11px">Ward</label>
+            <input type="text" id="edit-ward" readonly class="auto-filled" placeholder="Auto-filled">
+          </div>
+          <div class="form-group">
+            <label style="font-size:11px">Polling Station</label>
+            <input type="text" id="edit-station-name" readonly class="auto-filled" placeholder="Auto-filled">
+          </div>
+          <div class="form-group">
+            <label style="font-size:11px">Branch Name</label>
+            <input type="text" id="edit-branch-name" readonly class="auto-filled" placeholder="Auto-filled">
+          </div>
+          <div class="form-group">
+            <label style="font-size:11px">Station Code</label>
+            <input type="text" id="edit-station-code" readonly class="auto-filled" placeholder="Auto-filled">
+          </div>
+        </div>
+      </div>
+
+      <!-- Personal Details -->
+      <div class="form-grid">
+        <div class="form-group"><label>First Name <span class="required">*</span></label><input type="text" id="edit-first"></div>
+        <div class="form-group"><label>Last Name <span class="required">*</span></label><input type="text" id="edit-last"></div>
+        <div class="form-group"><label>Other Names</label><input type="text" id="edit-other"></div>
+        <div class="form-group">
+          <label>Gender</label>
+          <select id="edit-gender"><option value="">—</option><option value="Male">Male</option><option value="Female">Female</option></select>
+        </div>
+        <div class="form-group"><label>Party ID</label><input type="text" id="edit-party"></div>
+        <div class="form-group"><label>Voter ID</label><input type="text" id="edit-voter"></div>
+        <div class="form-group"><label>Phone</label><input type="text" id="edit-phone"></div>
+        <div class="form-group full-width">
+          <label>Reason for Change <span class="required">*</span></label>
+          <textarea id="edit-reason" rows="2" placeholder="Required: explain why this record is being modified…"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('modal-edit')">Cancel</button>
+      <button class="btn btn-primary" onclick="PageRenderers.submitEdit()">💾 Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: DELETE ═══ -->
+<div id="modal-delete" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header"><div class="card-icon red">🗑️</div><h3>Delete Member Record</h3><button class="modal-close" onclick="Modal.close('modal-delete')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="del-id">
+      <div style="background:var(--ndc-red-pale);border:1px solid var(--ndc-red);border-radius:var(--radius);padding:14px;margin-bottom:16px">⚠️ Permanently deleting: <strong id="del-name"></strong>. This action cannot be undone.</div>
+      <div class="form-group"><label>Reason <span class="required">*</span></label><textarea id="del-reason" rows="3" placeholder="Required: explain why this record is being deleted…"></textarea></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="Modal.close('modal-delete')">Cancel</button><button class="btn btn-danger" onclick="PageRenderers.submitDelete()">🗑️ Confirm Delete</button></div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: ADD/EDIT USER ═══ -->
+<div id="modal-user" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header"><div class="card-icon">👤</div><h3 id="user-modal-title">Add New User</h3><button class="modal-close" onclick="Modal.close('modal-user')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-user-id">
+      <div class="form-grid" id="user-form">
+        <div class="form-group full-width"><label>Full Name <span class="required">*</span></label><input type="text" id="u-name" placeholder="e.g. Kofi Mensah"></div>
+        <div class="form-group"><label>Username <span class="required">*</span></label><input type="text" id="u-username"></div>
+        <div class="form-group"><label>Password <span class="required">*</span></label><input type="text" id="u-password"></div>
+        <div class="form-group"><label>Role <span class="required">*</span></label>
+          <select id="u-role"><option value="officer">Data Entry Officer</option><option value="ward">Ward Coordinator</option><option value="exec">Constituency Executive</option><option value="admin">System Administrator</option></select>
+        </div>
+        <div class="form-group"><label>Ward</label><input type="text" id="u-ward"></div>
+        <div class="form-group"><label>Primary Station Code</label><input type="text" id="u-station" placeholder="e.g. PS-001"></div>
+        <div class="form-group full-width"><label>Branch</label><input type="text" id="u-branch"><span class="input-hint">For Data Entry Officers, use 📍 Assign to set stations via checkboxes.</span></div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="Modal.close('modal-user')">Cancel</button><button class="btn btn-primary" onclick="PageRenderers.submitUser()">💾 Save User</button></div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: ASSIGN STATIONS ═══ -->
+<div id="modal-assign" class="modal-overlay">
+  <div class="modal" style="max-width:720px">
+    <div class="modal-header"><div class="card-icon">📍</div><h3>Assign Polling Stations</h3><button class="modal-close" onclick="Modal.close('modal-assign')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="assign-user-id">
+      <div style="background:var(--ndc-green-pale);border:1px solid var(--ndc-green-lt);border-radius:var(--radius);padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;gap:12px">
+        <div style="font-size:28px">👤</div>
+        <div><div style="font-weight:700;color:var(--ndc-green-dk)" id="assign-user-name">—</div><div style="font-size:12px;color:var(--gray-500)" id="assign-user-role">—</div></div>
+        <div style="flex:1"></div>
+        <div style="font-size:12px;color:var(--gray-500);text-align:right">✅ Check ward to select all, or pick individual stations.</div>
+      </div>
+      <div style="max-height:420px;overflow-y:auto" id="assign-stations-container"></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="Modal.close('modal-assign')">Cancel</button><button class="btn btn-primary" onclick="PageRenderers.submitAssignment()">💾 Save Assignment</button></div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: CHANGE PASSWORD (first login) ═══ -->
+<div id="modal-change-password" class="modal-overlay">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header" style="background:linear-gradient(to right,var(--ndc-green-pale),transparent)">
+      <div class="card-icon">🔑</div>
+      <h3>Set Your New Password</h3>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--ndc-green-pale);border-radius:var(--radius);padding:12px 16px;margin-bottom:18px;font-size:13px;color:var(--ndc-green-dk)">
+        🔐 This is your first login. You must set a personal password before continuing.
+      </div>
+      <div class="form-grid">
+        <div class="form-group full-width">
+          <label>New Password <span class="required">*</span></label>
+          <input type="password" id="new-pwd" placeholder="Enter a strong password">
+        </div>
+        <div class="form-group full-width">
+          <label>Confirm Password <span class="required">*</span></label>
+          <input type="password" id="new-pwd-confirm" placeholder="Repeat your new password">
+        </div>
+      </div>
+      <div id="pwd-strength-msg" style="font-size:12px;margin-top:8px;color:var(--gray-400)"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary btn-lg" style="width:100%" onclick="submitPasswordChange()">🔑 Set Password & Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: DEMO DATA CLEAR ═══ -->
+<div id="modal-demo-clear" class="modal-overlay">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header" style="background:linear-gradient(to right,var(--ndc-red-pale),transparent)">
+      <div class="card-icon red">🗑️</div>
+      <h3>Clear Demo Data</h3>
+      <button class="modal-close" onclick="Modal.close('modal-demo-clear')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--ndc-red-pale);border:1px solid var(--ndc-red);border-radius:var(--radius);padding:16px;margin-bottom:16px">
+        <div style="font-weight:700;color:var(--ndc-red-dk);margin-bottom:6px">⚠️ This action cannot be undone</div>
+        <p style="font-size:13px;color:var(--ndc-red-dk)">This will permanently remove all <strong>sample/demo member records</strong> from the database. Any records you have entered yourself will be kept.</p>
+      </div>
+      <p style="font-size:13px;color:var(--gray-600)">This is recommended before going live. Users, settings and polling stations are not affected.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('modal-demo-clear')">Cancel — Keep Demo Data</button>
+      <button class="btn btn-danger" onclick="App.clearDemoData();Modal.close('modal-demo-clear');PageRenderers.dashboard()">🗑️ Yes, Remove Demo Data</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app_v3.js"></script>
+<script src="js/pages_v3.js"></script>
+<script src="js/app_v3.js"></script>
+<script src="js/pages_v3.js"></script>
+<script>
+// ── CONFIG ────────────────────────────────────────────────────
+const CONFIG = {
+  VERSION:      '3.0.0',
+  APP_NAME:     'KNNDCmdb',
+  CONSTITUENCY: 'Ketu North',
+  SCRIPT_URL:   '',     // set via Quick Connect or Settings
+};
+
+// ── TOAST ─────────────────────────────────────────────────────
+const Toast = {
+  show(title, msg, type='info', duration=4000) {
+    const c=document.getElementById('toast-container'); if(!c) return;
+    const t=document.createElement('div'); t.className=`toast toast-${type}`;
+    t.innerHTML=`<div class="toast-title">${title}</div>${msg?`<div class="toast-msg">${msg}</div>`:''}`;
+    c.appendChild(t); setTimeout(()=>t.classList.add('show'),10);
+    setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),300); }, duration);
+  }
+};
+window._showToast = (msg, type) => Toast.show(msg, '', type);
+
+// ── MODAL ─────────────────────────────────────────────────────
+const Modal = {
+  open(id)  { const m=document.getElementById(id); if(m){m.classList.add('open');document.body.style.overflow='hidden';} },
+  close(id) { const m=document.getElementById(id); if(m){m.classList.remove('open');document.body.style.overflow='';} }
+};
+document.addEventListener('keydown', e => { if(e.key==='Escape') document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open')); });
+
+// ── NAVIGATION ────────────────────────────────────────────────
+function navigateTo(page) {
+  window._currentPage = page;
+  document.querySelectorAll('.page').forEach(p => p.style.display='none');
+  const target = document.getElementById('page-'+page);
+  if (target) target.style.display='block';
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.toggle('active', l.dataset.page===page));
+  if (typeof PageRenderers[page] === 'function') PageRenderers[page]();
+  window.scrollTo(0,0);
+}
+
+function _renderNav() {
+  const u = App.getCurrentUser() || App.currentUser;
+  if (!u) return;
+  const pages = App.ROLE_PAGES[u.role] || [];
+  const labels = { dashboard:'🏠 Dashboard', entry:'✍️ Data Entry', 'my-records':'📋 My Records', records:'📊 All Records', reports:'📄 Reports', analytics:'📈 Analytics', audit:'🛡️ Audit Log', users:'👥 Users', settings:'⚙️ Settings' };
+  const nav = document.getElementById('main-nav');
+  const icons = { dashboard:'🏠', entry:'✍️', 'my-records':'📋', records:'📊', reports:'📄', analytics:'📈', audit:'🛡️', users:'👥', settings:'⚙️' };
+  const short = { dashboard:'Home', entry:'Entry', 'my-records':'Mine', records:'Records', reports:'Reports', analytics:'Stats', audit:'Audit', users:'Users', settings:'Settings' };
+  if (nav) nav.innerHTML = pages.map(p => `<a class="nav-link${window._currentPage===p?' active':''}" href="#" data-page="${p}" onclick="navigateTo('${p}');return false" title="${labels[p]||p}"><span class="nav-icon">${icons[p]||'📄'}</span><span class="nav-text">${short[p]||p}</span></a>`).join('');
+}
+
+function _renderHeader() {
+  const u = App.getCurrentUser() || App.currentUser;
+  if (!u) return;
+  const av = document.getElementById('user-avatar');
+  const nm = document.getElementById('user-name-hdr');
+  const rl = document.getElementById('user-role-hdr');
+  if (av) av.textContent = u.name.split(' ').map(n=>n[0]).slice(0,2).join('');
+  if (nm) nm.textContent = u.name;
+  if (rl) rl.textContent = { officer:'Data Entry Officer', ward:'Ward Coordinator', exec:'Constituency Executive', admin:'System Administrator' }[u.role] || u.role;
+}
+
+// Wire up the stubs in app.js
+window._renderNav    = _renderNav;
+window._renderHeader = _renderHeader;
+
+// ── PASSWORD TOGGLE ───────────────────────────────────────────
+function togglePassword() {
+  const p=document.getElementById('login-password'), c=document.getElementById('show-pwd-check');
+  const show=p.type==='password'; p.type=show?'text':'password'; if(c) c.checked=show;
+}
+
+// ── LOCKOUT COUNTDOWN ─────────────────────────────────────────
+let _lockTimer = null;
+function startLockoutCountdown(seconds) {
+  const banner=document.getElementById('lockout-banner'), timer=document.getElementById('lockout-timer');
+  const btn=document.getElementById('login-btn'), aw=document.getElementById('attempt-warning');
+  if(banner) banner.style.display='block'; if(aw) aw.style.display='none';
+  if(btn){btn.disabled=true;btn.textContent='🔒 Locked';}
+  let rem=seconds;
+  if(_lockTimer) clearInterval(_lockTimer);
+  _lockTimer=setInterval(()=>{
+    rem--;
+    const m=Math.floor(rem/60),s=rem%60;
+    if(timer) timer.textContent=`${m}:${String(s).padStart(2,'0')}`;
+    if(rem<=0){clearInterval(_lockTimer);if(banner)banner.style.display='none';if(btn){btn.disabled=false;btn.textContent='🔐 Sign In';}}
+  },1000);
+}
+
+// ── LOGIN ─────────────────────────────────────────────────────
+async function doLogin() {
+  const u=document.getElementById('login-username').value.trim();
+  const p=document.getElementById('login-password').value;
+  if(!u||!p){Toast.show('Error','Please enter username and password.','error');return;}
+  if(App.isLockedOut()){Toast.show('Locked','Account locked. Please wait.','error');return;}
+  const btn=document.getElementById('login-btn');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Signing in…';}
+  const result = await App.login(u,p);
+  if(btn){btn.disabled=false;btn.textContent='🔐 Sign In';}
+
+  if(result.success) {
+    document.getElementById('attempt-warning').style.display='none';
+    document.getElementById('lockout-banner').style.display='none';
+    if(_lockTimer) clearInterval(_lockTimer);
+    App.clearLockout();
+    App._logAuditPublic('LOGIN', `User logged in: ${u}`, u);
+
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app-shell').style.display='flex';
+    document.getElementById('app-shell').style.flexDirection='column';
+    _renderNav();
+    _renderHeader();
+
+    if(result.user?.mustChangePassword || result.user?.must_change_password) {
+      Modal.open('modal-change-password');
+    } else {
+      setTimeout(()=>{
+        navigateTo('dashboard');
+        const syncBanner = document.getElementById('user-sync-banner');
+        if(syncBanner) { syncBanner.style.display='block'; syncBanner.textContent='🔄 Loading your records…'; }
+        App.syncAfterLogin().then(ok=>{
+          if(syncBanner) syncBanner.style.display='none';
+          if(window._currentPage==='dashboard') PageRenderers.dashboard();
+          else if(window._currentPage==='records') PageRenderers.records();
+        });
+        App.startSyncTimer();
+      }, 50);
+    }
+  } else {
+    const remaining = App.recordFailedAttempt();
+    if(remaining<=0) {
+      startLockoutCountdown(15*60);
+      Toast.show('Locked',`Too many failed attempts. Wait 15 minutes.`,'error',6000);
+    } else {
+      const w=document.getElementById('attempt-warning'), al=document.getElementById('attempts-left');
+      if(w) w.style.display='block'; if(al) al.textContent=remaining;
+      Toast.show('Login Failed',`${result.error||'Invalid credentials'}. ${remaining} attempt(s) left.`,'error');
+      document.getElementById('login-password').value='';
+      document.getElementById('login-password').focus();
+    }
+  }
+}
+
+// ── CHANGE PASSWORD (first login) ────────────────────────────
+async function submitPasswordChange() {
+  const np=document.getElementById('new-pwd').value;
+  const nc=document.getElementById('new-pwd-confirm').value;
+  const msg=document.getElementById('pwd-strength-msg');
+  if(!np||np.length<6){if(msg){msg.textContent='⚠️ Password must be at least 6 characters.';msg.style.color='var(--ndc-red)';}return;}
+  if(np!==nc){if(msg){msg.textContent='⚠️ Passwords do not match.';msg.style.color='var(--ndc-red)';}return;}
+  const u = App.getCurrentUser() || App.currentUser;
+  const result = await App.changePassword('', np);
+  Modal.close('modal-change-password');
+  Toast.show('Password Set','Your password has been updated.','success');
+  App._logAuditPublic('PASSWORD_CHANGE','User set new password on first login', u?.username);
+  setTimeout(()=>{
+    navigateTo('dashboard');
+    App.syncAfterLogin();
+    App.startSyncTimer();
+  }, 50);
+}
+
+// ── LOGOUT ────────────────────────────────────────────────────
+const _origLogout = App.logout.bind(App);
+App.logout = function() {
+  const u = App.getCurrentUser() || App.currentUser;
+  App._logAuditPublic('LOGOUT', 'User logged out', u?.username);
+  App.stopSyncTimer();
+  _origLogout();
+  document.getElementById('app-shell').style.display='none';
+  document.getElementById('login-screen').style.display='';
+  document.getElementById('login-password').value='';
+  window._currentPage = 'dashboard';
+};
+
+// ── QUICK CONNECT ─────────────────────────────────────────────
+async function quickConnect() {
+  const input  = document.getElementById('qc-script-url');
+  const btn    = document.getElementById('qc-connect-btn');
+  const status = document.getElementById('qc-status');
+  const url    = input?.value.trim();
+  if(!url||!url.startsWith('https://')){if(status)status.textContent='⚠️ Please paste a valid API URL.';return;}
+  btn.disabled=true; btn.textContent='⏳ Connecting…';
+  if(status) status.textContent='Fetching settings, accounts and stations…';
+  // Save the URL first so apiGet uses it
+  App.saveSettings({scriptUrl:url});
+  try {
+    const [settingsRes, usersRes, stationsRes] = await Promise.allSettled([
+      App.apiGet('/settings'),
+      App.apiGet('/users'),
+      App.apiGet('/stations'),
+    ]);
+    // Apply settings
+    if(settingsRes.status==='fulfilled'&&settingsRes.value?.settings) {
+      const s=settingsRes.value.settings;
+      App.saveSettings({appName:s.appName||'KNNDCmdb', constituency:s.constituency||'Ketu North'});
+    }
+    // Apply users
+    if(usersRes.status==='fulfilled'&&usersRes.value?.users?.length) {
+      localStorage.setItem('knndc_users', JSON.stringify(usersRes.value.users));
+    }
+    // Apply stations
+    if(stationsRes.status==='fulfilled'&&stationsRes.value?.stations?.length) {
+      const ps = stationsRes.value.stations.map(s=>({
+        code:s.code, zone:s.zone, ward:s.ward, name:s.name,
+        branch:s.branch, branchCode:s.branch_code||s.branchCode
+      }));
+      App.saveSettings({pollingStations:ps});
+    }
+    document.getElementById('quick-connect-panel').style.display='none';
+    const parts=[];
+    if(usersRes.value?.users?.length)       parts.push(`${usersRes.value.users.length} account(s)`);
+    if(stationsRes.value?.stations?.length) parts.push(`${stationsRes.value.stations.length} station(s)`);
+    Toast.show('Connected ✅',`${parts.join(', ')} loaded. You can now sign in.`,'success',7000);
+    const subtitle=document.querySelector('.login-subtitle');
+    if(subtitle) subtitle.textContent='✅ Connected — please sign in';
+  } catch(e) {
+    Toast.show('Connect Failed','Could not reach the API. Check the URL.','error');
+    App.saveSettings({scriptUrl:''});
+  } finally {
+    btn.disabled=false; btn.textContent='✅ Connect';
+  }
+}
+
+// ── SYNC STATIONS FROM API ────────────────────────────────────
+async function syncStationsFromApi() {
+  if(!App.getApiBase()){Toast.show('No API URL','Please configure the API URL in Settings first.','error');return;}
+  Toast.show('Importing…','Fetching polling stations from API.','info');
+  try {
+    const data = await App.apiGet('/stations');
+    if(!data?.stations?.length){Toast.show('No Stations Found','The API returned no polling stations.','warning');return;}
+    const ps = data.stations.map(s=>({
+      code:s.code, zone:s.zone, ward:s.ward, name:s.name,
+      branch:s.branch, branchCode:s.branch_code||s.branchCode
+    }));
+    App.saveSettings({pollingStations:ps});
+    PageRenderers._renderStationsList();
+    const sc=document.getElementById('station-count'); if(sc) sc.textContent=ps.length;
+    Toast.show('Stations Imported',`${ps.length} polling station(s) loaded from API.`,'success');
+    App._logAuditPublic('SYNC_STATIONS',`Imported ${ps.length} stations from API`,(App.getCurrentUser()||App.currentUser)?.username);
+  } catch(e) {
+    Toast.show('Sync Failed','Could not reach the API.','error');
+  }
+}
+
+// ── SETTINGS TAB SWITCHER ─────────────────────────────────────
+function setTab(el, tabId) {
+  document.querySelectorAll('.settings-nav-item').forEach(i=>i.classList.remove('active'));
+  document.querySelectorAll('.settings-tab').forEach(t=>t.style.display='none');
+  el.classList.add('active'); document.getElementById(tabId).style.display='block';
+}
+
+// ── EMERGENCY RESET ───────────────────────────────────────────
+function emergencyReset() {
+  if(!confirm('This will clear cached user accounts on THIS device.\n\nAfter resetting, log in with:\n  Username: admin\n  Password: admin123\n\nMember records and settings are NOT affected.\n\nContinue?')) return;
+  localStorage.removeItem('knndc_users');
+  localStorage.removeItem('knndc_lockout');
+  localStorage.removeItem('knndc_session');
+  localStorage.removeItem('knndc_jwt');
+  document.getElementById('attempt-warning').style.display='none';
+  document.getElementById('lockout-banner').style.display='none';
+  const btn=document.getElementById('login-btn');
+  if(btn){btn.disabled=false;btn.textContent='🔐 Sign In';}
+  document.getElementById('login-username').value='admin';
+  document.getElementById('login-password').value='';
+  document.getElementById('login-password').focus();
+  Toast.show('Reset Complete','Local user cache cleared. Log in with admin / your password.','success',6000);
+}
+
+// ── ONLINE STATUS ─────────────────────────────────────────────
+function _updateConnStatus() {
+  const dot=document.getElementById('conn-dot');
+  if(dot) dot.className='online-dot'+(navigator.onLine?'':' offline');
+}
+window.addEventListener('online',  _updateConnStatus);
+window.addEventListener('offline', _updateConnStatus);
+
+// ── INITIALISE ────────────────────────────────────────────────
+document.getElementById('current-date').textContent=new Date().toLocaleDateString('en-GH',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+// Check lockout on page load
+(()=>{const l=JSON.parse(localStorage.getItem('knndc_lockout')||'null');if(l&&l.until){const r=Math.ceil((l.until-Date.now())/1000);if(r>0)startLockoutCountdown(r);}})();
+
+// ── Auto cache-clear on version change ───────────────────────
+// If the app version stored in localStorage doesn't match the
+// current version, wipe stale cached users and session so all
+// devices always load fresh data after an update.
+(()=>{
+  const CURRENT = '3.2.4';
+  const stored  = localStorage.getItem('knndc_app_version');
+  if (stored !== CURRENT) {
+    localStorage.removeItem('knndc_users');
+    // NOTE: knndc_session and knndc_jwt are intentionally NOT cleared here
+    // so users stay logged in across version updates
+    localStorage.removeItem('knndc_lockout');
+    sessionStorage.clear();
+    localStorage.setItem('knndc_app_version', CURRENT);
+  }
+})();
+
+App.init();
+_updateConnStatus();
+
+// ── Restore session on page refresh ──────────────────────────
+// If a valid session exists in localStorage, skip login screen
+(()=>{
+  if (App.restoreSession()) {
+    const u = App.getCurrentUser();
+    if (u) {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app-shell').style.display    = 'flex';
+      document.getElementById('app-shell').style.flexDirection = 'column';
+      _renderNav();
+      _renderHeader();
+      setTimeout(()=>{
+        navigateTo('dashboard');
+        App.syncAfterLogin().then(()=>{
+          if(window._currentPage==='dashboard') PageRenderers.dashboard();
+        });
+        App.startSyncTimer();
+      }, 50);
+    }
+  }
+})();
+
+// Auto-configure API URL from server — users never need to type it
+// Quick Connect panel only shown if auto-config fails
+(async ()=>{
+  const hasUrl=(JSON.parse(localStorage.getItem('knndc_settings')||'{}').scriptUrl)||'';
+  if(!hasUrl) {
+    await App.fetchApiConfig();
+  }
+  const stillNoUrl=(JSON.parse(localStorage.getItem('knndc_settings')||'{}').scriptUrl)||'';
+  const panel=document.getElementById('quick-connect-panel');
+  if(!stillNoUrl&&panel) panel.style.display='block';
+})();
+
+// Pre-login: pull settings + stations from API (unauthenticated endpoints only)
+(async function prefetchOnLoad() {
+  const apiUrl = JSON.parse(localStorage.getItem('knndc_settings')||'{}').scriptUrl || '';
+  if(!apiUrl||!navigator.onLine) return;
+  const banner=document.getElementById('user-sync-banner');
+  const hasLocalUsers=localStorage.getItem('knndc_users')&&JSON.parse(localStorage.getItem('knndc_users')).length>0;
+  if(!hasLocalUsers&&banner) banner.style.display='block';
+  try {
+    const [settingsRes, stationsRes] = await Promise.allSettled([
+      App.apiGet('/settings'),
+      App.apiGet('/stations'),
+    ]);
+    if(settingsRes.status==='fulfilled'&&settingsRes.value?.settings) {
+      const s=settingsRes.value.settings;
+      const stored=JSON.parse(localStorage.getItem('knndc_settings')||'{}');
+      if(s.appName)      stored.appName=s.appName;
+      if(s.constituency) stored.constituency=s.constituency;
+      localStorage.setItem('knndc_settings',JSON.stringify(stored));
+    }
+    if(stationsRes.status==='fulfilled'&&stationsRes.value?.stations?.length) {
+      const ps=stationsRes.value.stations.map(s=>({
+        code:s.code, zone:s.zone, ward:s.ward, name:s.name,
+        branch:s.branch, branchCode:s.branch_code||s.branchCode
+      }));
+      App.saveSettings({pollingStations:ps});
+    }
+  } catch {}
+  if(banner) banner.style.display='none';
+  if(!hasLocalUsers) {
+    const subtitle=document.querySelector('.login-subtitle');
+    if(subtitle) subtitle.textContent='🔄 Please sign in with your credentials';
+  }
+})();
+
+// Periodic dashboard refresh
+setInterval(()=>{ if((App.getCurrentUser()||App.currentUser)&&window._currentPage==='dashboard') PageRenderers.dashboard(); }, 30000);
+</script>
+</body>
+</html>
