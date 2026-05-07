@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Page Renderers  v3.0.9
+   KNNDCmdb – Page Renderers  v3.1.4
    MySQL REST API backend edition
    ============================================================ */
 
@@ -110,7 +110,7 @@ var PageRenderers = {
 
     setTimeout(() => {
       this._drawBarChart('dash-chart', s.byDay);
-      this._drawGenderDonut('dash-gender-chart', s.byGender);
+      this._drawGenderDonut('dash-gender-chart', s.byGender, s.total);
       this._drawZoneBar('dash-zone-chart', s.byZone, s.total);
     }, 100);
   },
@@ -188,15 +188,22 @@ var PageRenderers = {
     });
   },
 
-  _drawGenderDonut(canvasId, byGender) {
+  _drawGenderDonut(canvasId, byGender, grandTotal) {
     const canvas = document.getElementById(canvasId); if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const W = canvas.width = canvas.offsetWidth || 220, H = canvas.height = 180;
     ctx.clearRect(0, 0, W, H);
-    const male = byGender?.Male || 0, female = byGender?.Female || 0, total = male + female;
+    const male   = byGender?.Male   || 0;
+    const female = byGender?.Female || 0;
+    const other  = (grandTotal || 0) - male - female; // unclassified
+    const total  = grandTotal || (male + female);
     if (!total) { ctx.fillStyle = '#e5e7eb'; ctx.beginPath(); ctx.arc(W / 2, H / 2, 60, 0, Math.PI * 2); ctx.fill(); return; }
     const cx = W / 2, cy = H / 2, r = Math.min(cx, cy) - 15;
-    const slices = [{ val: male, color: '#1a6b3a' }, { val: female, color: '#c8102e' }];
+    const slices = [
+      { val: male,   color: '#1a6b3a' },
+      { val: female, color: '#c8102e' },
+      { val: other > 0 ? other : 0, color: '#9ca3af' }, // grey for unclassified
+    ].filter(s => s.val > 0);
     let angle = -Math.PI / 2;
     slices.forEach(s => {
       const slice = (s.val / total) * Math.PI * 2;
@@ -205,7 +212,7 @@ var PageRenderers = {
     });
     ctx.beginPath(); ctx.arc(cx, cy, r * .55, 0, Math.PI * 2); ctx.fillStyle = 'white'; ctx.fill();
     ctx.fillStyle = '#1f2937'; ctx.font = 'bold 16px Outfit'; ctx.textAlign = 'center';
-    ctx.fillText(total, cx, cy + 4);
+    ctx.fillText(total.toLocaleString(), cx, cy + 4);
     ctx.fillStyle = '#6b7280'; ctx.font = '9px Inter'; ctx.fillText('Total', cx, cy + 16);
   },
 
@@ -846,7 +853,7 @@ var PageRenderers = {
     const female = members.filter(m => m.gender === 'Female').length;
     document.getElementById('rep-male-count').textContent   = male;
     document.getElementById('rep-female-count').textContent = female;
-    setTimeout(() => { this._drawPieChart(byStation, members.length); this._drawGenderDonut('rep-gender-chart', { Male:male, Female:female }); }, 100);
+    setTimeout(() => { this._drawPieChart(byStation, members.length); this._drawGenderDonut('rep-gender-chart', { Male:male, Female:female }, members.length); }, 100);
   },
 
   _drawPieChart(byStation, total) {
@@ -974,7 +981,7 @@ var PageRenderers = {
     this._renderZoneList('ana-zone-list', byZone, members.length);
     setTimeout(() => {
       this._drawBarChart('ana-chart', byDay);
-      this._drawGenderDonut('ana-gender-chart', { Male:male, Female:female });
+      this._drawGenderDonut('ana-gender-chart', { Male:male, Female:female }, members.length);
       this._drawZoneBar('ana-zone-chart', byZone, members.length);
       this._drawPieChart(byStation, members.length);
     }, 100);
