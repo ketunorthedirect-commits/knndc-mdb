@@ -1083,6 +1083,7 @@ var PageRenderers = {
             <button class="btn btn-sm btn-outline"   onclick="PageRenderers.resetPassword('${u.id}')" title="Reset password">🔑</button>
             ${(u.role==='officer'||u.role==='ward')?`<button class="btn btn-sm btn-secondary" style="border-color:var(--ndc-green);color:var(--ndc-green)" onclick="PageRenderers.openAssignModal('${u.id}')" title="Assign stations">📍</button>`:''}
             <button class="btn btn-sm btn-danger" onclick="PageRenderers.toggleUser('${u.id}')" title="${u.active?'Disable':'Enable'}">${u.active?'🚫':'✅'}</button>
+            <button class="btn btn-sm btn-danger" onclick="PageRenderers.confirmDeleteUser('${u.id}')" title="Delete user permanently" style="background:#7f1d1d">🗑️</button>
           </div>
         </td>
       </tr>`).join('');
@@ -1162,6 +1163,18 @@ var PageRenderers = {
     App._logAuditPublic(u.active?'ENABLE_USER':'DISABLE_USER', `${u.active?'Enabled':'Disabled'}: ${u.username}`, cu?.username);
     Toast.show('Status Updated', `${u.name} is now ${u.active?'active':'inactive'}.`, u.active?'success':'warning');
     PageRenderers.users();
+  },
+
+  confirmDeleteUser(id) {
+    const cu = App.getCurrentUser() || App.currentUser;
+    if (cu?.id === id) { Toast.show('Cannot Delete', 'You cannot delete your own account.', 'error'); return; }
+    const u = (App.getUsers()||[]).find(x => x.id === id); if (!u) return;
+    if (!confirm(`Permanently delete user:\n"${u.name}" (${u.username} / ${u.role})\n\nThis cannot be undone. All their audit entries will be preserved.\n\nContinue?`)) return;
+    App.deleteUser(id).then(() => {
+      App._logAuditPublic('DELETE_USER', `Permanently deleted user: ${u.username} (${u.role})`, cu?.username);
+      Toast.show('User Deleted', `${u.name} has been permanently removed.`, 'error', 5000);
+      PageRenderers.users();
+    });
   },
 
   openAssignModal(userId) {
