@@ -996,12 +996,27 @@ var PageRenderers = {
       this._drawZoneBar('ana-zone-chart', byZone, members.length);
       this._drawPieChart(byStation, members.length);
     }, 100);
+    // Build officer map: key=officer username, value={name, count}
     const byOfficer = {};
-    members.forEach(m => { byOfficer[m.officer] = (byOfficer[m.officer]||0) + 1; });
-    const top = Object.entries(byOfficer).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    members.forEach(m => {
+      const key  = m.officer || m.officerName || m.officer_name || '—';
+      const name = m.officerName || m.officer_name || m.officer || '—';
+      if (!byOfficer[key]) byOfficer[key] = { name, count: 0 };
+      byOfficer[key].count++;
+      // Update name if we find a better one (officer_name preferred over username)
+      if ((m.officerName || m.officer_name) && byOfficer[key].name === m.officer) {
+        byOfficer[key].name = m.officerName || m.officer_name;
+      }
+    });
+    const top = Object.values(byOfficer).sort((a,b) => b.count - a.count).slice(0, 8);
     const t = document.getElementById('ana-officers-tbody');
     if (t) t.innerHTML = top.length
-      ? top.map(([name,count]) => `<tr><td>${name}</td><td>${count}</td><td><div class="progress-bar"><div class="progress-fill" style="width:${members.length?Math.round(count/members.length*100):0}%"></div></div></td><td>${members.length?Math.round(count/members.length*100):0}%</td></tr>`).join('')
+      ? top.map(o => `<tr>
+          <td>${o.name}</td>
+          <td>${o.count}</td>
+          <td><div class="progress-bar"><div class="progress-fill" style="width:${members.length?Math.round(o.count/members.length*100):0}%"></div></div></td>
+          <td>${members.length?Math.round(o.count/members.length*100):0}%</td>
+        </tr>`).join('')
       : '<tr><td colspan="4" style="text-align:center">No data</td></tr>';
   },
 
