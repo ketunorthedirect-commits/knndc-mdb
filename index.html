@@ -60,7 +60,7 @@
     .header-logo { width: 36px !important; height: 36px !important; object-fit: contain !important; }
     @media (max-width: 768px) {
       .login-logo { width: 70px !important; max-width: 70px !important; }
-      .login-title, .app-title-text { text-align: center !important; font-size: 16px !important; }
+      .login-title { text-align: center !important; font-size: clamp(15px,4vw,20px) !important; white-space: normal !important; word-wrap: break-word !important; line-height: 1.3 !important; padding: 0 4px !important; }
       .login-card { text-align: center !important; }
       .login-logo-wrap { margin-bottom: 12px !important; }
       .header-logo { width: 28px !important; height: 28px !important; }
@@ -78,7 +78,7 @@
   <div class="login-card">
     <div class="login-logo-wrap" style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:16px">
       <img src="assets/ndc-logo.png" alt="NDC Logo" class="login-logo" style="width:100px;height:auto;max-width:100px">
-      <div class="login-title app-title-text" style="text-align:center;width:100%">Ketu North NDC Members Database</div>
+      <div class="login-title app-title-text" style="text-align:center;width:100%;white-space:normal;word-wrap:break-word;line-height:1.3;padding:0 8px;font-size:clamp(16px,4vw,24px)">Ketu North NDC Members Database</div>
       <div class="login-subtitle">KNNDCmdb · Constituency Members Portal</div>
     </div>
 
@@ -942,10 +942,10 @@
   </div>
 </div>
 
-<script src="js/app.js?v=3.1.6"></script>
-<script src="js/pages.js?v=3.1.6"></script>
-<script src="js/app.js?v=3.1.6"></script>
-<script src="js/pages.js?v=3.1.6"></script>
+<script src="js/app.js?v=3.1.7"></script>
+<script src="js/pages.js?v=3.1.7"></script>
+<script src="js/app.js?v=3.1.7"></script>
+<script src="js/pages.js?v=3.1.7"></script>
 <script>
 // ── CONFIG ────────────────────────────────────────────────────
 const CONFIG = {
@@ -1233,7 +1233,7 @@ document.getElementById('current-date').textContent=new Date().toLocaleDateStrin
 // current version, wipe stale cached users and session so all
 // devices always load fresh data after an update.
 (()=>{
-  const CURRENT = '3.1.6';
+  const CURRENT = '3.1.7';
   const stored  = localStorage.getItem('knndc_app_version');
   if (stored !== CURRENT) {
     localStorage.removeItem('knndc_users');
