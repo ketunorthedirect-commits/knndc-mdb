@@ -1,5 +1,5 @@
 // ============================================================
-// KNNDCmdb  app.js  v3.2.0
+// KNNDCmdb  app.js  v3.2.1
 // Elections & IT Directorate · Ketu North NDC · 2026
 //
 // Changes from v2.4.0 → v3.0:
@@ -17,7 +17,7 @@ var App = (() => {
   'use strict';
 
   // ── Version ───────────────────────────────────────────────
-  const VERSION = '3.2.0';
+  const VERSION = '3.2.1';
 
   // ── localStorage keys ─────────────────────────────────────
   const LS = {
@@ -418,9 +418,18 @@ var App = (() => {
     if (_membersCache === null) _membersCache = getMembers();
     const idx = _membersCache.findIndex(m => m.id === (updated.id || updated));
     const u   = typeof updated === 'string' ? { id: updated } : updated;
-    if (idx >= 0) { _membersCache[idx] = { ..._membersCache[idx], ...u }; }
-    saveMembers(_membersCache);
-    _pushMemberToApi(u, 'update');
+    if (idx >= 0) {
+      _membersCache[idx] = { ..._membersCache[idx], ...u };
+      saveMembers(_membersCache);
+      // Push the FULL merged record, not just the edited fields — addMember()
+      // always sends a complete record, and a partial payload here risks the
+      // API's upsert nulling out officer/officerName/timestamp/isoDate/_demo
+      // on every single-record edit if it isn't a strict partial UPDATE.
+      _pushMemberToApi(_membersCache[idx], 'update');
+    } else {
+      saveMembers(_membersCache);
+      _pushMemberToApi(u, 'update');
+    }
     _logAudit('UPDATE_MEMBER', `Updated ${u.firstName||''} ${u.lastName||''}`, u.id);
   }
 

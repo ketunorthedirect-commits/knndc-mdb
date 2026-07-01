@@ -1,5 +1,5 @@
 /* ============================================================
-   KNNDCmdb – Page Renderers  v3.1.4
+   KNNDCmdb – Page Renderers  v3.1.5
    MySQL REST API backend edition
    ============================================================ */
 
@@ -764,6 +764,18 @@ var PageRenderers = {
     const id     = document.getElementById('edit-id').value;
     const reason = document.getElementById('edit-reason').value.trim();
     if (!reason) { Toast.show('Reason Required', 'Please provide a reason for this change.', 'error'); return; }
+
+    // Required-field guard — mirrors submitEntry(). Without this, a blank
+    // First/Last Name silently overwrites the existing name on save.
+    const requiredEdit = ['edit-first', 'edit-last'];
+    let editOk = true;
+    requiredEdit.forEach(fid => {
+      const el = document.getElementById(fid);
+      if (el && !el.value.trim()) { el.style.borderColor = 'var(--ndc-red)'; editOk = false; }
+      else if (el) el.style.borderColor = '';
+    });
+    if (!editOk) { Toast.show('Validation Error', 'First Name and Last Name cannot be blank.', 'error'); return; }
+
     const g = fid => document.getElementById(fid)?.value.trim() || '';
     const updated = {
       firstName:   g('edit-first'),
